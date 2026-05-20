@@ -44,6 +44,7 @@ Hôm nay, ${today}, chúng tôi tiến hành tiếp nhận hồ sơ của:
 Thông tin liên hệ: ${selectedCase.contactInfo}
 
 Lĩnh vực: ${selectedCase.field}
+Khu phố: ${selectedCase.neighborhood || 'KP3'}
 Nội dung tóm tắt: ${selectedCase.summary}
 
 Tài liệu đã nhận:
@@ -87,6 +88,7 @@ Mã hồ sơ: ${selectedCase.caseId}
 
 Kính gửi: Bộ phận chuyên môn / Giám đốc
 Lĩnh vực: ${selectedCase.field}
+Khu phố: ${selectedCase.neighborhood || 'KP3'}
 Người gửi: ${selectedCase.senderName}
 Liên hệ: ${selectedCase.contactInfo}
 

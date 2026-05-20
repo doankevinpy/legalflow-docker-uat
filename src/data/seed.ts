@@ -11,6 +11,7 @@ const MOCK_CASES: Omit<LegalCase, 'id' | 'caseId' | 'checklist'>[] = [
     contactInfo: '0901234567 - nguyenvana@email.com',
     type: 'Khiếu nại',
     field: 'Đất đai',
+    neighborhood: 'KP1',
     summary: 'Khiếu nại về quyết định bồi thường giải phóng mặt bằng dự án khu dân cư.',
     status: 'Mới tiếp nhận',
     assignee: 'Trần Thị B',
@@ -26,6 +27,7 @@ const MOCK_CASES: Omit<LegalCase, 'id' | 'caseId' | 'checklist'>[] = [
     contactInfo: '0912345678',
     type: 'Tư vấn pháp lý',
     field: 'Doanh nghiệp',
+    neighborhood: 'Khác',
     summary: 'Tư vấn thủ tục chia tách doanh nghiệp Cổ phần.',
     status: 'Đang xử lý',
     assignee: 'Phạm Văn D',
@@ -42,6 +44,7 @@ const MOCK_CASES: Omit<LegalCase, 'id' | 'caseId' | 'checklist'>[] = [
     contactInfo: 'vuthie@email.com',
     type: 'Tố cáo',
     field: 'Lao động',
+    neighborhood: 'KP3',
     summary: 'Tố cáo công ty X không đóng BHXH cho người lao động trong 2 năm.',
     status: 'Cần bổ sung',
     assignee: 'Trần Thị B',
@@ -58,6 +61,7 @@ const MOCK_CASES: Omit<LegalCase, 'id' | 'caseId' | 'checklist'>[] = [
     contactInfo: '0987654321',
     type: 'Khác',
     field: 'Hôn nhân gia đình',
+    neighborhood: 'KP4',
     summary: 'Yêu cầu giải quyết ly hôn đơn phương có yếu tố nước ngoài.',
     status: 'Đã hoàn thành',
     assignee: 'Phạm Văn D',
@@ -72,7 +76,8 @@ const MOCK_CASES: Omit<LegalCase, 'id' | 'caseId' | 'checklist'>[] = [
 export const seedData = () => {
   const currentCases = storage.getCases();
   if (currentCases.length === 0) {
-    const seedCases: LegalCase[] = MOCK_CASES.map((data) => {
+    const seedCases: LegalCase[] = [];
+    MOCK_CASES.forEach((data) => {
       // Mock some check lists as checked
       const checklist = JSON.parse(JSON.stringify(defaultChecklists[data.field] || defaultChecklists['Khác']));
       if (data.status === 'Đã hoàn thành') {
@@ -81,12 +86,14 @@ export const seedData = () => {
         if (checklist[0]) checklist[0].checked = true;
       }
 
-      return {
+      const caseId = generateCaseId(data.type, data.neighborhood, data.receivedDate, seedCases);
+
+      seedCases.push({
         ...data,
         id: crypto.randomUUID(),
-        caseId: generateCaseId(),
+        caseId,
         checklist,
-      };
+      });
     });
     
     storage.saveCases(seedCases);

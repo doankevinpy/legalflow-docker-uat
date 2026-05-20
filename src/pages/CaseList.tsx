@@ -14,15 +14,18 @@ export default function CaseList() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [fieldFilter, setFieldFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>('all');
   const [deadlineFilter, setDeadlineFilter] = useState<string>('all');
 
   const filteredCases = cases.filter(c => {
     const matchesSearch = c.caseId.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           c.senderName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          c.summary.toLowerCase().includes(searchTerm.toLowerCase());
+                          c.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (c.neighborhood && c.neighborhood.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     const matchesField = fieldFilter === 'all' || c.field === fieldFilter;
     const matchesType = typeFilter === 'all' || c.type === typeFilter;
+    const matchesNeighborhood = neighborhoodFilter === 'all' || c.neighborhood === neighborhoodFilter;
     
     let matchesDeadline = true;
     if (deadlineFilter !== 'all') {
@@ -31,7 +34,7 @@ export default function CaseList() {
       else if (deadlineFilter === 'soon') matchesDeadline = dlStatus === 'soon';
     }
 
-    return matchesSearch && matchesStatus && matchesField && matchesType && matchesDeadline;
+    return matchesSearch && matchesStatus && matchesField && matchesType && matchesNeighborhood && matchesDeadline;
   });
 
   return (
@@ -98,6 +101,19 @@ export default function CaseList() {
             <option value="Khác">Khác</option>
           </select>
           <select
+            value={neighborhoodFilter}
+            onChange={(e) => setNeighborhoodFilter(e.target.value)}
+            className="bg-background border rounded-md text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">Tất cả khu phố</option>
+            <option value="KP1">KP1</option>
+            <option value="KP2">KP2</option>
+            <option value="KP3">KP3</option>
+            <option value="KP4">KP4</option>
+            <option value="KP5">KP5</option>
+            <option value="Khác">Khác</option>
+          </select>
+          <select
             value={deadlineFilter}
             onChange={(e) => setDeadlineFilter(e.target.value)}
             className="bg-background border rounded-md text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary"
@@ -117,6 +133,7 @@ export default function CaseList() {
                 <th className="px-6 py-4 font-medium">Mã hồ sơ</th>
                 <th className="px-6 py-4 font-medium">Người gửi</th>
                 <th className="px-6 py-4 font-medium">Lĩnh vực</th>
+                <th className="px-6 py-4 font-medium">Khu phố</th>
                 <th className="px-6 py-4 font-medium">Ngày tiếp nhận</th>
                 <th className="px-6 py-4 font-medium">Trạng thái</th>
                 <th className="px-6 py-4 text-right font-medium">Thao tác</th>
@@ -141,6 +158,7 @@ export default function CaseList() {
                       <div className="text-xs text-muted-foreground">{c.contactInfo}</div>
                     </td>
                     <td className="px-6 py-4">{c.field}</td>
+                    <td className="px-6 py-4 font-medium text-muted-foreground">{c.neighborhood}</td>
                     <td className="px-6 py-4">
                       <div>{format(new Date(c.receivedDate), 'dd/MM/yyyy', { locale: vi })}</div>
                       {c.deadlineDate && (

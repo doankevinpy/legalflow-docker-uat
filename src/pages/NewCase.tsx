@@ -9,6 +9,7 @@ import { addDays, format } from 'date-fns';
 
 const CASE_TYPES: CaseType[] = ['Khiếu nại', 'Tố cáo', 'Kiến nghị', 'Phản ánh', 'Tư vấn pháp lý', 'Khác'];
 const CASE_FIELDS: CaseField[] = ['Đất đai', 'Dân sự', 'Lao động', 'Hôn nhân gia đình', 'Doanh nghiệp', 'Hành chính', 'Khác'];
+const NEIGHBORHOODS = ['KP1', 'KP2', 'KP3', 'KP4', 'KP5', 'Khác'];
 
 export default function NewCase() {
   const { addCase } = useCases();
@@ -19,6 +20,7 @@ export default function NewCase() {
     contactInfo: '',
     type: 'Tư vấn pháp lý' as CaseType,
     field: 'Dân sự' as CaseField,
+    neighborhood: 'KP3' as any,
     summary: '',
     assignee: 'Nhân viên (Local)',
     deadlineDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
@@ -33,6 +35,7 @@ export default function NewCase() {
       contactInfo: formData.contactInfo,
       type: formData.type,
       field: formData.field,
+      neighborhood: formData.neighborhood,
       summary: formData.summary,
       status: 'Mới tiếp nhận',
       assignee: formData.assignee,
@@ -103,6 +106,18 @@ export default function NewCase() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {CASE_FIELDS.map(field => <option key={field} value={field}>{field}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">Khu phố <span className="text-destructive">*</span></label>
+              <select
+                required
+                value={formData.neighborhood}
+                onChange={(e) => setFormData({...formData, neighborhood: e.target.value as any})}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {NEIGHBORHOODS.map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
 

@@ -160,6 +160,10 @@ export default function CaseDetail() {
                     <p className="font-medium text-base">{currentCase.field}</p>
                   </div>
                   <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Khu phố</h4>
+                    <p className="font-medium text-base">{currentCase.neighborhood || 'KP3'}</p>
+                  </div>
+                  <div>
                     <h4 className="text-sm font-medium text-muted-foreground mb-1">Người phụ trách</h4>
                     <p className="font-medium text-base">{currentCase.assignee}</p>
                   </div>

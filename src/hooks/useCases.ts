@@ -9,6 +9,7 @@ export function useCases() {
 
   // Load from storage initially
   useEffect(() => {
+    storage.migrateCaseIdsIfNeeded();
     setCases(storage.getCases());
   }, []);
 
@@ -18,7 +19,8 @@ export function useCases() {
 
   const addCase = useCallback((newCaseData: Omit<LegalCase, 'id' | 'caseId' | 'checklist' | 'logs'>) => {
     const id = crypto.randomUUID();
-    const caseId = generateCaseId();
+    const existingCases = storage.getCases();
+    const caseId = generateCaseId(newCaseData.type, newCaseData.neighborhood, newCaseData.receivedDate, existingCases);
     
     // Deep copy checklist to avoid referencing the default array directly
     const initialChecklist = JSON.parse(JSON.stringify(defaultChecklists[newCaseData.field] || defaultChecklists['Khác']));

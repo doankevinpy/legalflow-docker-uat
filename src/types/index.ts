@@ -15,6 +15,8 @@ export type CaseField =
   | 'Hành chính'
   | 'Khác';
 
+export type Neighborhood = 'KP1' | 'KP2' | 'KP3' | 'KP4' | 'KP5' | 'Khác';
+
 export type CaseStatus = 'Mới tiếp nhận' | 'Đang xử lý' | 'Cần bổ sung' | 'Đã hoàn thành' | 'Đóng';
 
 export interface ChecklistItem {
@@ -40,6 +42,7 @@ export interface LegalCase {
   contactInfo: string;
   type: CaseType;
   field: CaseField;
+  neighborhood: Neighborhood; // Thêm trường Khu phố
   summary: string;
   status: CaseStatus;
   assignee: string; // Người phụ trách
