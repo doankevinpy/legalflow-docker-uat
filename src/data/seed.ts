@@ -72,7 +72,7 @@ const MOCK_CASES: Omit<LegalCase, 'id' | 'caseId' | 'checklist'>[] = [
 export const seedData = () => {
   const currentCases = storage.getCases();
   if (currentCases.length === 0) {
-    const seedCases: LegalCase[] = MOCK_CASES.map((data, index) => {
+    const seedCases: LegalCase[] = MOCK_CASES.map((data) => {
       // Mock some check lists as checked
       const checklist = JSON.parse(JSON.stringify(defaultChecklists[data.field] || defaultChecklists['Khác']));
       if (data.status === 'Đã hoàn thành') {
@@ -84,7 +84,7 @@ export const seedData = () => {
       return {
         ...data,
         id: crypto.randomUUID(),
-        caseId: generateCaseId() + index, // Add index to ensure uniqueness for simultaneous generation
+        caseId: generateCaseId(),
         checklist,
       };
     });

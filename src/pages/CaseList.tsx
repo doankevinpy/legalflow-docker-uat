@@ -13,6 +13,7 @@ export default function CaseList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [fieldFilter, setFieldFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deadlineFilter, setDeadlineFilter] = useState<string>('all');
 
   const filteredCases = cases.filter(c => {
@@ -21,6 +22,7 @@ export default function CaseList() {
                           c.summary.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     const matchesField = fieldFilter === 'all' || c.field === fieldFilter;
+    const matchesType = typeFilter === 'all' || c.type === typeFilter;
     
     let matchesDeadline = true;
     if (deadlineFilter !== 'all') {
@@ -29,7 +31,7 @@ export default function CaseList() {
       else if (deadlineFilter === 'soon') matchesDeadline = dlStatus === 'soon';
     }
 
-    return matchesSearch && matchesStatus && matchesField && matchesDeadline;
+    return matchesSearch && matchesStatus && matchesField && matchesType && matchesDeadline;
   });
 
   return (
@@ -80,6 +82,19 @@ export default function CaseList() {
             <option value="Hôn nhân gia đình">Hôn nhân gia đình</option>
             <option value="Doanh nghiệp">Doanh nghiệp</option>
             <option value="Hành chính">Hành chính</option>
+            <option value="Khác">Khác</option>
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="bg-background border rounded-md text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">Tất cả loại đơn</option>
+            <option value="Khiếu nại">Khiếu nại</option>
+            <option value="Tố cáo">Tố cáo</option>
+            <option value="Kiến nghị">Kiến nghị</option>
+            <option value="Phản ánh">Phản ánh</option>
+            <option value="Tư vấn pháp lý">Tư vấn pháp lý</option>
             <option value="Khác">Khác</option>
           </select>
           <select

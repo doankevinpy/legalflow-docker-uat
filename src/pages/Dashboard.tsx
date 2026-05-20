@@ -15,6 +15,7 @@ export default function Dashboard() {
   const totalCases = cases.length;
   const newCases = cases.filter(c => c.status === 'Mới tiếp nhận').length;
   const processingCases = cases.filter(c => c.status === 'Đang xử lý').length;
+  const needsMoreInfoCases = cases.filter(c => c.status === 'Cần bổ sung').length;
 
 
   const overdueCases = cases.filter(c => getDeadlineStatus(c) === 'overdue');
@@ -26,6 +27,7 @@ export default function Dashboard() {
     { name: 'Tổng số hồ sơ', value: totalCases },
     { name: 'Mới tiếp nhận', value: newCases },
     { name: 'Đang xử lý', value: processingCases },
+    { name: 'Cần bổ sung', value: needsMoreInfoCases, isInfo: true },
     { name: 'Quá hạn xử lý', value: overdueCases.length, isWarning: true },
   ];
 
@@ -46,9 +48,9 @@ export default function Dashboard() {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat, i) => (
-          <div key={i} className={`rounded-xl border shadow-sm p-6 flex flex-col justify-between ${stat.isWarning && stat.value > 0 ? 'bg-red-50 dark:bg-red-950/20 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800' : 'bg-card text-card-foreground'}`}>
+          <div key={i} className={`rounded-xl border shadow-sm p-6 flex flex-col justify-between ${stat.isWarning && stat.value > 0 ? 'bg-red-50 dark:bg-red-950/20 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800' : stat.isInfo && stat.value > 0 ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-amber-200 dark:border-amber-800' : 'bg-card text-card-foreground'}`}>
             <h3 className="tracking-tight text-sm font-medium opacity-80">{stat.name}</h3>
             <div className="text-3xl font-bold mt-2">{stat.value}</div>
           </div>

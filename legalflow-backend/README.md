@@ -31,6 +31,16 @@
 $ npm install
 ```
 
+### Cấu hình môi trường
+
+```bash
+# Tạo file .env từ template
+$ cp .env.example .env
+
+# Mở .env và thay JWT_SECRET bằng chuỗi bí mật của bạn
+# Không commit file .env vào Git
+```
+
 ## Compile and run the project
 
 ```bash
