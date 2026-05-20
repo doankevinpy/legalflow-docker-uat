@@ -33,7 +33,9 @@ export function Sidebar({ onClose }: SidebarProps) {
       </div>
       <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = location.pathname.startsWith(item.href);
+          const isActive = item.href === '/cases' 
+            ? location.pathname === '/cases' 
+            : location.pathname.startsWith(item.href);
           return (
             <Link
               key={item.name}

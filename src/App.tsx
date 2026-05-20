@@ -11,6 +11,7 @@ import CaseDetail from './pages/CaseDetail';
 import Drafts from './pages/Drafts';
 import Settings from './pages/Settings';
 import Anonymizer from './pages/Anonymizer';
+import NotFound from './pages/NotFound';
 
 function App() {
   // Seed initial data
@@ -30,6 +31,7 @@ function App() {
           <Route path="/drafts" element={<Drafts />} />
           <Route path="/anonymizer" element={<Anonymizer />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
     </Router>

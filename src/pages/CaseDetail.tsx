@@ -33,8 +33,6 @@ export default function CaseDetail() {
     const note = window.prompt(`Nhập ghi chú cho việc chuyển trạng thái thành "${newStatus}" (tùy chọn):`);
     if (note !== null) {
       updateStatus(currentCase.id, newStatus, 'Nhân viên (Local)', note);
-    } else {
-      e.target.value = currentCase.status;
     }
   };
 

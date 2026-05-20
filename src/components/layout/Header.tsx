@@ -6,6 +6,8 @@ const routeNames: Record<string, string> = {
   '/cases': 'Danh sách hồ sơ',
   '/cases/new': 'Tạo hồ sơ mới',
   '/drafts': 'Dự thảo văn bản',
+  '/anonymizer': 'Công cụ Ẩn danh',
+  '/settings': 'Cài đặt',
 };
 
 interface HeaderProps {
@@ -46,7 +48,6 @@ export function Header({ onMenuClick }: HeaderProps) {
           >
             <span className="sr-only">Xem thông báo</span>
             <Bell className="h-6 w-6" aria-hidden="true" />
-            <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background" />
           </button>
         </div>
       </div>
