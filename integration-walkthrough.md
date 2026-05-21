@@ -137,7 +137,8 @@ Commit: `142361f – feat: integrate frontend with backend api phase 3`
 | 18 | MigrationPanel trong Settings | Vào `/settings` → thấy section Migration |
 
 ---
-## Lỗi nhỏ ghi nhận trong quá trình nghiệm thu (chưa sửa)
-- **POST /cases/:id/notes**: Backend trả về `CaseNote` object nhưng `casesApi.ts` định nghĩa kiểu trả về là `ApiCase`. Frontend `CaseDetail.tsx` không dùng object trả về mà gọi `load()` để lấy lại data từ backend nên giao diện không bị lỗi, nhưng type khai báo sai.
-- **POST /cases**: `checklist` khởi tạo rỗng ngay lúc tạo nhưng sẽ được populate khi lấy `GET /cases/:id`. (Backend tạo checklist trong cùng transaction nhưng có vẻ không trả về ngay trong create response).
+## Các cập nhật sau nghiệm thu (Fixes)
+Đã sửa 2 lỗi nhỏ được phát hiện trong quá trình nghiệm thu:
+- **POST /cases/:id/notes**: Đã sửa kiểu trả về trong `casesApi.ts` thành `ApiCaseNote` thay vì `ApiCase` để khớp hoàn toàn với backend.
+- **POST /cases**: Backend `cases.service.ts` đã được sửa để gọi `this.findOne()` sau khi tạo, giúp trả về object đầy đủ kèm theo checklist mặc định ngay lập tức.
 

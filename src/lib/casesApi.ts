@@ -5,6 +5,8 @@
 import { apiClient } from './apiClient';
 import type {
   ApiCase,
+  ApiCaseNote,
+  ApiChecklistItem,
   CaseStats,
   CreateCaseDto,
   PaginatedResponse,
@@ -59,9 +61,9 @@ export const casesApi = {
 
   /** POST /cases/:id/notes */
   addNote: (id: string, content: string) =>
-    apiClient.post<ApiCase>(`/cases/${id}/notes`, { content }),
+    apiClient.post<ApiCaseNote>(`/cases/${id}/notes`, { content }),
 
   /** PATCH /cases/:id/checklist/:itemId */
   patchChecklist: (id: string, itemId: string, isCompleted: boolean) =>
-    apiClient.patch<ApiCase>(`/cases/${id}/checklist/${itemId}`, { isCompleted }),
+    apiClient.patch<ApiChecklistItem>(`/cases/${id}/checklist/${itemId}`, { isCompleted }),
 };

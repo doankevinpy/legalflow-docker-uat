@@ -109,7 +109,7 @@ export class CasesService {
       throw new InternalServerErrorException('Cannot generate unique case code');
     }
 
-    return createdCase;
+    return this.findOne(createdCase.id);
   }
 
   async findAll(query: QueryCasesDto) {
