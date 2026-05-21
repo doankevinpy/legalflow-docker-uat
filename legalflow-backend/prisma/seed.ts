@@ -13,25 +13,25 @@ async function main() {
       email: 'admin@legalflow.local',
       fullName: 'Administrator',
       role: 'ADMIN',
-      password: 'Admin@123!',
+      password: process.env.SEED_ADMIN_PASSWORD || 'Admin@123!',
     },
     {
       email: 'manager@legalflow.local',
       fullName: 'Manager User',
       role: 'MANAGER',
-      password: 'Manager@123!',
+      password: process.env.SEED_MANAGER_PASSWORD || 'Manager@123!',
     },
     {
       email: 'staff@legalflow.local',
       fullName: 'Staff User',
       role: 'STAFF',
-      password: 'Staff@123!',
+      password: process.env.SEED_STAFF_PASSWORD || 'Staff@123!',
     },
     {
       email: 'viewer@legalflow.local',
       fullName: 'Viewer User',
       role: 'VIEWER',
-      password: 'Viewer@123!',
+      password: process.env.SEED_VIEWER_PASSWORD || 'Viewer@123!',
     },
   ];
 
@@ -43,7 +43,11 @@ async function main() {
     
     const user = await prisma.user.upsert({
       where: { email: normalizedEmail },
-      update: {},
+      update: {
+        fullName: u.fullName,
+        passwordHash,
+        isActive: true,
+      },
       create: {
         email: normalizedEmail,
         fullName: u.fullName,

@@ -28,8 +28,14 @@ dist-ssr
 .env.local
 .env.*.local
 
-# Database files
+# Database and Backup files
 *.db
 *.db-journal
-prisma/*.db
-prisma/*.db-journal
+*.db-wal
+*.db-shm
+legalflow-backend/backups/
+backups/
+legalflow-backend/prisma/*.db
+legalflow-backend/prisma/*.db-journal
+legalflow-backend/prisma/*.db-wal
+legalflow-backend/prisma/*.db-shm

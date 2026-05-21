@@ -1,59 +1,98 @@
-# LegalFlow v0.4.0 UAT Checklist (Kịch bản Nghiệm thu Người dùng)
+# Kịch bản Nghiệm thu Người dùng LegalFlow v0.4.2 (UAT Checklist)
 
 > [!WARNING]
-> **Dữ liệu giả:** Chỉ sử dụng các thông tin và dữ liệu giả định (fake data) trong quá trình kiểm thử này. Tuyệt đối không nhập dữ liệu thật, thông tin định danh khách hàng (PII) hoặc tài liệu nội bộ nhạy cảm lên hệ thống ở giai đoạn này.
+> **QUY TẮC AN TOÀN DỮ LIỆU**:
+> Chỉ sử dụng dữ liệu và thông tin giả lập (mock data) trong toàn bộ quá trình kiểm thử này. Tuyệt đối không nhập thông tin thật hoặc upload tài liệu nhạy cảm lên hệ thống.
 
-## Giới thiệu
-Tài liệu này dùng để kiểm thử độc lập các tính năng ở góc nhìn của người dùng thực tế. Các Test Case được phân theo 4 vai trò (Role): Admin, Manager, Staff và Viewer. 
-
-**Tài khoản Test mặc định:**
-- `admin@legalflow.local` / `Admin@123!`
-- `manager@legalflow.local` / `Manager@123!`
-- `staff@legalflow.local` / `Staff@123!`
-- `viewer@legalflow.local` / `Viewer@123!`
+Tài liệu này đóng vai trò là kịch bản nghiệm thu thực tế, giúp kiểm tra tính đúng đắn của toàn bộ luồng nghiệp vụ, phân quyền vai trò (RBAC), quy trình dọn dẹp dữ liệu cũ (Migration Panel), và động cơ sao lưu/khôi phục cơ sở dữ liệu SQLite trong Phase 4.
 
 ---
 
-## 1. Role: VIEWER (Chỉ xem)
+## Tài khoản Kiểm thử Mặc định
+- **Admin**: `admin@legalflow.local` / `Admin@123!`
+- **Manager**: `manager@legalflow.local` / `Manager@123!`
+- **Staff**: `staff@legalflow.local` / `Staff@123!`
+- **Viewer**: `viewer@legalflow.local` / `Viewer@123!`
 
-| ID | Test Case | Bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái (Pass/Fail) |
+---
+
+## 1. Nghiệm thu phân quyền theo Vai trò (RBAC Scenarios)
+
+### Kịch bản 1: Vai trò VIEWER (Chỉ xem)
+
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
 |:---|:---|:---|:---|:---|
-| **V-01** | **Đăng nhập & Logout** | 1. Vào `/login`, nhập `viewer@legalflow.local` / `Viewer@123!`.<br>2. Bấm Đăng xuất từ thanh Header. | Đăng nhập vào màn Dashboard. Logout sẽ xoá token và trả về `/login`. | [ ] |
-| **V-02** | **Truy cập Dashboard** | 1. Login bằng tài khoản Viewer.<br>2. Xem các thông số thống kê. | Hiển thị đúng số lượng hồ sơ, các biểu đồ (nếu có), số liệu trích xuất từ server. | [ ] |
-| **V-03** | **Xem danh sách & Lọc** | 1. Mở "Hồ sơ".<br>2. Thử lọc theo trạng thái, loại đơn. Thử phân trang. | Dữ liệu bảng phản hồi đúng. Không thấy nút "Tạo mới" hoặc cột "Xóa". | [ ] |
-| **V-04** | **Xem chi tiết hồ sơ** | 1. Bấm vào một mã hồ sơ bất kỳ.<br>2. Xem các tab: Ghi chú, Checklist, Lịch sử. | Hiện đầy đủ các tab. Checkbox bị disable (mờ). Không thấy nút "Lưu ghi chú". Thẻ dropdown trạng thái cũng bị khóa hoặc không thay đổi được. | [ ] |
-| **V-05** | **Xác thực RBAC UI/API** | 1. Nhập trực tiếp URL `/cases/new` trên thanh địa chỉ.<br>2. Nhập URL truy cập settings (Migration). | Bị đẩy (redirect) về danh sách hoặc báo "Không có quyền". Các nút thao tác dữ liệu đều bị ẩn. | [ ] |
+| **V-01** | **Truy cập Dashboard** | 1. Đăng nhập bằng tài khoản Viewer.<br>2. Xem thống kê trên Dashboard. | Truy cập thành công. Biểu đồ và thông số thống kê tải đầy đủ dữ liệu từ Backend. | [ ] |
+| **V-02** | **Xem danh sách & chi tiết** | 1. Vào Tab "Hồ sơ".<br>2. Thử lọc theo trạng thái.<br>3. Bấm xem chi tiết 1 hồ sơ. | Xem được danh sách và chi tiết. **Không có nút "Tạo mới" hoặc cột "Xóa"**. Không có quyền cập nhật trạng thái, lưu ghi chú hay checkbox checklist (tất cả bị khóa/read-only). | [ ] |
+| **V-03** | **Bảo mật URL (RBAC)** | 1. Nhập trực tiếp URL tạo mới `/cases/new` trên thanh địa chỉ. | Giao diện tự động chặn và đẩy về trang danh sách hoặc thông báo không có quyền truy cập. | [ ] |
 
 ---
 
-## 2. Role: STAFF (Nhân sự thụ lý)
+### Kịch bản 2: Vai trò STAFF (Nhân sự thụ lý)
 
-| ID | Test Case | Bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái (Pass/Fail) |
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
 |:---|:---|:---|:---|:---|
-| **S-01** | **Tạo hồ sơ mới** | 1. Bấm "Tạo mới".<br>2. Nhập Người gửi, Chọn Loại đơn, Khu phố, Tóm tắt.<br>3. Bấm "Lưu". | Case được lưu, tự động sinh mã (VD: `2026-KN-015-KP3`) và nhảy sang màn chi tiết hồ sơ đó. | [ ] |
-| **S-02** | **Cập nhật hồ sơ (Của mình)** | 1. Vẫn ở case vừa tạo, mở tab Ghi chú, gõ text và lưu.<br>2. Mở tab Checklist, tick/untick.<br>3. Đổi trạng thái case sang "Đang xử lý". | Thực hiện thành công. Tab "Lịch sử" ghi nhận đủ các thao tác vừa làm của user. | [ ] |
-| **S-03** | **Truy cập hồ sơ người khác** | 1. Quay lại danh sách hồ sơ.<br>2. Chọn một hồ sơ do tài khoản khác tạo (và chưa assign cho mình).<br>3. Thử đổi checklist hoặc thêm note. | Giao diện cho xem (Read-only) nhưng API chặn lưu lỗi 403 Forbidden. (Nút có thể hiện nhưng bấm sẽ báo lỗi, hoặc nút bị ẩn tuỳ logic UI). | [ ] |
-| **S-04** | **Phân quyền xóa** | 1. Mở danh sách hồ sơ hoặc chi tiết hồ sơ do mình tạo. | Không thấy nút Xóa (Staff không có quyền Delete, dù là bài tự tạo). | [ ] |
+| **S-01** | **Tạo hồ sơ mới** | 1. Đăng nhập bằng Staff.<br>2. Bấm "Tạo mới" -> Nhập thông tin giả -> Lưu. | Tạo thành công. Mã hồ sơ tự động sinh dạng tiếng Việt (Ví dụ: `2026-KN-001-KP3`) và tự động chuyển vào trang chi tiết hồ sơ. | [ ] |
+| **S-02** | **Cập nhật hồ sơ (Của mình)** | 1. Tại hồ sơ vừa tạo, mở tab Ghi chú -> gửi ghi chú.<br>2. Mở Checklist -> tick chọn.<br>3. Thay đổi trạng thái sang "Đang xử lý". | Lưu thành công. Tab "Lịch sử" ghi nhận đầy đủ lịch sử thay đổi của Staff vừa thực hiện. | [ ] |
+| **S-03** | **Quyền hạn trên hồ sơ người khác** | 1. Xem chi tiết hồ sơ do tài khoản khác tạo (chưa gán cho mình).<br>2. Thử lưu ghi chú hoặc đổi trạng thái. | Giao diện chặn không cho thao tác ghi, hoặc nút bấm bị ẩn (nếu bấm gửi API sẽ báo lỗi 403 Forbidden). | [ ] |
+| **S-04** | **Quyền xóa hồ sơ** | 1. Kiểm tra danh sách hồ sơ hoặc chi tiết hồ sơ do mình tạo. | **Không hiển thị nút Xóa** (Staff tuyệt đối không có quyền Delete). | [ ] |
 
 ---
 
-## 3. Role: MANAGER (Quản lý)
+### Kịch bản 3: Vai trò MANAGER (Quản lý)
 
-| ID | Test Case | Bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái (Pass/Fail) |
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
 |:---|:---|:---|:---|:---|
-| **M-01** | **Can thiệp hồ sơ bất kỳ** | 1. Login bằng Manager.<br>2. Chọn một hồ sơ do Staff tạo.<br>3. Thêm Note và Checkbox. | Cập nhật được hồ sơ của tất cả nhân viên. Lịch sử hiển thị tên Manager đã sửa. | [ ] |
-| **M-02** | **Xóa hồ sơ (Soft Delete)** | 1. Ở danh sách hồ sơ, tìm hồ sơ nháp vừa test.<br>2. Bấm nút Trash/Xóa, xác nhận Xóa. | Hệ thống báo thành công. Hồ sơ biến mất khỏi danh sách (API đã ẩn deleted case). | [ ] |
-| **M-03** | **Công cụ Drafts** | 1. Vào menu Dự thảo/Drafts.<br>2. Chọn mẫu in Biên nhận. | Giao diện Drafts hiển thị và tạo được docx thành công. (Drafts hiện tại vẫn dùng local). | [ ] |
+| **M-01** | **Cập nhật hồ sơ bất kỳ** | 1. Đăng nhập bằng Manager.<br>2. Chọn một hồ sơ do Staff khác tạo.<br>3. Thêm ghi chú mới và đổi trạng thái hồ sơ. | Lưu thành công. Cập nhật được dữ liệu của toàn bộ nhân viên. Tab Lịch sử ghi nhận đúng tên Manager. | [ ] |
+| **M-02** | **Xóa mềm hồ sơ (Soft Delete)** | 1. Chọn một hồ sơ trong danh sách.<br>2. Bấm biểu tượng Thùng rác -> Xác nhận xóa. | Xóa thành công. Hồ sơ biến mất khỏi danh sách nghiệp vụ thông thường (đã được ẩn an toàn dưới DB bằng soft-delete). | [ ] |
 
 ---
 
-## 4. Role: ADMIN (Quản trị viên)
+### Kịch bản 4: Vai trò ADMIN (Quản trị viên)
 
-| ID | Test Case | Bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái (Pass/Fail) |
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
 |:---|:---|:---|:---|:---|
-| **A-01** | **Toàn quyền thao tác** | 1. Mở danh sách hồ sơ.<br>2. Lọc tất cả, xem và chỉnh sửa tuỳ ý. | Giống hệt tính năng của Manager, toàn quyền trên toàn hệ thống. | [ ] |
-| **A-02** | **Sử dụng MigrationPanel** | 1. Chuẩn bị 1 ít dữ liệu giả trong `localStorage`.<br>2. Mở `/settings`, kéo xuống phần Migration.<br>3. Bấm "Detect" → "Export Backup" → "Preview" → "Import". | Bảng report hiển thị danh sách hồ sơ pass. Danh sách hồ sơ thật hiển thị bên trang `/cases`. | [ ] |
-| **A-03** | **Tràn token (Edge case)** | 1. Login bằng Admin.<br>2. Mở DevTools (F12) → Application → Session Storage, xoá key `lf_access_token`.<br>3. Chuyển hướng sang 1 tab bất kỳ. | Frontend báo lỗi 401 hoặc tự động log-out và văng ra trang Login. | [ ] |
+| **A-01** | **Toàn quyền hệ thống** | 1. Kiểm tra Dashboard, Cases CRUD, ghi chú, lịch sử. | Toàn quyền thao tác trên toàn bộ hệ thống giống Manager. | [ ] |
+| **A-02** | **Quyền quản trị nâng cao** | 1. Kiểm tra quyền vào phần cấu hình `/settings` và Migration. | Truy cập thành công. Đây là vai trò duy nhất hiển thị bảng điều khiển di trú MigrationPanel. | [ ] |
 
 ---
-*Mọi kết quả không đúng với Expected Result cần được ghi chú lại vào ô (Fail) kèm theo lý do cụ thể hoặc màn hình lỗi.*
+
+## 2. Nghiệm thu Tính năng Nghiệp vụ nâng cao
+
+### Kịch bản 5: Biên soạn dự thảo (Drafts - Backend Integrated)
+
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
+|:---|:---|:---|:---|:---|
+| **D-01** | **Liên kết hồ sơ Backend** | 1. Vào Tab "Biên soạn dự thảo" (`/drafts`).<br>2. Mở danh sách chọn hồ sơ liên kết. | Danh sách tải đầy đủ và chính xác các mã hồ sơ thật trực tiếp từ Database Backend. | [ ] |
+| **D-02** | **Tự động điền dữ liệu mẫu** | 1. Chọn 1 hồ sơ từ dropdown.<br>2. Chọn mẫu "Biên nhận hồ sơ". | Các trường thông tin (Người nộp, Địa chỉ, Nội dung...) tự động điền chính xác thông tin từ hồ sơ backend được chọn. | [ ] |
+| **D-03** | **Sao chép và Xuất Word** | 1. Bấm nút "Sao chép" văn bản.<br>2. Bấm nút "Tải file Word" (.docx). | Sao chép thành công vào Clipboard. File `.docx` được tải về máy hoàn chỉnh cấu trúc và định dạng biểu mẫu hành chính. | [ ] |
+
+---
+
+### Kịch bản 6: MigrationPanel (Di trú và Dọn dẹp Local Dữ liệu cũ)
+
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
+|:---|:---|:---|:---|:---|
+| **MP-01** | **Nhận dạng dữ liệu cũ** | 1. Chuẩn bị 5 hồ sơ giả trong `localStorage['legalflow_cases']`.<br>2. Đăng nhập Admin -> `/settings`. | Panel nhận diện đúng số lượng hồ sơ cũ trong local, hiện thông báo "Chưa sao lưu" và "Chưa di trú". Nút "Xóa dữ liệu cũ" bị ẩn hoàn toàn. | [ ] |
+| **MP-02** | **Sao lưu dữ liệu JSON** | 1. Bấm nút "Xuất file Backup (.json)". | Tải về file backup JSON chứa toàn bộ dữ liệu localStorage. Trạng thái sao lưu đổi thành "Đã sao lưu" (màu xanh lá). | [ ] |
+| **MP-03** | **Preview & Import toàn bộ** | 1. Bấm "Xem trước và di trú".<br>2. Chọn tất cả hồ sơ.<br>3. Bấm "Tiến hành di trú lên Backend". | Hiển thị bảng Migration Report. Hệ thống import và báo cáo trạng thái từng hồ sơ (imported/already_migrated/failed). | [ ] |
+| **MP-04** | **Phát hiện trùng lặp (Duplicate)** | 1. Import lại hồ sơ đã được di chuyển trước đó. | Trạng thái báo `possible_duplicate` hoặc `already_migrated`, ngăn chặn việc import trùng lặp tạo rác dữ liệu trên backend. | [ ] |
+| **MP-05** | **Xóa sạch dữ liệu cũ an toàn** | 1. Đảm bảo toàn bộ hồ sơ đã xử lý xong (pending = 0, failed = 0) và đã backup.<br>2. Bấm nút "Xóa dữ liệu localStorage cũ" vừa xuất hiện.<br>3. Nhấp HỦY ở xác nhận Lớp 1 -> dữ liệu giữ nguyên.<br>4. Nhấp HỦY ở xác nhận Lớp 2 -> dữ liệu giữ nguyên.<br>5. Xác nhận đầy đủ -> localStorage cũ được làm sạch. Xuất hiện marker `legalflow_local_cleanup_completed` trong local storage. | Xóa thành công. Local storage được giải phóng, dữ liệu trên backend vẫn an toàn 100%. | [ ] |
+
+---
+
+## 3. Nghiệm thu Động cơ Sao lưu & Phục hồi (SQLite Engine)
+
+### Kịch bản 7: Quy trình Backup và Restore
+
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected) | Trạng thái |
+|:---|:---|:---|:---|:---|
+| **BR-01** | **Sao lưu dữ liệu SQLite** | 1. Mở terminal tại `legalflow-backend/`.<br>2. Chạy lệnh: `npm run db:backup`. | Thực thi thành công. File sao lưu có tên chứa timestamp chính xác được lưu vào thư mục `backups/`, kích thước file > 0 KB. | [ ] |
+| **BR-02** | **Hủy phục hồi - Lớp 1** | 1. Chạy lệnh: `npm run db:restore`.<br>2. Chọn bản sao lưu muốn restore.<br>3. Tại câu hỏi Xác nhận lớp 1: Gõ `n` (hoặc phím bất kỳ khác y). | Tiến trình dừng ngay lập tức. Dữ liệu DB hiện tại hoàn toàn giữ nguyên, không thay đổi. | [ ] |
+| **BR-03** | **Hủy phục hồi - Lớp 2** | 1. Chạy lệnh: `npm run db:restore`.<br>2. Chọn bản sao lưu, gõ `y` ở lớp 1.<br>3. Tại câu hỏi Xác nhận lớp 2: Gõ sai từ khóa `RESTORE-CONFIRM` (Ví dụ: `123` hoặc `CONFIRM`). | Xác thực thất bại, tiến trình dừng ngay lập tức. Dữ liệu DB hiện tại giữ nguyên. | [ ] |
+| **BR-04** | **Phục hồi thành công** | 1. Chỉnh sửa hoặc xóa bớt 1 hồ sơ trên giao diện để tạo sai lệch dữ liệu.<br>2. Chạy lệnh `npm run db:restore`.<br>3. Chọn bản backup cũ, gõ `y` và gõ đúng `RESTORE-CONFIRM`. | **Khôi phục thành công**: <br>1. Hệ thống tự động tạo một tệp lưu dự phòng trước phục hồi dạng `pre_restore_YYYYMMDD_HHMMSS.db`. <br>2. Ghi đè thành công tệp chính. <br>3. Restart lại backend -> F5 trình duyệt -> dữ liệu cũ khôi phục hoàn chỉnh 100%. | [ ] |
+| **BR-05** | **Khóa tiến trình (Lock Check)** | 1. Bật server backend (`npm run start:dev`).<br>2. Mở một terminal khác, chạy lệnh: `npm run db:restore`.<br>3. Thực hiện đầy đủ 2 lớp xác nhận. | Do server đang chạy và giữ khóa file SQLite trên Windows, script sẽ phát hiện lỗi hệ thống (`EBUSY` hoặc `EPERM`), dừng lại an toàn, in thông báo màu đỏ yêu cầu người dùng tắt backend server và thử lại. | [ ] |
+| **BR-06** | **Rollback khẩn cấp** | 1. Sau khi restore thành công ở `BR-04`, thực hiện rollback về trạng thái ngay trước thời điểm restore bằng cách chạy: `npm run db:restore pre_restore_YYYYMMDD_HHMMSS.db`. | Cơ sở dữ liệu quay về chính xác trạng thái chứa các chỉnh sửa sai lệch trước khi thực hiện kịch bản `BR-04`. | [ ] |
+
+---
+*Mọi kết quả kiểm thử không khớp với Kết quả mong đợi (Expected Result) đều được coi là Fail và cần được chụp màn hình, ghi nhận log lỗi gửi cho nhóm phát triển.*

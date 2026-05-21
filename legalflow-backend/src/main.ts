@@ -17,6 +17,12 @@ async function bootstrap() {
   );
 
   const frontendOrigin = configService.get<string>('FRONTEND_ORIGIN', 'http://localhost:5173');
+  if (frontendOrigin === '*') {
+    console.warn(
+      '\x1b[33m%s\x1b[0m',
+      '[SECURITY WARNING] Wildcard CORS (*) is enabled. For production or intranet trials, please specify the exact frontend origin.',
+    );
+  }
   app.enableCors({
     origin: frontendOrigin,
     credentials: true,
