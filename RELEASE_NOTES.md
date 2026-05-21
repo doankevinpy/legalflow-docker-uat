@@ -1,5 +1,30 @@
 # Release Notes
 
+## v0.4.2-migration-cleanup (21/05/2026)
+
+### Tính năng chính (Phase 3.2 Safe localStorage Migration & Cleanup Dashboard)
+- **Cổng An Toàn 3 Tầng**:
+  - Dữ liệu cục bộ cũ tuyệt đối **không tự động xóa**.
+  - Nút **"Xóa dữ liệu localStorage cũ"** chỉ hiển thị khi:
+    - Đã tải xuống file sao lưu JSON an toàn (`legalflow_migration_backed_up === 'true'`).
+    - Đã hoàn thành xử lý 100% hồ sơ local cũ (`legalflow_migration_completed === 'true'`).
+    - Báo cáo di chuyển ghi nhận không còn hồ sơ chưa xử lý (`pendingCount === 0`) và không còn hồ sơ lỗi (`failedCount === 0`).
+  - Thực thi luồng **Double Confirm** (Xác nhận 2 lớp) cực kỳ chi tiết, nhấn mạnh hành động chỉ dọn dẹp trình duyệt cục bộ và hoàn toàn không ảnh hưởng tới dữ liệu máy chủ backend.
+- **Migration Report (`legalflow_migration_report`)**:
+  - Theo dõi chi tiết trạng thái của từng hồ sơ local cũ với các trạng thái: `pending`, `imported`, `already_migrated`, `possible_duplicate`, `failed`, `skipped`.
+  - Hỗ trợ nút thao tác nhanh **"Bỏ qua (Skip)"** để loại bỏ hồ sơ rác khỏi tiến trình di chuyển, hoặc **"Kích hoạt lại"** để linh hoạt xử lý dữ liệu.
+- **Chống Trùng Lặp Đa Yếu Tố (Multi-factor Duplicate Protection)**:
+  - Đầu tiên, đối sánh trực tiếp `caseCode === c.caseId` trên Backend (nếu không phải định dạng mã cũ `HS-`).
+  - Nếu không khớp mã trực tiếp, so sánh sâu kết hợp 5 yếu tố nội dung: `senderName` (so khớp tương đối không dấu), `receivedDate`, `type`, `neighborhood`, và `summary`.
+  - Nếu phát hiện nghi trùng, gán trạng thái `"possible_duplicate"`, hiển thị cảnh báo màu cam và **không tự động tạo bản ghi trùng rác trên backend**, yêu cầu người dùng xác nhận thủ công (Vẫn import tiếp hoặc Xác nhận trùng/Skip).
+- **Hỗ Trợ Mã Cũ `HS-`**:
+  - Nhận diện mã cũ dạng `HS-YYMM-XXXX` và preview rõ cho người dùng biết mã dự kiến sau import sẽ được backend sinh tự động theo sequence mới an toàn của hệ thống, không ghi đè mã HS cũ lên DB.
+- **Marker Dọn Dẹp Vĩnh Viễn**:
+  - Lưu cờ `legalflow_local_cleanup_completed` kèm timestamp để luôn hiển thị trạng thái hoàn thành sạch sẽ ("Đã dọn dẹp bộ nhớ localStorage cục bộ thành công") trong Settings, ẩn hoàn toàn các widget di chuyển không còn cần thiết.
+
+### Quyết định thiết kế & Giới hạn
+- Mọi logic so khớp, tìm kiếm, đánh giá trùng lặp nội dung và báo cáo đều được xử lý 100% Client-side giúp giảm tải cho Server và tuyệt đối không sửa đổi API hay Schema của Backend.
+
 ## v0.4.0-frontend-backend-integration (21/05/2026)
 
 ### Tính năng chính (Phase 3 Frontend ↔ Backend Integration & Phase 3.1 Drafts Backend Migration)

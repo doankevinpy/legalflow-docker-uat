@@ -125,6 +125,51 @@ Login → POST /auth/login → accessToken
 
 ---
 
+## Phase 3.2: Safe localStorage Migration & Cleanup Dashboard
+
+Phiên bản `v0.4.2-migration-cleanup` bổ sung các cơ chế an toàn tối đa để bảo vệ, di chuyển có kiểm soát và dọn dẹp an toàn dữ liệu `localStorage` cũ trên trình duyệt mà không gây rủi ro mất mát hay tạo trùng lặp dữ liệu trên Backend máy chủ.
+
+### 1. Báo cáo tiến trình di chuyển (`legalflow_migration_report`)
+- Toàn bộ hồ sơ trong `localStorage['legalflow_cases']` (không chỉ những hồ sơ được chọn) được theo dõi chặt chẽ dưới một báo cáo lưu trữ tập trung.
+- Các trạng thái theo dõi gồm:
+  - `pending`: Chờ di chuyển.
+  - `imported`: Tạo mới thành công trên backend.
+  - `already_migrated`: Đã trùng khớp mã `caseCode` từ trước.
+  - `possible_duplicate`: Nghi trùng lặp nội dung (yêu cầu người dùng duyệt).
+  - `skipped`: Người dùng chủ động loại bỏ/bỏ qua.
+  - `failed`: Di chuyển lỗi.
+- Chỉ khi **100% hồ sơ** local đã được giải quyết (tức là không còn hồ sơ nào có trạng thái `pending`, `failed`, hoặc `possible_duplicate`), cờ `legalflow_migration_completed: 'true'` mới được kích hoạt.
+
+### 2. Cổng an toàn dọn dẹp bộ nhớ đệm (Cleanup Guard)
+- Nút **"Xóa dữ liệu localStorage cũ"** chỉ hiển thị khi đáp ứng đủ các cổng an toàn:
+  - Cờ sao lưu đã ghi nhận: `legalflow_migration_backed_up === 'true'` (người dùng đã click nút tải backup JSON).
+  - Cờ hoàn thành đã ghi nhận: `legalflow_migration_completed === 'true'`.
+  - Không còn hồ sơ chưa giải quyết (`pendingCount === 0` và `failedCount === 0`).
+- Áp dụng quy trình **Double Confirm (Cảnh báo hai lớp)** cực kỳ chi tiết, làm nổi bật thông tin:
+  - Hành động này chỉ xóa sạch dữ liệu cũ cục bộ trên trình duyệt hiện tại.
+  - Không làm mất hay ảnh hưởng bất kỳ dữ liệu nào đã lưu thành công trên Backend máy chủ.
+  - Không thể tự động khôi phục nếu chưa lưu trữ file backup JSON an toàn.
+- Sau khi xóa, thiết lập marker cleanup vĩnh viễn:
+  - `legalflow_local_cleanup_completed: 'true'`
+  - `legalflow_local_cleanup_completed_at: ISO Timestamp`
+  - Settings Dashboard hiển thị trạng thái hoàn thành sạch sẽ, ẩn đi các panel di chuyển dữ liệu cũ không còn tác dụng.
+
+### 3. Cơ chế Chống trùng lặp đa yếu tố (Multi-factor Duplicate Protection)
+- **Kiểm tra mã trực tiếp**: So sánh `caseCode === localCase.caseId` (bỏ qua nếu là mã cũ định dạng `HS-`).
+- **Kiểm tra nghi trùng nội dung**: So khớp đồng thời 4 yếu tố nội dung trên Backend:
+  - Khớp tương đối không dấu tên người gửi (`senderName`).
+  - Khớp loại hồ sơ (`type`).
+  - Khớp khu phố (`neighborhood`).
+  - Khớp ngày tiếp nhận (`receivedDate`).
+- **Xử lý nghi trùng**: Nếu phát hiện trùng 4 yếu tố trên, hệ thống đánh dấu trạng thái `"possible_duplicate"`, hiển thị nhãn màu cam và **ngừng tự động import** để tránh rác DB backend. Cung cấp 2 lựa chọn nhanh:
+  - *"Xác nhận đã trùng (Skip)"*: chuyển sang `skipped` để skip an toàn.
+  - *"Vẫn import tạo mới"*: đặt cờ `forceImport = true` để đưa vào hàng chờ import tạo mới luôn ở lượt tiếp theo.
+
+### 4. Giải pháp 100% Client-side
+- Toàn bộ logic so khớp, tìm kiếm, đánh giá trùng lặp nội dung, skip trùng, quản lý report đều được xử lý gọn gàng phía Client-side trong React Components (`Settings.tsx` và `MigrationPanel.tsx`).
+- NestJS Backend giữ nguyên vẹn 100% các API hiện tại nhằm tránh phát sinh rủi ro hệ thống.
+
+---
 
 ## Build verification
 
