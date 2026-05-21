@@ -1,26 +1,29 @@
 import { Badge } from './Badge';
-import type { CaseStatus } from '../../types';
+import { CASE_STATUS_LABELS, type CaseStatusCode } from '../../lib/constants';
 
-export function StatusBadge({ status }: { status: CaseStatus }) {
+// Nhận code backend (NEW, IN_PROGRESS...) – hiển thị label tiếng Việt
+export function StatusBadge({ status }: { status: string }) {
+  const label = CASE_STATUS_LABELS[status as CaseStatusCode] ?? status;
+
   let variant: 'default' | 'secondary' | 'outline' | 'destructive' | 'success' | 'warning' = 'default';
 
-  switch (status) {
-    case 'Mới tiếp nhận':
+  switch (status as CaseStatusCode) {
+    case 'NEW':
       variant = 'secondary';
       break;
-    case 'Đang xử lý':
+    case 'IN_PROGRESS':
       variant = 'default';
       break;
-    case 'Cần bổ sung':
+    case 'NEEDS_MORE_INFO':
       variant = 'warning';
       break;
-    case 'Đã hoàn thành':
+    case 'RESPONDED':
       variant = 'success';
       break;
-    case 'Đóng':
+    case 'CLOSED':
       variant = 'outline';
       break;
   }
 
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{label}</Badge>;
 }

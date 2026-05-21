@@ -1,22 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  FolderOpen, 
-  PlusCircle, 
+import {
+  LayoutDashboard,
+  FolderOpen,
+  PlusCircle,
   FileText,
   Scale,
   Settings,
-  Shield
+  Shield,
 } from 'lucide-react';
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Danh sách hồ sơ', href: '/cases', icon: FolderOpen },
-  { name: 'Tạo mới', href: '/cases/new', icon: PlusCircle },
-  { name: 'Dự thảo văn bản', href: '/drafts', icon: FileText },
-  { name: 'Công cụ Ẩn danh', href: '/anonymizer', icon: Shield },
-  { name: 'Cài đặt', href: '/settings', icon: Settings },
-];
+import { useAuth } from '../../contexts/AuthContext';
+import { canCreate } from '../../lib/rbac';
 
 interface SidebarProps {
   onClose: () => void;
@@ -24,6 +17,21 @@ interface SidebarProps {
 
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
+  const { user } = useAuth();
+  const role = user?.role ?? 'VIEWER';
+
+  const navigation = [
+    { name: 'Dashboard',         href: '/dashboard',  icon: LayoutDashboard, show: true },
+    { name: 'Danh sách hồ sơ',  href: '/cases',      icon: FolderOpen,      show: true },
+    { name: 'Tạo mới',          href: '/cases/new',  icon: PlusCircle,      show: canCreate(role) },
+    { name: 'Dự thảo văn bản',  href: '/drafts',     icon: FileText,        show: true },
+    { name: 'Công cụ Ẩn danh',  href: '/anonymizer', icon: Shield,          show: true },
+    { name: 'Cài đặt',          href: '/settings',   icon: Settings,        show: true },
+  ];
+
+  const initials = user?.fullName
+    ? user.fullName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase()
+    : 'NV';
 
   return (
     <div className="flex h-full flex-col bg-card border-r shadow-sm">
@@ -31,11 +39,13 @@ export function Sidebar({ onClose }: SidebarProps) {
         <Scale className="h-8 w-8 text-primary" />
         <span className="ml-3 text-xl font-bold tracking-tight">LegalFlow</span>
       </div>
+
       <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
-        {navigation.map((item) => {
-          const isActive = item.href === '/cases' 
-            ? location.pathname === '/cases' 
-            : location.pathname.startsWith(item.href);
+        {navigation.filter(item => item.show).map((item) => {
+          const isActive =
+            item.href === '/cases'
+              ? location.pathname === '/cases'
+              : location.pathname.startsWith(item.href);
           return (
             <Link
               key={item.name}
@@ -43,8 +53,8 @@ export function Sidebar({ onClose }: SidebarProps) {
               onClick={onClose}
               className={`
                 group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200
-                ${isActive 
-                  ? 'bg-primary text-primary-foreground shadow-md' 
+                ${isActive
+                  ? 'bg-primary text-primary-foreground shadow-md'
                   : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}
               `}
             >
@@ -59,14 +69,15 @@ export function Sidebar({ onClose }: SidebarProps) {
           );
         })}
       </nav>
+
       <div className="p-4 border-t">
         <div className="flex items-center px-3 py-2">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-sm font-semibold text-primary">NV</span>
+            <span className="text-sm font-semibold text-primary">{initials}</span>
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-foreground">Nhân viên</p>
-            <p className="text-xs text-muted-foreground">Local Version</p>
+          <div className="ml-3 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{user?.fullName ?? 'Nhân viên'}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.role ?? 'VIEWER'}</p>
           </div>
         </div>
       </div>
