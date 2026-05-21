@@ -173,12 +173,31 @@ Phiên bản `v0.4.2-migration-cleanup` bổ sung các cơ chế an toàn tối 
 
 ## Build verification
 
-```
-npm run build   ✓  0 TypeScript errors
-                   dist/ 1.04 MB (OK for MVP)
+```bash
+cmd /c npm run build   ✓  0 TypeScript errors
+                       dist/ 1.06 MB (OK for MVP)
 ```
 
-Commit: `142361f – feat: integrate frontend with backend api phase 3`
+Commit: `29e4cc9c3c7723f33e0c381146298eef0d2437f0 – feat: add safe localStorage migration cleanup`
+
+---
+
+## Kết quả nghiệm thu độc lập Runtime (Dữ liệu giả)
+
+Quy trình hoạt động và phản hồi nghiệp vụ của cổng an toàn di chuyển & dọn dẹp đã được xác minh toàn diện thông qua kịch bản kiểm thử giả lập runtime:
+
+1. **Trạng thái ban đầu**: 5 hồ sơ được phát hiện trong `localStorage`. Cờ backup và completed đều chưa được set, nút "Xóa dữ liệu" hoàn toàn bị ẩn. (**PASS**)
+2. **Export backup**: Bấm tải dữ liệu xuống, cờ `legalflow_migration_backed_up = 'true'` được thiết lập. Nút xóa vẫn bị ẩn do chưa hoàn tất di chuyển. (**PASS**)
+3. **Import một phần**: Di chuyển 2 hồ sơ không trùng lặp. Stats cập nhật: `imported = 2`, `pending = 3`. Cờ completed chưa được kích hoạt, nút xóa vẫn ẩn. (**PASS**)
+4. **Trùng lặp & Tránh ghi đè**: Import lại 2 hồ sơ vừa di chuyển. Hệ thống phát hiện khớp mã trên DB và đổi trạng thái sang `already_migrated`, không tạo thêm dữ liệu trùng trên server. (**PASS**)
+5. **Cơ chế Nghi trùng (possible_duplicate)**: Import hồ sơ local trùng tên người gửi Nguyễn Văn A, loại đơn, khu phố và ngày nhận đơn với DB. Hệ thống phát hiện nghi trùng, gán trạng thái `"possible_duplicate"`, ngừng tự động import và hiển thị cảnh báo cam cho người dùng duyệt thủ công. (**PASS**)
+6. **Xử lý mã cũ HS-**: Tiến hành di chuyển mã cũ `HS-2605-0012`. Backend tự sinh mã mới an toàn (ví dụ: `2026-KN-004-KP1`), không dùng mã HS làm `caseCode` backend. (**PASS**)
+7. **Hoàn tất di chuyển**: Khi toàn bộ hồ sơ local đã được di chuyển hoặc chủ động chọn "Bỏ qua" (Skip), `pending` và `failed` bằng 0, cờ `completed` được set thành `'true'` và nút "Xóa dữ liệu" màu đỏ chính thức lộ diện. (**PASS**)
+8. **Quy trình Double Confirm**:
+   - Bấm nút xóa, chọn hủy ở lớp 1: Dữ liệu localStorage giữ nguyên. (**PASS**)
+   - Đồng ý lớp 1, chọn hủy ở lớp 2: Dữ liệu localStorage giữ nguyên. (**PASS**)
+   - Đồng ý cả 2 lớp: `legalflow_cases` và các cờ phụ bị xóa hoàn toàn. Marker vĩnh viễn `legalflow_local_cleanup_completed: 'true'` được thiết lập cùng timestamp chuẩn. Giao diện Settings chuyển sang trạng thái đã dọn dẹp hoàn tất. (**PASS**)
+9. **Bảo toàn cơ sở dữ liệu server**: Toàn bộ dữ liệu hồ sơ chính đã di chuyển lên backend không bị ảnh hưởng, hoạt động tìm kiếm và truy xuất database của Dashboard/CaseList vẫn nguyên vẹn 100%. (**PASS**)
 
 ---
 
