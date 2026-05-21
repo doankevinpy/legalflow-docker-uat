@@ -22,8 +22,9 @@
 - **Marker Dọn Dẹp Vĩnh Viễn**:
   - Lưu cờ `legalflow_local_cleanup_completed` kèm timestamp để luôn hiển thị trạng thái hoàn thành sạch sẽ ("Đã dọn dẹp bộ nhớ localStorage cục bộ thành công") trong Settings, ẩn hoàn toàn các widget di chuyển không còn cần thiết.
 
-### Quyết định thiết kế & Giới hạn
+### Quyết định thiết kế & Giới hạn đã biết (Known limitations)
 - Mọi logic so khớp, tìm kiếm, đánh giá trùng lặp nội dung và báo cáo đều được xử lý 100% Client-side giúp giảm tải cho Server và tuyệt đối không sửa đổi API hay Schema của Backend.
+- **Giới hạn kiểm thử**: Tính năng hiện tại chỉ mới được nghiệm thu độc lập và chạy thử nghiệm bằng dữ liệu giả lập (mock data), chưa được đưa vào chạy thực tế và kiểm thử với các hồ sơ nghiệp vụ pháp lý thực tế (real production records).
 
 ## v0.4.0-frontend-backend-integration (21/05/2026)
 
