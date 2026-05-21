@@ -2,23 +2,24 @@
 
 ## v0.4.0-frontend-backend-integration (21/05/2026)
 
-### Tính năng chính (Phase 3 Frontend ↔ Backend Integration)
+### Tính năng chính (Phase 3 Frontend ↔ Backend Integration & Phase 3.1 Drafts Backend Migration)
 - **Auth UI**: Tích hợp màn hình đăng nhập an toàn, lưu token trong `sessionStorage`, phân quyền Route.
 - **Dashboard dùng backend**: Lấy số liệu thống kê realtime từ API (`GET /cases/stats`).
 - **Cases dùng backend**: Tất cả CRUD thao tác trực tiếp trên DB, thay vì localStorage.
 - **Notes/checklist/status dùng backend**: Các tương tác cập nhật case detail ghi nhận ngay trên backend và lưu lịch sử chuẩn xác.
 - **MigrationPanel**: Cung cấp công cụ thủ công (Settings > Migration) gồm 6 bước rõ ràng để di chuyển dữ liệu từ localStorage cũ sang hệ thống mới một cách an toàn.
-- **Drafts vẫn localStorage**: Tạm giữ nguyên theo kế hoạch cho MVP.
+- **Drafts dùng Backend (Phase 3.1)**: Loại bỏ hoàn toàn sự phụ thuộc vào `localStorage` của Drafts. Toàn bộ danh sách hồ sơ và dữ liệu chi tiết (checklist, tài liệu, thông tin người dùng) được nạp realtime từ Backend API.
 
 ### Bug Fixes
 - Đã sửa lỗi `POST /cases/:id/notes` trả về `CaseNote` mismatch type trên Frontend (`casesApi.ts`).
 - Đã sửa lỗi `POST /cases` khởi tạo checklist nhưng không trả về ngay trong response, giúp Frontend hiện checklist ngay lập tức.
 
-### Known limitations
+### Quyết định thiết kế & Giới hạn đã biết (Known limitations)
+- **Không ghi log Drafts vào Backend**: Trong Phase 3.1, việc tạo/copy/export dự thảo không ghi log vào Backend. Không dùng endpoint `POST /cases/:id/notes` để tránh nhiễu dữ liệu nghiệp vụ của hồ sơ (Notes chỉ dùng cho chuyên môn). Thao tác audit sẽ được thiết kế riêng ở phase sau.
 - `documents` chỉ lưu metadata JSON, chưa upload file thật.
-- Drafts chưa được migrate sang backend.
-- localStorage cũ (của version cũ) chưa được tự động xóa, phải bấm tay xoá sau khi Migration.
+- localStorage cũ (của phiên bản cũ) chưa được tự động xóa, người dùng cần bấm nút thủ công trong Settings sau khi di chuyển dữ liệu thành công.
 - Chưa deploy production (vẫn ở môi trường dev).
+
 
 ---## v0.3.0-backend-cases-api (20/05/2026)
 

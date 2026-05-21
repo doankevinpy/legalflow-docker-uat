@@ -8,7 +8,10 @@
 
 ## Tổng quan
 
-Phase 3 chuyển frontend LegalFlow từ `localStorage` sang Backend Cases API (Phase 2). Các luồng chính (Auth, Dashboard, Cases CRUD, Notes, Checklist, Status, Stats) đều dùng backend. Drafts vẫn giữ localStorage.
+Phase 3 chuyển frontend LegalFlow từ `localStorage` sang Backend Cases API (Phase 2). Các luồng chính (Auth, Dashboard, Cases CRUD, Notes, Checklist, Status, Stats) đều dùng backend.
+
+Trong **Phase 3.1**, chức năng Drafts (Dự thảo văn bản) cũng đã được chuyển hoàn toàn sang sử dụng dữ liệu realtime từ Backend API, loại bỏ sự phụ thuộc vào `localStorage` của trình duyệt đối với thông tin hồ sơ chính.
+
 
 ---
 
@@ -95,12 +98,33 @@ Login → POST /auth/login → accessToken
 
 ## Giữ nguyên (không thay đổi)
 
-- `src/hooks/useCases.ts` – Drafts vẫn dùng localStorage
 - `src/utils/storage.ts` – backup/restore localStorage
-- `src/pages/Drafts.tsx` – không chạm
-- `legalflow-backend/` – không sửa backend Phase 2
+- `legalflow-backend/` – không sửa backend API hiện tại
 
 ---
+
+## Phase 3.1: Chuyển Drafts sang dữ liệu Backend
+
+### Tóm tắt thay đổi
+- **Nguồn dữ liệu**: `Drafts.tsx` loại bỏ hoàn toàn hook `useCases` và dữ liệu `localStorage`.
+- **Luồng hoạt động**:
+  1. Khi người dùng truy cập trang `/drafts`, ứng dụng tự động thực hiện gọi API `casesApi.getCases({ limit: 100 })` để tải danh sách các hồ sơ hiện có từ backend DB.
+  2. Khi người dùng chọn hồ sơ và bấm **Tạo dự thảo**, ứng dụng sẽ thực hiện gọi `casesApi.getCase(selectedCaseId)` để lấy dữ liệu chi tiết mới nhất theo thời gian thực (bao gồm danh sách checklist chi tiết, thông tin liên hệ, lĩnh vực, trạng thái).
+  3. Định dạng mã hồ sơ sử dụng trực tiếp trường `caseCode` thay vì trường `caseId` cũ.
+  4. Thực hiện ánh xạ (mapping) ngôn ngữ tiếng Việt tự động cho các thông tin hiển thị trên văn bản dự thảo bằng cách sử dụng `constants.ts` (ví dụ: `field` thành `CASE_FIELD_LABELS[field]`, `type` thành `CASE_TYPE_LABELS[type]`, `status` thành `CASE_STATUS_LABELS[status]`, `neighborhood` thành `NEIGHBORHOOD_LABELS[neighborhood]`). Bản dự thảo hoàn toàn không hiển thị raw code của backend ngoại trừ mã hồ sơ `caseCode`.
+  5. Thông tin chuyên viên đảm nhận được cập nhật theo định dạng `assignedTo?.fullName` (nếu chưa có sẽ hiển thị `"Chưa phân công"`).
+
+### Logic Checklist Mới
+- Chuyển hoàn toàn logic kiểm tra trạng thái từ `checked` sang `isCompleted`.
+- Nhãn mô tả của checklist item sử dụng `title` thay vì `label` cũ.
+- Tài liệu còn thiếu được tính toán động dựa trên điều kiện `isCompleted === false`.
+
+### Quyết định thiết kế & Quyền hạn
+- **Không ghi log Drafts vào Backend**: Để tránh làm loãng và nhiễu các ghi chú chuyên môn nghiệp vụ của hồ sơ pháp lý, hoạt động tạo dự thảo trong Phase 3.1 sẽ **không** tự động tạo Note qua endpoint `POST /cases/:id/notes` hay ghi audit log vào DB. Thao tác audit riêng sẽ được thiết kế ở phase sau nếu cần.
+- **RBAC**: Do trang Drafts là chức năng đọc và xuất dữ liệu (không làm thay đổi trạng thái hay ghi dữ liệu mới lên DB), bất kỳ tài khoản nào có quyền xem hồ sơ (Admin, Manager, Staff, Viewer) đều có thể sử dụng đầy đủ các tính năng tạo, copy và xuất file Word `.docx` của Drafts.
+
+---
+
 
 ## Build verification
 
