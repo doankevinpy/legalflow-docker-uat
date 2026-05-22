@@ -1,6 +1,6 @@
 # Release Notes
 
-## v0.6.0-admin-user-management (22/05/2026)
+## v0.6.0-user-management (22/05/2026)
 
 ### Tính năng chính (Phase 4.1: Quản lý Người dùng)
 - **Hệ thống API CRUD Quản trị Người dùng**:
