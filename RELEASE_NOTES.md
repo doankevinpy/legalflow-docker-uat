@@ -1,6 +1,41 @@
 # Release Notes
 
+## v0.6.0-admin-user-management (22/05/2026)
+
+### Tính năng chính (Phase 4.1: Quản lý Người dùng)
+- **Hệ thống API CRUD Quản trị Người dùng**:
+  - Triển khai đầy đủ các endpoint `/users` (GET, POST, PATCH, DELETE, reset-password) được bảo mật nghiêm ngặt bằng `JwtAuthGuard` + `RolesGuard` chỉ cho phép vai trò `ADMIN` truy cập.
+- **Bảo mật và Phức tạp mật khẩu tạm thời**:
+  - Cho phép Admin tự nhập mật khẩu tạm thời thủ công (tối thiểu 8 ký tự, bắt buộc chứa chữ hoa, chữ thường, chữ số và ký tự đặc biệt).
+  - Tích hợp công cụ kiểm tra độ phức tạp của mật khẩu trong thời gian thực (live validation) tại Frontend để hỗ trợ Admin tạo mật khẩu mạnh.
+  - Bảo mật tuyệt đối: Ẩn mật khẩu sau khi lưu, không bao giờ ghi nhận mật khẩu thô hoặc `passwordHash` trong Backend console log hay trả về trong Response payload.
+- **Bảo vệ tài khoản tối cao và tài khoản hiện tại**:
+  - Vô hiệu hóa tính năng tự khóa hoặc tự xóa tài khoản của chính quản trị viên đang đăng nhập.
+  - Cơ chế chặn nghiêm ngặt trên Backend không cho phép khóa, xóa hoặc hạ cấp vai trò (`demote`) của tài khoản ADMIN cuối cùng đang hoạt động trên hệ thống.
+- **Chống Trùng lặp & Chuẩn hóa email**:
+  - Chuẩn hóa email trước khi lưu và khi đăng nhập bằng hàm `trim().toLowerCase()`.
+  - Kiểm tra trùng lặp email và trả về mã lỗi `409 Conflict` nếu email đã tồn tại.
+- **Chặn Xóa cứng theo liên kết dữ liệu (Hard Delete Safeguard)**:
+  - Trước khi xóa người dùng, hệ thống kiểm tra sự tồn tại của dữ liệu liên kết trên 4 bảng nghiệp vụ: `LegalCase`, `CaseNote`, `CaseHistory`, `CaseChecklistItem`.
+  - Nếu đã phát sinh dữ liệu nghiệp vụ liên kết, Backend sẽ chặn hành động xóa cứng và trả lỗi 409 Conflict. Giao diện Frontend hiển thị thông báo khuyên dùng tính năng **Khóa tài khoản** thay thế để bảo toàn tính toàn vẹn của lịch sử nghiệp vụ.
+- **JWT Hardening & Khóa người dùng tức thì (Real-time Lockout)**:
+  - Cấu hình lại `JwtStrategy` thực hiện truy vấn trực tiếp cơ sở dữ liệu trên mỗi request để xác minh trạng thái `isActive` và `role` hiện hành.
+  - Nếu một tài khoản bị Admin khóa hoặc thay đổi vai trò, các yêu cầu API tiếp theo của tài khoản đó sẽ lập tức bị chặn hoặc áp dụng phân quyền mới theo thời gian thực mà không cần chờ Token JWT cũ hết hạn.
+- **Frontend Quản trị Hiện đại**:
+  - Thêm trang Quản lý tài khoản `/users` với thiết kế cao cấp, bảng thống kê thành viên trực quan kèm các badge vai trò (Rose cho Admin, Purple cho Manager, Blue cho Staff, Slate cho Viewer) và avatar tự động.
+  - Sidebar hiển thị linh hoạt: ẩn menu "Quản lý tài khoản" đối với non-ADMIN.
+  - Tích hợp tìm kiếm và lọc thời gian thực.
+  - Toàn bộ thao tác khóa/mở khóa, đặt lại mật khẩu, đổi role, xóa tài khoản đều tích hợp hộp thoại xác nhận chi tiết.
+
+### Quyết định thiết kế & Giới hạn đã biết (Known limitations)
+- **Không deploy public internet**: Hệ thống chỉ hoạt động trong mạng nội bộ (Offline/Intranet) hoặc thông qua cổng localhost để phục vụ đợt thử nghiệm.
+- **Không dùng dữ liệu thật**: Nghiêm cấm sử dụng thông tin cá nhân hoặc hồ sơ thực tế. Chỉ sử dụng dữ liệu giả lập (mock data).
+- **SQLite MVP**: Vẫn sử dụng SQLite làm công cụ lưu trữ dữ liệu cục bộ cho giai đoạn thử nghiệm MVP.
+
+---
+
 ## v0.5.0-safe-ops-backup-restore (22/05/2026)
+
 
 ### Tính năng chính (Phase 4: Safe Operations & Backup/Restore)
 - **Động cơ Sao lưu & Khôi phục SQLite Khép Kín**:

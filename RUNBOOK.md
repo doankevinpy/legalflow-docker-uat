@@ -212,3 +212,43 @@ Nếu server không khởi động được do cổng bị chiếm dụng, hãy 
 ### 8.2. Lỗi khóa tệp tin DB khi Restore (EBUSY hoặc EPERM)
 - **Nguyên nhân**: Bạn cố gắng chạy lệnh khôi phục (`db:restore`) trong khi server Backend (`npm run start:dev`) vẫn đang hoạt động. Hệ điều hành Windows khóa tệp cơ sở dữ liệu SQLite nhằm bảo vệ dữ liệu, ngăn chặn việc ghi đè trực tiếp.
 - **Cách khắc phục**: Nhấn `Ctrl + C` tại terminal đang chạy backend hoặc kill port 3000 theo hướng dẫn bên trên, sau đó thực hiện lại lệnh restore. Sau khi restore thành công, bật lại server backend.
+
+---
+
+## 9. Hướng dẫn Vận hành Quản lý Người dùng (Phase 4.1)
+
+Tính năng **Quản lý người dùng** được giới hạn nghiêm ngặt và chỉ hiển thị/cho phép truy cập đối với tài khoản có vai trò `ADMIN`.
+
+### 9.1. Phân quyền và Bảo mật Trang Quản trị
+- **Sidebar**: Mục menu "Quản lý tài khoản" chỉ hiển thị với vai trò `ADMIN`.
+- **Bảo vệ Route**: Nếu bất kỳ tài khoản nào có vai trò `MANAGER`, `STAFF`, hoặc `VIEWER` cố tình truy cập vào `/users` bằng cách nhập trực tiếp URL, hệ thống sẽ tự động chặn và redirect về `/dashboard` lập tức nhờ `ProtectedRoute` kết hợp danh sách `allowedRoles: ['ADMIN']`.
+- **JWT Hardening**: Cơ chế JWT Strategy trên Backend thực hiện truy vấn trực tiếp Database trên mỗi request để xác thực trạng thái `isActive` và vai trò `role` hiện tại. Nếu tài khoản bị khóa (`isActive: false`) hoặc vai trò bị thay đổi, hành động tiếp theo của tài khoản đó sẽ lập tức áp dụng quyền mới mà không cần đợi Token JWT cũ hết hạn.
+
+### 9.2. Quy trình Thêm người dùng mới
+1. Admin đăng nhập và truy cập trang **Quản lý tài khoản** (`/users`).
+2. Bấm nút **Tạo tài khoản mới** để mở modal form.
+3. Nhập đầy đủ thông tin: Email, Họ và tên, Vai trò và **Mật khẩu tạm thời**.
+   - *Lưu ý*: Mật khẩu tạm thời do Admin tự nhập thủ công (tối thiểu 8 ký tự, phải có chữ hoa, chữ thường, số và ký tự đặc biệt). Hệ thống cung cấp panel kiểm tra độ phức tạp của mật khẩu thời gian thực (live validation).
+   - Hệ thống normalizes email thành chữ thường và trim khoảng trắng (`trim().toLowerCase()`) để đảm bảo không trùng lặp.
+4. Bấm **Lưu tài khoản**. Hệ thống sẽ mã hóa mật khẩu bằng `bcrypt` trước khi lưu và ghi nhận hành động vào console log của Backend (`[CREATE_USER]`). Mật khẩu tạm thời sẽ được ẩn đi ngay sau khi lưu để bảo mật thông tin.
+5. Admin tự gửi mật khẩu tạm này cho người dùng qua các kênh trao đổi an toàn riêng biệt.
+
+### 9.3. Đặt lại Mật khẩu tạm thời (Reset Password)
+1. Trong danh sách người dùng, bấm nút biểu tượng **Chìa khóa** (`KeyRound`) tại hàng của người dùng cần đặt lại mật khẩu.
+2. Nhập mật khẩu tạm thời mới thỏa mãn đầy đủ các tiêu chuẩn bảo mật tối thiểu 8 ký tự.
+3. Xác nhận cập nhật. Backend sẽ băm (hash) mật khẩu mới và ghi nhận log `[RESET_PASSWORD]`.
+4. Người dùng sử dụng mật khẩu mới để đăng nhập.
+
+### 9.4. Tạm khóa/Mở khóa người dùng
+1. Bấm nút biểu tượng **Khóa/Mở khóa** (`Lock`/`Unlock`) tại hàng của người dùng.
+2. Xác nhận tại pop-up cảnh báo.
+3. **Cơ chế Bảo vệ đặc biệt**:
+   - Quản trị viên **không thể tự khóa tài khoản của chính mình**. Nút khóa trên dòng của bản thân sẽ bị vô hiệu hóa (disabled).
+   - **Tài khoản ADMIN duy nhất còn hoạt động** trên hệ thống sẽ bị chặn không cho khóa hoặc chuyển vai trò sang vai trò thấp hơn nhằm tránh tình trạng hệ thống mất đi quyền Admin điều hành tối cao.
+
+### 9.5. Xóa tài khoản vĩnh viễn (Hard Delete)
+- **Ràng buộc an toàn dữ liệu**: Hệ thống chỉ cho phép xóa cứng các tài khoản chưa thực hiện bất kỳ hoạt động nghiệp vụ nào có liên kết dữ liệu trong 4 bảng: `LegalCase`, `CaseNote`, `CaseHistory`, `CaseChecklistItem`.
+- Nếu tài khoản đã có dữ liệu liên kết, API sẽ lập tức trả về mã lỗi `409 Conflict`. Trình duyệt sẽ hiển thị cảnh báo dễ hiểu: *"Không thể xóa tài khoản này vì đã có dữ liệu nghiệp vụ liên kết. Hãy khóa tài khoản thay thế."*
+- Admin được khuyên dùng tính năng **Khóa tài khoản** để chặn truy cập nhưng vẫn bảo toàn tính toàn vẹn của lịch sử nghiệp vụ.
+- Admin không thể tự xóa tài khoản của chính mình hoặc xóa tài khoản ADMIN duy nhất còn lại trên hệ thống.
+

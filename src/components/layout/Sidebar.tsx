@@ -1,4 +1,3 @@
-import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -7,7 +6,9 @@ import {
   Scale,
   Settings,
   Shield,
+  Users,
 } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { canCreate } from '../../lib/rbac';
 
@@ -26,6 +27,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     { name: 'Tạo mới',          href: '/cases/new',  icon: PlusCircle,      show: canCreate(role) },
     { name: 'Dự thảo văn bản',  href: '/drafts',     icon: FileText,        show: true },
     { name: 'Công cụ Ẩn danh',  href: '/anonymizer', icon: Shield,          show: true },
+    { name: 'Quản lý tài khoản', href: '/users',      icon: Users,           show: role === 'ADMIN' },
     { name: 'Cài đặt',          href: '/settings',   icon: Settings,        show: true },
   ];
 
