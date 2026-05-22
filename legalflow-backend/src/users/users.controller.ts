@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -29,6 +30,7 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto, req.user);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
   resetPassword(@Param('id') id: string, @Body() resetPasswordDto: ResetPasswordDto, @Request() req: any) {

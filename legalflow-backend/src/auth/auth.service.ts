@@ -19,16 +19,41 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const normalizedEmail = loginDto.email.trim().toLowerCase();
     const user = await this.usersService.findByEmail(normalizedEmail);
+    
     if (!user) {
+      await this.auditLogsService.logAction({
+        actorUserId: undefined,
+        actorEmail: normalizedEmail,
+        action: 'LOGIN_FAILED',
+        targetUserId: undefined,
+        targetEmail: normalizedEmail,
+        details: { email: normalizedEmail, result: 'failed', reason: 'Email not found', timestamp: new Date().toISOString() },
+      });
       throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
 
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
     if (!isPasswordValid) {
+      await this.auditLogsService.logAction({
+        actorUserId: user.id,
+        actorEmail: user.email,
+        action: 'LOGIN_FAILED',
+        targetUserId: user.id,
+        targetEmail: user.email,
+        details: { email: user.email, result: 'failed', reason: 'Invalid password', timestamp: new Date().toISOString() },
+      });
       throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
 
     if (!user.isActive) {
+      await this.auditLogsService.logAction({
+        actorUserId: user.id,
+        actorEmail: user.email,
+        action: 'LOGIN_FAILED',
+        targetUserId: user.id,
+        targetEmail: user.email,
+        details: { email: user.email, result: 'failed', reason: 'Account locked', timestamp: new Date().toISOString() },
+      });
       throw new UnauthorizedException('Tài khoản này đã bị khóa hoặc ngừng hoạt động');
     }
 
@@ -36,6 +61,15 @@ export class AuthService {
     
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...userWithoutPassword } = user;
+
+    await this.auditLogsService.logAction({
+      actorUserId: user.id,
+      actorEmail: user.email,
+      action: 'LOGIN_SUCCESS',
+      targetUserId: user.id,
+      targetEmail: user.email,
+      details: { email: user.email, result: 'success', timestamp: new Date().toISOString() },
+    });
 
     return {
       accessToken: this.jwtService.sign(payload),
