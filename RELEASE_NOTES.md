@@ -1,5 +1,20 @@
 # Release Notes
 
+## v0.8.0-admin-audit-logs (22/05/2026)
+
+### Tính năng chính (Phase 4.3: Admin Audit Logs)
+- **Cơ sở dữ liệu (Database)**: Thêm bảng `AdminAuditLog` để lưu vết mọi thao tác quản trị tài khoản người dùng, bao gồm các index (`action`, `actorEmail`, `targetEmail`, `createdAt`) giúp truy xuất nhanh.
+- **Backend API**: 
+  - Triển khai `GET /admin-audit-logs` chỉ dành riêng cho quyền ADMIN (`RolesGuard` + `JwtAuthGuard`). 
+  - Hỗ trợ phân trang (pagination) và lọc (filters) theo `action`, `actor`, `target`, `startDate`, `endDate`.
+  - Tích hợp lớp bảo vệ `sanitizer` trước khi lưu vào DB: loại bỏ hoàn toàn các keys nhạy cảm như `password`, `passwordTemp`, `passwordHash`, `accessToken`, `DATABASE_URL` khỏi trường `details`.
+- **Hành động được ghi log (Actions Logged)**: `CREATE_USER`, `UPDATE_USER`, `CHANGE_ROLE`, `LOCK_USER`, `UNLOCK_USER`, `RESET_PASSWORD`, `DELETE_USER`, `CHANGE_PASSWORD`.
+- **Frontend UI**:
+  - Giao diện "Nhật ký hệ thống" (đặt dưới "Quản lý tài khoản" trong Sidebar), bảo mật chỉ ADMIN mới xem được.
+  - Tích hợp bảng hiển thị audit log có filter, search và pagination đầy đủ.
+- **Kết quả kiểm thử tự động (Automated Runtime Test)**:
+  - Script test nội bộ `test-audit.js` tự động vượt qua 100% kịch bản kiểm tra: tạo, khóa, mở khóa, reset password, đổi password, đổi role, xóa test user, chặn 403 các role Manager/Staff, không lộ secret vào DB.
+
 ## v0.7.0-user-profile-change-password (22/05/2026)
 
 ### Tính năng chính (Phase 4.2: Hồ sơ Người dùng & Tự đổi Mật khẩu)
