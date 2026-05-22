@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { AdminAuditLogsService } from '../admin-audit-logs/admin-audit-logs.service';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +13,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private auditLogsService: AdminAuditLogsService,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -74,6 +76,15 @@ export class AuthService {
 
     // In log quản trị sử dụng NestJS Logger
     this.logger.log(`[CHANGE_PASSWORD] User (${user.email}) changed password successfully`);
+
+    await this.auditLogsService.logAction({
+      actorUserId: user.id,
+      actorEmail: user.email,
+      action: 'CHANGE_PASSWORD',
+      targetUserId: user.id,
+      targetEmail: user.email,
+      details: {}, // Empty details to avoid logging passwords
+    });
 
     return {
       message: 'Thay đổi mật khẩu thành công. Vui lòng đăng nhập lại.',

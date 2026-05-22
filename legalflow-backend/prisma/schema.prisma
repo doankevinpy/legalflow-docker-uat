@@ -98,3 +98,19 @@ model CaseChecklistItem {
   completedBy   User?     @relation(fields: [completedById], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
 }
+
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?
+  actorEmail   String
+  action       String
+  targetUserId String?
+  targetEmail  String?
+  details      String   @default("{}")
+  createdAt    DateTime @default(now())
+
+  @@index([action])
+  @@index([actorEmail])
+  @@index([targetEmail])
+  @@index([createdAt])
+}

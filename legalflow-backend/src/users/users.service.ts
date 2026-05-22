@@ -4,12 +4,16 @@ import { User } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { AdminAuditLogsService } from '../admin-audit-logs/admin-audit-logs.service';
 
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger('UsersService');
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly auditLogsService: AdminAuditLogsService,
+  ) {}
 
   private readonly safeSelect = {
     id: true,
@@ -68,6 +72,19 @@ export class UsersService {
     });
 
     this.logger.log(`[CREATE_USER] Admin (${adminUser.email}) created user (${newUser.email}) with role (${newUser.role})`);
+    
+    await this.auditLogsService.logAction({
+      actorUserId: adminUser.id,
+      actorEmail: adminUser.email,
+      action: 'CREATE_USER',
+      targetUserId: newUser.id,
+      targetEmail: newUser.email,
+      details: {
+        role: newUser.role,
+        fullName: newUser.fullName,
+      },
+    });
+
     return newUser;
   }
 
@@ -115,14 +132,38 @@ export class UsersService {
     if (updateUserDto.isActive !== undefined) {
       const action = updateUserDto.isActive ? 'UNLOCK_USER' : 'LOCK_USER';
       this.logger.log(`[${action}] Admin (${adminUser.email}) ${updateUserDto.isActive ? 'unlocked' : 'locked'} user (${updatedUser.email})`);
+      await this.auditLogsService.logAction({
+        actorUserId: adminUser.id,
+        actorEmail: adminUser.email,
+        action: action,
+        targetUserId: updatedUser.id,
+        targetEmail: updatedUser.email,
+        details: { oldIsActive: targetUser.isActive, newIsActive: updatedUser.isActive },
+      });
     }
 
     if (updateUserDto.role !== undefined && updateUserDto.role !== targetUser.role) {
       this.logger.log(`[CHANGE_ROLE] Admin (${adminUser.email}) changed role of user (${updatedUser.email}) from (${targetUser.role}) to (${updatedUser.role})`);
+      await this.auditLogsService.logAction({
+        actorUserId: adminUser.id,
+        actorEmail: adminUser.email,
+        action: 'CHANGE_ROLE',
+        targetUserId: updatedUser.id,
+        targetEmail: updatedUser.email,
+        details: { oldRole: targetUser.role, newRole: updatedUser.role },
+      });
     }
 
     if (updateUserDto.fullName !== undefined && updateUserDto.fullName !== targetUser.fullName) {
       this.logger.log(`[UPDATE_USER] Admin (${adminUser.email}) updated fullName of user (${updatedUser.email})`);
+      await this.auditLogsService.logAction({
+        actorUserId: adminUser.id,
+        actorEmail: adminUser.email,
+        action: 'UPDATE_USER',
+        targetUserId: updatedUser.id,
+        targetEmail: updatedUser.email,
+        details: { changedFields: ['fullName'] },
+      });
     }
 
     return updatedUser;
@@ -144,6 +185,16 @@ export class UsersService {
     });
 
     this.logger.log(`[RESET_PASSWORD] Admin (${adminUser.email}) reset password for user (${targetUser.email})`);
+    
+    await this.auditLogsService.logAction({
+      actorUserId: adminUser.id,
+      actorEmail: adminUser.email,
+      action: 'RESET_PASSWORD',
+      targetUserId: targetUser.id,
+      targetEmail: targetUser.email,
+      details: {},
+    });
+
     return { message: 'Đặt lại mật khẩu thành công' };
   }
 
@@ -213,6 +264,16 @@ export class UsersService {
     });
 
     this.logger.log(`[DELETE_USER] Admin (${adminUser.email}) deleted user (${targetUser.email})`);
+    
+    await this.auditLogsService.logAction({
+      actorUserId: adminUser.id,
+      actorEmail: adminUser.email,
+      action: 'DELETE_USER',
+      targetUserId: targetUser.id,
+      targetEmail: targetUser.email,
+      details: { role: targetUser.role },
+    });
+
     return { success: true };
   }
 
