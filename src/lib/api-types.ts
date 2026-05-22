@@ -127,3 +127,10 @@ export interface QueryCasesParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
+
+export interface ChangePasswordDto {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+

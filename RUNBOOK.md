@@ -254,3 +254,42 @@ Tính năng **Quản lý người dùng** được giới hạn nghiêm ngặt v
 - Admin được khuyên dùng tính năng **Khóa tài khoản** để chặn truy cập nhưng vẫn bảo toàn tính toàn vẹn của lịch sử nghiệp vụ.
 - Admin không thể tự xóa tài khoản của chính mình hoặc xóa tài khoản ADMIN duy nhất còn lại trên hệ thống.
 
+---
+
+## 10. Hướng dẫn Tự Đổi Mật Khẩu và Quản Lý Hồ Sơ (Phase 4.2)
+
+Hệ thống cho phép tất cả người dùng đang hoạt động (không phân biệt vai trò) tự xem thông tin cá nhân và thay đổi mật khẩu của chính mình để bảo mật tài khoản.
+
+### 10.1. Xem thông tin Hồ sơ cá nhân (My Profile)
+- Người dùng truy cập menu **Cài đặt** trên thanh điều hướng (hoặc truy cập đường dẫn `/settings`).
+- Chọn tab **Tài khoản của tôi** để xem các thông tin chi tiết:
+  - **Họ và tên**: Tên hiển thị đầy đủ trên hệ thống.
+  - **Địa chỉ Email**: Email tài khoản dùng để đăng nhập.
+  - **Vai trò**: Quyền hạn hiện hành (`ADMIN`/`MANAGER`/`STAFF`/`VIEWER`).
+  - **Trạng thái**: Tình trạng hoạt động thời gian thực.
+- Toàn bộ thông tin này được lấy trực tiếp từ JWT Token đã được xác thực an toàn thông qua API `/auth/profile` hoặc `/auth/me`.
+
+### 10.2. Quy trình Tự Đổi Mật Khẩu
+1. Tại tab **Tài khoản của tôi**, di chuyển đến khu vực **Đổi mật khẩu tài khoản**.
+2. Nhập các trường thông tin:
+   - **Mật khẩu hiện tại**: Phải khớp chính xác với mật khẩu hiện tại (xác thực bằng `bcrypt.compare` phía máy chủ).
+   - **Mật khẩu mới**: Phải đạt các tiêu chuẩn an toàn bắt buộc:
+     - Độ dài tối thiểu **8 ký tự**.
+     - Có ít nhất 1 chữ viết hoa (`A-Z`).
+     - Có ít nhất 1 chữ viết thường (`a-z`).
+     - Có ít nhất 1 chữ số (`0-9`).
+     - Có ít nhất 1 ký tự đặc biệt (`@$!%*?&#`).
+     - *Lưu ý*: Mật khẩu mới không được trùng khớp hoàn toàn với mật khẩu hiện tại.
+   - **Xác nhận mật khẩu mới**: Phải trùng khớp 100% với mật khẩu mới đã nhập.
+3. **Tiện ích Hỗ trợ**:
+   - Sử dụng biểu tượng **Mắt ẩn/hiện** ở góc phải mỗi trường để kiểm tra ký tự đã nhập.
+   - Theo dõi **Bảng tiêu chuẩn mật khẩu bảo mật (Real-time Checklist)**: Các tiêu chí sẽ tự động chuyển màu xanh lá cây kèm dấu check (`✓`) khi mật khẩu nhập vào đạt yêu cầu, giúp người dùng dễ dàng kiểm soát độ phức tạp.
+4. Bấm nút **Cập nhật mật khẩu mới**.
+5. **Cơ chế Hủy phiên và Đăng xuất tự động**:
+   - Sau khi Backend xử lý đổi mật khẩu thành công và trả về mã `200 OK`, Frontend sẽ hiển thị thông điệp thành công.
+   - Hệ thống trì hoãn **đúng 1.5 giây** để người dùng đọc thông tin, sau đó gọi phương thức `logout()` của `AuthContext`.
+   - Token truy cập (`lf_access_token`) sẽ bị xóa sạch khỏi `sessionStorage`, phiên làm việc cũ kết thúc ngay lập tức.
+   - Người dùng được chuyển hướng về màn hình `/login` để thực hiện đăng nhập lại bằng mật khẩu mới.
+   - Ghi nhận Audit Log phía Backend: `[CHANGE_PASSWORD] User (email) changed password successfully` (Tuyệt đối không log thông tin clear-text của mật khẩu cũ/mới).
+
+

@@ -215,4 +215,12 @@ export class UsersService {
     this.logger.log(`[DELETE_USER] Admin (${adminUser.email}) deleted user (${targetUser.email})`);
     return { success: true };
   }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+    });
+  }
 }
+

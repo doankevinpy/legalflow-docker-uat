@@ -113,5 +113,25 @@ Tài liệu này đóng vai trò là kịch bản nghiệm thu thực tế, giú
 | **UM-09** | **Bảo mật Log và Response** | 1. Admin mở console log của Backend hoặc xem database SQLite.<br>2. Kiểm tra log của các thao tác `CREATE_USER`, `UPDATE_USER`, `RESET_PASSWORD` vừa qua.<br>3. Kiểm tra payload response từ mạng (F12 Network). | 1. Các hành động được ghi nhận đầy đủ với prefix chuẩn.<br>2. **Tuyệt đối không chứa mật khẩu tạm hoặc passwordHash** trong console logs.<br>3. Response payload chỉ chứa các trường thông tin cơ bản an toàn, **không bao giờ trả về passwordHash, JWT_SECRET hay DATABASE_URL**. | [ ] |
 
 ---
+
+## 5. Nghiệm thu Hồ sơ cá nhân & Tự đổi mật khẩu (Phase 4.2)
+
+### Kịch bản 9: Hồ sơ người dùng & Tự đổi mật khẩu
+
+| ID | Test Case | Các bước thực hiện (Steps) | Kết quả mong đợi (Expected Result) | Trạng thái |
+|:---|:---|:---|:---|:---|
+| **UP-01** | **Xem hồ sơ cá nhân** | 1. Đăng nhập bằng tài khoản bất kỳ (Ví dụ: `staff@legalflow.local`).<br>2. Truy cập `/settings`. <br>3. Chọn tab **Tài khoản của tôi**. | Hiển thị đúng Họ tên, Email, Vai trò (STAFF) và Trạng thái hoạt động, khớp hoàn toàn với tài khoản đang đăng nhập. | [ ] |
+| **UP-02** | **Đổi mật khẩu - Sai mật khẩu hiện tại** | 1. Tại tab Tài khoản của tôi, nhập Mật khẩu hiện tại sai.<br>2. Nhập Mật khẩu mới đạt chuẩn và xác nhận khớp.<br>3. Bấm **Cập nhật mật khẩu mới**. | Hệ thống chặn thao tác, hiển thị Banner lỗi rõ ràng: *"Mật khẩu hiện tại không chính xác"*. Người dùng vẫn duy trì đăng nhập, mật khẩu cũ không bị đổi. | [ ] |
+| **UP-03** | **Đổi mật khẩu - Mật khẩu mới yếu** | 1. Nhập Mật khẩu hiện tại đúng.<br>2. Nhập Mật khẩu mới vi phạm tiêu chuẩn (ví dụ chỉ có 6 ký tự hoặc không có ký tự đặc biệt). | 1. Real-time Checklist hiển thị các tiêu chí chưa đạt bằng màu đỏ hoặc xám kèm dấu X.<br>2. Nút "Cập nhật mật khẩu mới" bị disabled hoàn toàn, không thể nhấn submit. | [ ] |
+| **UP-04** | **Đổi mật khẩu - Xác nhận không khớp** | 1. Nhập Mật khẩu hiện tại đúng.<br>2. Nhập Mật khẩu mới đạt chuẩn.<br>3. Nhập Mật khẩu xác nhận khác mật khẩu mới. | 1. Hiển thị cảnh báo màu đỏ: *"Mật khẩu xác nhận chưa trùng khớp"*.<br>2. Nút Cập nhật bị disabled, không cho submit. | [ ] |
+| **UP-05** | **Đổi mật khẩu - Trùng mật khẩu cũ** | 1. Nhập Mật khẩu hiện tại đúng.<br>2. Nhập Mật khẩu mới trùng khớp 100% mật khẩu hiện tại.<br>3. Nhập xác nhận khớp -> Bấm cập nhật. | Hệ thống chặn thao tác và hiển thị Banner lỗi rõ ràng: *"Mật khẩu mới không được trùng với mật khẩu hiện tại"*. | [ ] |
+| **UP-06** | **Đổi mật khẩu thành công & Đăng xuất** | 1. Nhập Mật khẩu hiện tại đúng (`Staff@123!`).<br>2. Nhập Mật khẩu mới đạt chuẩn (`NewStaff@123!`) và xác nhận khớp.<br>3. Bấm **Cập nhật mật khẩu mới**. | 1. Form chuyển sang trạng thái Loading (hiển thị Spinner trên nút).<br>2. Đổi mật khẩu thành công, hiển thị Banner thành công màu xanh lá.<br>3. **Đúng 1.5 giây sau**, hệ thống tự động đăng xuất, xóa sạch token khỏi `sessionStorage` và điều hướng về trang `/login`. | [ ] |
+| **UP-07** | **Xác minh hiệu lực mật khẩu mới** | 1. Tại màn hình `/login`, thử đăng nhập lại tài khoản đó bằng mật khẩu cũ (`Staff@123!`).<br>2. Thử đăng nhập lại bằng mật khẩu mới (`NewStaff@123!`). | 1. Đăng nhập bằng mật khẩu cũ bị từ chối truy cập.<br>2. Đăng nhập bằng mật khẩu mới thành công, đưa người dùng vào Dashboard hoạt động bình thường. | [ ] |
+| **UP-08** | **Chống giả mạo userId** | 1. Đăng nhập bằng tài khoản Staff.<br>2. Dùng công cụ cURL/Postman giả lập gửi request đổi mật khẩu `POST /auth/change-password` nhưng chèn thêm trường ID của Admin trong body hoặc query string.<br>3. Xác nhận kết quả. | Hệ thống chỉ đổi mật khẩu của CHÍNH tài khoản Staff đang gửi request (lấy từ `req.user.id` của token giải mã), hoàn toàn không làm ảnh hưởng đến mật khẩu của Admin. | [ ] |
+| **UP-09** | **Bảo mật logs & response** | 1. Kiểm tra Network response của API đổi mật khẩu thành công.<br>2. Kiểm tra console log phía Backend Server. | 1. Response không chứa bất kỳ trường nào liên quan đến `passwordHash` hay mật khẩu thô.<br>2. Backend log chỉ in dòng: `[CHANGE_PASSWORD] User (email) changed password successfully`, tuyệt đối không rò rỉ mật khẩu thô. | [ ] |
+| **UP-10** | **Bảo toàn chức năng cũ (Settings)** | 1. Truy cập tab **Cài đặt hệ thống & Dữ liệu**.<br>2. Kiểm tra các chức năng: sao lưu JSON, khôi phục JSON, MigrationPanel và dọn dẹp localStorage. | Tất cả chức năng cũ đều hiển thị đầy đủ, giữ nguyên các biến trạng thái, hoạt động ổn định và chính xác 100% không bị ảnh hưởng. | [ ] |
+
+---
 *Mọi kết quả kiểm thử không khớp với Kết quả mong đợi (Expected Result) đều được coi là Fail và cần được chụp màn hình, ghi nhận log lỗi gửi cho nhóm phát triển.*
+
 

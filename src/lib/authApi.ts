@@ -3,7 +3,7 @@
 // ============================================================
 
 import { apiClient } from './apiClient';
-import type { ApiUser, LoginResponse } from './api-types';
+import type { ApiUser, LoginResponse, ChangePasswordDto } from './api-types';
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -11,4 +11,7 @@ export const authApi = {
 
   getProfile: () =>
     apiClient.get<ApiUser>('/auth/profile'),
+
+  changePassword: (dto: ChangePasswordDto) =>
+    apiClient.post<{ message: string }>('/auth/change-password', dto),
 };

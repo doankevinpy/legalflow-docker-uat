@@ -1,6 +1,28 @@
 # Release Notes
 
+## v0.7.0-user-profile-change-password (22/05/2026)
+
+### Tính năng chính (Phase 4.2: Hồ sơ Người dùng & Tự đổi Mật khẩu)
+- **Tự đổi mật khẩu bảo mật**:
+  - Triển khai endpoint `POST /auth/change-password` bảo vệ bởi `JwtAuthGuard`, tuyệt đối chống giả mạo bằng cách trích xuất `userId` trực tiếp từ JWT payload đã xác thực (`req.user.id`).
+  - Tích hợp so khớp mật khẩu hiện tại bằng `bcrypt.compare` với cơ sở dữ liệu.
+  - Áp dụng các quy tắc validate mật khẩu nghiêm ngặt: độ dài $\ge 8$, bắt buộc chứa cả chữ hoa, chữ thường, chữ số và ký tự đặc biệt, đồng thời không cho phép trùng mật khẩu hiện tại.
+  - Bảo mật tuyệt đối: Không phản hồi `passwordHash` hay mật khẩu rõ, không in các thông tin nhạy cảm này ra console hay file log.
+- **Alias Endpoint `/auth/me`**:
+  - Thêm endpoint `GET /auth/me` chạy song song cùng `GET /auth/profile` để trả về thông tin người dùng hiện tại an toàn.
+- **Tái cấu trúc UI Settings thành dạng Tabs**:
+  - **Tab "Tài khoản của tôi"**: 
+    - Hiển thị thông tin cá nhân hiện thời của người dùng: Họ tên, Email, Vai trò, Trạng thái hoạt động đọc động từ `useAuth().user`.
+    - Form tự đổi mật khẩu hoàn chỉnh: hỗ trợ icon mắt để ẩn/hiện mật khẩu, checklist tiêu chuẩn độ mạnh mật khẩu kiểm tra theo thời gian thực (Real-time strength checklist) đổi màu xanh khi đạt tiêu chí.
+    - Cơ chế **Đăng xuất tự động (Auto Logout)**: Đổi mật khẩu thành công sẽ báo xanh lá, đợi 1.5 giây để tăng trải nghiệm người dùng, sau đó xóa token khỏi `sessionStorage` và điều hướng về trang đăng nhập `/login`.
+  - **Tab "Cài đặt hệ thống"**: Bảo toàn 100% các tính năng cũ (sao lưu dữ liệu local dưới dạng JSON, khôi phục từ tệp JSON, Migration Panel di trú dữ liệu lên backend, dọn dẹp localStorage an toàn).
+
+### Quyết định thiết kế & Giới hạn đã biết (Known limitations)
+- **Hủy phiên hoạt động**: Nhờ cơ chế tự động đăng xuất phía Client (xóa token), người dùng đổi mật khẩu sẽ bị kết thúc phiên cũ ngay lập tức, đảm bảo an toàn tối đa mà không làm phức tạp hóa database schema.
+- **Trạng thái sẵn sàng**: Thử nghiệm nội bộ cục bộ bằng dữ liệu giả, chưa triển khai internet công cộng và chưa sử dụng dữ liệu pháp lý thật.
+
 ## v0.6.0-user-management (22/05/2026)
+
 
 ### Tính năng chính (Phase 4.1: Quản lý Người dùng)
 - **Hệ thống API CRUD Quản trị Người dùng**:
