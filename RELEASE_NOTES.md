@@ -28,9 +28,11 @@
   - Toàn bộ thao tác khóa/mở khóa, đặt lại mật khẩu, đổi role, xóa tài khoản đều tích hợp hộp thoại xác nhận chi tiết.
 
 ### Quyết định thiết kế & Giới hạn đã biết (Known limitations)
-- **Không deploy public internet**: Hệ thống chỉ hoạt động trong mạng nội bộ (Offline/Intranet) hoặc thông qua cổng localhost để phục vụ đợt thử nghiệm.
-- **Không dùng dữ liệu thật**: Nghiêm cấm sử dụng thông tin cá nhân hoặc hồ sơ thực tế. Chỉ sử dụng dữ liệu giả lập (mock data).
-- **SQLite MVP**: Vẫn sử dụng SQLite làm công cụ lưu trữ dữ liệu cục bộ cho giai đoạn thử nghiệm MVP.
+- **Trạng thái sẵn sàng**: Đủ điều kiện chạy thử nội bộ cục bộ bằng dữ liệu giả.
+- **Chưa dùng dữ liệu thật**: Tuyệt đối chưa dùng dữ liệu pháp lý thật hay thông tin cá nhân thực tế (PII).
+- **Chưa deploy public internet**: Hệ thống chỉ chạy cục bộ (Offline/Intranet) thông qua cổng localhost để phục vụ đợt thử nghiệm.
+- **Chưa có upload file thật**: Các tệp đính kèm trong hồ sơ vẫn ở dạng thông tin metadata JSON giả lập, chưa tải file vật lý thật lên máy chủ.
+- **SQLite chỉ dùng cho MVP/local trial**: SQLite là hệ quản trị cơ sở dữ liệu dạng tệp tin cục bộ, chỉ phục vụ cho giai đoạn thử nghiệm MVP hiện hành.
 
 ---
 

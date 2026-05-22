@@ -1,4 +1,4 @@
-# Cẩm nang Vận hành và Bảo mật LegalFlow v0.4.2 (RUNBOOK)
+# Cẩm nang Vận hành và Bảo mật LegalFlow v0.6.0 (RUNBOOK)
 
 Tài liệu này cung cấp hướng dẫn từng bước và toàn diện cho các quản trị viên để cài đặt, cấu hình, vận hành và khôi phục hệ thống **LegalFlow MVP** một cách an toàn nhất trên môi trường Windows.
 
@@ -6,9 +6,11 @@ Tài liệu này cung cấp hướng dẫn từng bước và toàn diện cho c
 
 > [!CAUTION]
 > **QUY TẮC AN TOÀN DỮ LIỆU THỬ NGHIỆM (CỰC KỲ QUAN TRỌNG)**:
-> 1. **KHÔNG deploy public internet**: Hệ thống chỉ chạy cục bộ (Offline/Intranet) thông qua cổng localhost. Tuyệt đối không triển khai ra môi trường mạng công cộng.
-> 2. **KHÔNG nhập dữ liệu pháp lý thật**: Chỉ sử dụng các thông tin và tài liệu giả định (mock data). Tuyệt đối không nhập thông tin cá nhân khách hàng (PII) hoặc hồ sơ vụ việc thực tế trong giai đoạn dùng thử nội bộ này.
-> 3. **Tài khoản seed**: Chỉ sử dụng cho mục đích demo/kiểm thử. Không dùng tài khoản seed mặc định cho các nghiệp vụ chứa dữ liệu thật sau này.
+> 1. **Trạng thái sẵn sàng**: Hệ thống đã đủ điều kiện chạy thử nội bộ cục bộ bằng dữ liệu giả.
+> 2. **Chưa dùng dữ liệu pháp lý thật**: Tuyệt đối nghiêm cấm nhập thông tin cá nhân khách hàng (PII) hoặc hồ sơ vụ việc thực tế trong giai đoạn dùng thử nội bộ này.
+> 3. **Chưa deploy public internet**: Hệ thống chỉ chạy cục bộ (Offline/Intranet) thông qua cổng localhost. Tuyệt đối không triển khai ra môi trường mạng công cộng.
+> 4. **Chưa có upload file thật**: Các tệp đính kèm trong hồ sơ vẫn ở dạng thông tin metadata JSON giả lập, chưa tải file vật lý thật lên máy chủ.
+> 5. **SQLite chỉ dùng cho MVP/local trial**: SQLite là hệ quản trị cơ sở dữ liệu dạng tệp tin cục bộ, chỉ phục vụ cho giai đoạn thử nghiệm MVP hiện hành.
 
 ---
 
