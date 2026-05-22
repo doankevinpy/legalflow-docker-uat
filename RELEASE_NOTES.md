@@ -1,5 +1,31 @@
 # Release Notes
 
+## v0.5.0-safe-ops-backup-restore (22/05/2026)
+
+### Tính năng chính (Phase 4: Safe Operations & Backup/Restore)
+- **Động cơ Sao lưu & Khôi phục SQLite Khép Kín**:
+  - Tích hợp script sao lưu an toàn `db:backup` đọc trực tiếp đường dẫn cơ sở dữ liệu động từ biến môi trường `DATABASE_URL` trong `.env`.
+  - Tích hợp script khôi phục thông minh `db:restore` cho phép lựa chọn từ danh sách 10 bản sao lưu gần nhất.
+- **Xác nhận 2 lớp (Double Confirmation)**:
+  - Lớp 1: Hỏi người dùng có đồng ý ghi đè dữ liệu (`y` / `yes`).
+  - Lớp 2: Yêu cầu nhập chính xác từ khóa bảo mật `RESTORE-CONFIRM`.
+- **Mốc khôi phục khẩn cấp (`pre_restore_*`)**:
+  - Tự động nhân bản và sao lưu cơ sở dữ liệu hiện tại trước khi thực hiện ghi đè với định dạng tệp có timestamp `pre_restore_YYYYMMDD_HHMMSS.db` để hỗ trợ rollback khẩn cấp lập tức.
+- **Mật khẩu Seed động**:
+  - Đọc mật khẩu trực tiếp từ cấu hình biến môi trường `.env` (`SEED_*_PASSWORD`).
+  - Scoped upsert: Giới hạn nghiêm ngặt chỉ tác động và cập nhật thông tin/mật khẩu đúng 4 tài khoản seed demo mặc định.
+- **Cảnh báo CORS Wildcard**:
+  - Tự động phát hiện cấu hình CORS `FRONTEND_ORIGIN="*"` và in cảnh báo màu vàng có độ hiển thị cao tại console khởi động backend.
+- **Tài liệu Hướng dẫn và Nghiệm thu**:
+  - **RUNBOOK.md**: Cẩm nang chi tiết thiết lập môi trường, vận hành hệ thống, quy trình backup/restore/rollback và cách giải quyết xung đột cổng hoặc lỗi khóa tệp DB trên Windows.
+  - **UAT_CHECKLIST.md**: Bộ kịch bản nghiệm thu trực quan từ phân quyền vai trò (RBAC) đến tính năng nâng cao và kiểm thử an toàn cơ sở dữ liệu SQLite.
+
+### Quyết định thiết kế & Giới hạn đã biết (Known limitations)
+- **Chưa deploy public internet**: Hệ thống chỉ chạy cục bộ (Offline/Intranet) thông qua cổng localhost để thử nghiệm nội bộ.
+- **Chưa dùng dữ liệu thật**: Chỉ sử dụng các thông tin và tài liệu giả định (mock data). Tuyệt đối không nhập thông tin cá nhân khách hàng (PII) trong giai đoạn dùng thử này.
+- **Chưa có file upload thật**: Trường `documents` của hồ sơ chỉ lưu thông tin metadata JSON giả lập, chưa tải file thực tế lên máy chủ.
+- **SQLite chỉ dùng cho MVP/local trial**: SQLite là hệ quản trị cơ sở dữ liệu dạng tệp tin cục bộ, phù hợp cho thử nghiệm cục bộ MVP. Sau này sẽ chuyển đổi sang Postgres/MySQL để đảm bảo an toàn chịu tải cao hơn.
+
 ## v0.4.2-migration-cleanup (21/05/2026)
 
 ### Tính năng chính (Phase 3.2 Safe localStorage Migration & Cleanup Dashboard)
