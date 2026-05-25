@@ -1,0 +1,10 @@
+*.zip export-ignore
+*.db export-ignore
+*.db-journal export-ignore
+*.db-wal export-ignore
+*.db-shm export-ignore
+.env export-ignore
+.env.local export-ignore
+node_modules/ export-ignore
+dist/ export-ignore
+legalflow-backend/backups/ export-ignore
