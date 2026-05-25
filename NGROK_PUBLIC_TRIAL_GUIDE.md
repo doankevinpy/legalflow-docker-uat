@@ -1,110 +1,109 @@
 # Hướng Dẫn Thiết Lập Public Trial bằng ngrok (Zero Trust)
 
-Tài liệu này cung cấp hướng dẫn cách thiết lập 2 đường hầm (tunnels) thông qua `ngrok` nhằm phục vụ đợt Public Trial cho hệ thống LegalFlow v1.0.0. 
+Tài liệu này cung cấp hướng dẫn cách thiết lập 2 đường hầm (tunnels) thông qua `ngrok` nhằm phục vụ đợt Public Trial cho hệ thống LegalFlow.
 
 > [!IMPORTANT]
-> Tuyệt đối **không** lưu ngrok authtoken, file `ngrok.yml`, hoặc bất kỳ cấu hình `.env` thật nào vào Git project. Bạn sẽ phải tự nhập lệnh bằng tay để đảm bảo bảo mật.
+> Cảnh Báo An Toàn: 
+> - Tuyệt đối **không** lưu ngrok authtoken, file `ngrok.yml`, hoặc cấu hình `.env` thật vào Git.
+> - **Chỉ gửi frontend public URL** cho người tham gia. Không gửi backend URL cho người dùng cuối.
 
-## 1. Cài Đặt và Cấu Hình Cơ Bản
-### 1.1. Cài đặt ngrok
+## 1. Cài Đặt ngrok
 - **Windows (Khuyên dùng qua Scoop hoặc Choco):**
   ```powershell
   choco install ngrok
   ```
-  Hoặc tải tệp `.zip` trực tiếp từ [trang chủ ngrok](https://ngrok.com/download), giải nén và đưa vào biến môi trường `PATH`.
+- Hoặc tải tệp `.zip` trực tiếp từ [trang chủ ngrok](https://ngrok.com/download), giải nén và đưa vào biến môi trường `PATH`.
 
-### 1.2. Xác thực ngrok (Tự làm thủ công)
-- Lấy mã **Authtoken** từ bảng điều khiển ngrok của bạn.
-- Mở terminal, chạy lệnh sau để thêm token (lệnh này sẽ tự động lưu cấu hình vào thư mục mặc định của máy, không nằm trong source code dự án):
+## 2. Xác Thực và Cấu Hình Tunnels (Thủ công)
+- Lấy mã **Authtoken** từ bảng điều khiển ngrok.
+- Mở terminal, chạy lệnh sau để thiết lập token cục bộ:
   ```powershell
   ngrok config add-authtoken <MÃ_TOKEN_CỦA_BẠN>
   ```
+- Cấu hình file `ngrok.yml` song song tại thư mục mặc định của máy (ví dụ: `C:\Users\<Tên_User>\AppData\Local\ngrok\ngrok.yml`):
+  ```yaml
+  version: "2"
+  authtoken: <MÃ_TOKEN_CỦA_BẠN>
+  tunnels:
+    legalflow-backend:
+      proto: http
+      addr: 127.0.0.1:3000
+    legalflow-frontend:
+      proto: http
+      addr: 127.0.0.1:5173
+  ```
 
-### 1.3. Cấu hình file `ngrok.yml` song song
-Thay vì gõ lệnh ngrok trực tiếp, bạn sẽ cấu hình file `ngrok.yml` (Nằm bên ngoài dự án, thường ở `C:\Users\<Tên_User>\AppData\Local\ngrok\ngrok.yml` đối với hệ điều hành Windows).
-Thêm cấu trúc 2 tunnels:
-```yaml
-version: "2"
-authtoken: <MÃ_TOKEN_CỦA_BẠN>
-tunnels:
-  legalflow-backend:
-    proto: http
-    addr: 127.0.0.1:3000
-  legalflow-frontend:
-    proto: http
-    addr: 127.0.0.1:5173
+## 3. Quy Trình Khởi Động Dry Run (Tuần Tự)
+Làm chính xác theo thứ tự sau để tránh lỗi CORS và URL:
+
+**A. Backup Database**
+```powershell
+cd legalflow-backend
+npm run db:backup
 ```
 
-## 2. Checklist Bắt Buộc Trước Khi Chạy Trial Thực Tế
-**BẠN CHƯA ĐƯỢC CHẠY TUNNEL NẾU CHƯA HOÀN TẤT CHECKLIST NÀY:**
-- [ ] Đã chạy lệnh `npm run db:backup` tại thư mục backend.
-- [ ] Đã đổi `JWT_SECRET` sang chuỗi ngẫu nhiên.
-- [ ] Đã đổi mật khẩu Admin seed mặc định.
-- [ ] Đã tạo user test riêng biệt cho từng người dùng thử.
-- [ ] Xác nhận DB hoàn toàn không có dữ liệu pháp lý thật (PII).
-- [ ] Xác nhận không upload tài liệu thật.
-- [ ] Xác nhận `.env` và `.env.local` đang bị Git bỏ qua (Untracked) an toàn.
-- [ ] Xác nhận biến `FRONTEND_ORIGIN` và `VITE_API_BASE_URL` trỏ đúng vào HTTPS URL của ngrok (Xem thiết lập ở Bước 3).
-- [ ] Xác nhận backend đang bind ở `127.0.0.1` thay vì `0.0.0.0`.
-- [ ] Xác nhận tuyệt đối không mở port forwarding trên router.
+**B. Đổi JWT_SECRET Thủ Công**
+Mở file `legalflow-backend/.env` và đổi `JWT_SECRET` sang một chuỗi ngẫu nhiên mạnh. (Không dùng chuỗi gõ đại hoặc MD5).
+*Ví dụ sinh chuỗi random 32 bytes:*
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
-## 3. Khởi Động Tunnels và Build Hệ Thống
-### 3.1. Chạy ngrok
-Mở Terminal, gõ lệnh kích hoạt ngrok:
+**C. Chuẩn bị Tài Khoản Test (Bằng UI Admin)**
+- Khởi động tạm server dev, đăng nhập Admin qua UI và tạo 1 tài khoản test.
+- **Quy định Role:** Chỉ sử dụng Role `VIEWER` hoặc `STAFF`. Không dùng `ADMIN` cho người tham gia. (Hệ thống không hỗ trợ role `USER`).
+- Đảm bảo DB không có dữ liệu pháp lý thật và không upload tài liệu thật.
+
+**D. Chuẩn Bị Backend Local**
+```powershell
+cd legalflow-backend
+npm run build
+npm run start:prod
+```
+*(Backend chạy ở `127.0.0.1:3000`)*
+
+**E. Chạy ngrok (Mở Tunnels)**
+Mở một terminal mới:
 ```powershell
 ngrok start --all
 ```
-Trên màn hình console của ngrok sẽ cấp phát 2 đường dẫn HTTPS ngẫu nhiên. Hãy đọc kỹ màn hình:
-- Dòng trỏ về `127.0.0.1:3000` -> Đây là `<BACKEND_NGROK_HTTPS_URL>`
-- Dòng trỏ về `127.0.0.1:5173` -> Đây là `<FRONTEND_NGROK_HTTPS_URL>`
+Lấy 2 HTTPS URL cấp phát:
+- `127.0.0.1:3000` -> `<BACKEND_NGROK_HTTPS_URL>`
+- `127.0.0.1:5173` -> `<FRONTEND_NGROK_HTTPS_URL>`
 
-### 3.2. Cập nhật Biến Môi Trường (Bắt buộc)
-Mỗi lần khởi động ngrok free, URL sẽ bị đổi, do đó bạn phải copy URL trên và cập nhật ngay vào các file biến môi trường cục bộ:
-- **`legalflow-backend/.env`**:
-  ```env
-  FRONTEND_ORIGIN="<FRONTEND_NGROK_HTTPS_URL>"
-  ```
-- **`.env.local` (hoặc `.env.production`)** tại gốc dự án:
-  ```env
-  VITE_API_BASE_URL="<BACKEND_NGROK_HTTPS_URL>"
-  ```
+**F. Cập Nhật Môi Trường Backend**
+Mở `legalflow-backend/.env`:
+```env
+FRONTEND_ORIGIN="<FRONTEND_NGROK_HTTPS_URL>"
+```
 
-### 3.3. Build và Start Production
-> [!WARNING]
-> **LƯU Ý CỰC KỲ QUAN TRỌNG VỀ BUILD FRONTEND:**
-> Frontend build **phải được chạy SAU KHI** cập nhật biến `VITE_API_BASE_URL`. Việc build bằng Vite sẽ nhúng tĩnh (hard-code) URL này vào thư mục `dist/`. Nếu URL ngrok đổi, bạn buộc phải thay file `.env` và chạy lại `npm run build` cho frontend.
-> Tuyệt đối không dùng `npm run dev` để chạy public trial. Chỉ dùng cơ chế serve tĩnh đối với file build.
+**G. Cập Nhật Môi Trường Frontend**
+Mở `.env.local` hoặc `.env.production` ở gốc dự án:
+```env
+VITE_API_BASE_URL="<BACKEND_NGROK_HTTPS_URL>"
+```
 
-1. **Khởi động Backend:**
-   ```powershell
-   cd legalflow-backend
-   npm run start:prod
-   ```
-2. **Build & Khởi động Frontend:**
-   ```powershell
-   npm run build
-   npx serve -s dist -p 5173
-   ```
+**H. Restart Backend**
+Tắt tiến trình backend đang chạy ở bước D, và bật lại `npm run start:prod` để backend nạp `FRONTEND_ORIGIN` mới.
 
-## 4. Kịch Bản Kiểm Thử (Bắt Buộc Sau Khi Chạy Tunnel)
-Sau khi tunnel và ứng dụng đã up, chỉ gửi `<FRONTEND_NGROK_HTTPS_URL>` cho người dùng và tiến hành kiểm tra đồng bộ:
-- [ ] **Load UI:** Public Frontend URL truy cập tải giao diện thành công.
-- [ ] **Auth Flow:** Đăng nhập / đăng xuất thành công bằng User test.
-- [ ] **Tương tác:** Dashboard load số liệu. Tạo thử 1 hồ sơ giả thành công.
-- [ ] **Audit Log:** Admin vào `/admin-audit-logs` kiểm chứng hành động đăng nhập, tạo hồ sơ đều được ghi lại rành mạch.
-- [ ] **Rate Limiting:** Nhập sai mật khẩu liên tục, xác nhận hệ thống trả về HTTP 429.
-- [ ] **Kiểm thử chặn CORS bằng Origin lạ:**
-  ```bash
-  curl -i -H "Origin: https://evil.example.com" <BACKEND_NGROK_HTTPS_URL>/health
-  ```
-  *Kỳ vọng: Lệnh cURL bị từ chối, không trả về Header `Access-Control-Allow-Origin` cho domain lạ.*
-- [ ] **Bảo mật Token:** Token không tồn tại trong Response body, không lưu tại `localStorage`, không xuất hiện trên URL query string, không lọt vào backend logs.
-- [ ] **Chống Leak Secret:** `passwordHash`, `JWT_SECRET`, và `DATABASE_URL` không bao giờ bị lộ ra ngoài qua Response HTTP hay Backend logs.
+**I. Rebuild Frontend**
+Mở terminal ở gốc dự án:
+```powershell
+npm run build
+```
+*(Bắt buộc build lại vì Frontend cần ghim tĩnh URL API mới)*
 
-## 5. Kế Hoạch Ứng Phó Sự Cố Khẩn Cấp (Rollback Plan)
-Nếu có bất kỳ sự cố bất thường xảy ra trong quá trình Public Trial:
-- **Tắt Tunnel lập tức:** Nhấn `Ctrl + C` tại cửa sổ ngrok để đóng cửa, cắt luồng public ra khỏi hệ thống nội bộ ngay tức thì.
-- **Dừng Dịch Vụ:** Tắt các tiến trình Backend (node) và Frontend (serve).
-- **Lưu Vết Sự Cố:** Copy file `dev.db` hiện tại lưu thành `dev_error.db` riêng lẻ nếu cần truy vết/báo cáo phân tích sau này.
-- **Restore Khẩn Cấp:** Nếu dữ liệu bị nhiễu do trial, khôi phục (`npm run db:restore`) từ bản Pre-Trial backup đã sinh ra ở Mục 2.
-- **Báo Cáo Sự Cố:** Trình bày rõ nguyên nhân gây ra lỗi, kịch bản lọt lỗi vào tệp `UAT_PUBLIC_TRIAL_REPORT.md`.
+**J. Serve Frontend**
+```powershell
+npx serve -s dist -p 5173
+```
+
+**K. Kiểm Thử Public URL**
+Truy cập vào `<FRONTEND_NGROK_HTTPS_URL>` để bắt đầu thử nghiệm.
+
+## 4. Kế Hoạch Ứng Phó (Rollback)
+- **Tắt ngrok ngay lập tức:** Nhấn `Ctrl + C` tại cửa sổ ngrok.
+- **Dừng dịch vụ:** Dừng Backend và Frontend serve.
+- **Phân tích:** Copy file `dev.db` lỗi nếu cần phân tích.
+- **Khôi phục:** Chạy `npm run db:restore` từ bản backup tạo ở Bước A.
+- **Báo cáo:** Ghi nhận sự cố vào `UAT_PUBLIC_TRIAL_REPORT.md`.

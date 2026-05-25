@@ -8,18 +8,21 @@
 | **1. Khởi động (Deployment & Build)** | | |
 | Frontend Production Build (Không lỗi `npm run build`) | `[ ]` | |
 | Backend Production Build (Không lỗi `npm run build`) | `[ ]` | |
+| Đã kiểm tra `.env` và `.env.local` không bị Git track | `[ ]` | |
+| Đã đổi `JWT_SECRET` bằng chuỗi ngẫu nhiên mạnh | `[ ]` | |
 | **2. Truy cập & Mạng lưới (Network & Access)** | | |
 | Truy cập được giao diện người dùng qua Public HTTPS URL | `[ ]` | |
-| Gọi API thành công thông qua HTTPS endpoint (Tích hợp thành công) | `[ ]` | |
-| Thử truy cập bằng URL lạ / Origin lạ bị chặn bởi CORS | `[ ]` | |
-| Backend Port 3000 **KHÔNG** thể truy cập trực tiếp từ Internet (Bị chặn ở cấp độ Tunnel/Firewall) | `[ ]` | |
+| Gửi API thành công thông qua HTTPS endpoint | `[ ]` | |
+| Kiểm tra CORS: Test `curl` với Origin lạ bị chặn hoàn toàn | `[ ]` | |
+| Backend Port 3000 **KHÔNG** thể truy cập trực tiếp từ Internet | `[ ]` | |
 | **3. Xác thực & Phân quyền (Auth & RBAC)** | | |
-| Đăng nhập (Login) thành công với mật khẩu đúng | `[ ]` | |
+| Đăng nhập (Login) thành công với tài khoản Test | `[ ]` | |
 | Đăng xuất (Logout) thành công, Session Storage bị xóa sạch | `[ ]` | |
+| Xác nhận User Trial KHÔNG mang quyền `ADMIN` (Chỉ dùng VIEWER hoặc STAFF) | `[ ]` | |
 | Rate Limit chặn thành công (Lỗi 429) khi liên tục Spam Request Login | `[ ]` | |
-| Tài khoản bị khóa không thể đăng nhập (Lỗi 401/403) | `[ ]` | |
 | Helmet Headers xuất hiện đầy đủ trong Network Response | `[ ]` | |
-| Không Response API nào để lộ mật khẩu, JWT Secret, Token hay PasswordHash | `[ ]` | |
+| Token KHÔNG nằm trong Response Body, LocalStorage, Query String, hoặc Backend logs | `[ ]` | |
+| Tuyệt đối KHÔNG lộ `passwordHash`, `JWT_SECRET`, hay `DATABASE_URL` trong Response/Logs | `[ ]` | |
 | **4. Hệ thống Audit & Dữ liệu** | | |
-| `AdminAuditLog` ghi nhận sự kiện `LOGIN_SUCCESS` và `LOGIN_FAILED` chính xác từ trial session | `[ ]` | |
+| `AdminAuditLog` ghi nhận sự kiện `LOGIN_SUCCESS` và `LOGIN_FAILED` chính xác | `[ ]` | |
 | Đã tiến hành Sao lưu DB thành công (chạy `npm run db:backup`) SAU KHI phiên trial kết thúc | `[ ]` | |
