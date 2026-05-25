@@ -4,6 +4,24 @@ Tài liệu này cung cấp hướng dẫn từng bước và toàn diện cho c
 
 ---
 
+## Phase 6 - Secure Internet Trial / Public Access Setup
+
+> [!WARNING]
+> **CẢNH BÁO CAO ĐỘ**:
+> - Đây là Public Access Trial qua Private Tunnel / Zero Trust, không phải production chính thức.
+> - **Không dùng dữ liệu pháp lý thật**.
+> - **Không upload tài liệu thật**.
+> - Backend mặc định dùng `HOST=127.0.0.1`, không bind `0.0.0.0`.
+> - Không expose trực tiếp port backend 3000 ra internet.
+> - Public trial phải dùng **HTTPS**.
+> - Không dùng Vite dev server để public. Frontend phải dùng production build (`npm run build`).
+> - Backend phải dùng production start (`npm run start:prod`).
+> - CORS không wildcard, chỉ allow domain cụ thể.
+> - SQLite chỉ dùng cho trial nhỏ. Backup DB trước và sau trial.
+> - Đổi `JWT_SECRET` và mật khẩu Admin trước trial.
+> - Yêu cầu rà soát: Dùng `DEPLOYMENT_PLAN.md`, `PRE_PUBLIC_TRIAL_SECURITY_CHECKLIST.md` và `UAT_PUBLIC_TRIAL_CHECKLIST.md` trước khi chạy thử.
+
+---
 > [!CAUTION]
 > **QUY TẮC AN TOÀN DỮ LIỆU THỬ NGHIỆM (CỰC KỲ QUAN TRỌNG)**:
 > 1. **Trạng thái sẵn sàng**: Hệ thống đã đủ điều kiện chạy thử nội bộ cục bộ bằng dữ liệu giả.

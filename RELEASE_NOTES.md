@@ -1,5 +1,19 @@
 # Release Notes
 
+## Phase 6 Secure Internet Trial
+
+**Mô hình khuyến nghị:** Private Tunnel / Zero Trust.
+
+- Secure Internet Trial / Public Access Setup đã sẵn sàng về mặt cấu hình/tài liệu.
+- Backend bind `127.0.0.1` theo `HOST` env.
+- CORS strict allowlist, không wildcard.
+- HTTPS bắt buộc cho public trial.
+- Không dùng dữ liệu thật / không upload tài liệu thật.
+- Đây không phải production chính thức.
+- SQLite chỉ dùng trial nhỏ.
+- Đã có đầy đủ tài liệu: `DEPLOYMENT_PLAN.md`, `PRE_PUBLIC_TRIAL_SECURITY_CHECKLIST.md`, `UAT_PUBLIC_TRIAL_CHECKLIST.md`.
+
+
 ## v0.9.0-security-hardening-rate-limiting (22/05/2026)
 **Status:** 🎯 **Internal Trial Ready**
 
