@@ -39,3 +39,9 @@ legalflow-backend/prisma/*.db
 legalflow-backend/prisma/*.db-journal
 legalflow-backend/prisma/*.db-wal
 legalflow-backend/prisma/*.db-shm
+  
+.trial-test.local  
+set-trial-config.ps1  
+test_api.cjs 
+auto_trial.cjs  
+diagnostic_api.cjs 
