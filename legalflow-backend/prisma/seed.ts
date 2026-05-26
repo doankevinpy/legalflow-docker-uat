@@ -1,36 +1,32 @@
-import { PrismaClient } from '@prisma/client';
-import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-const adapter = new PrismaLibSql({
-  url: process.env.DATABASE_URL || 'file:./dev.db',
-});
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
   const usersToSeed = [
     {
       email: 'admin@legalflow.local',
       fullName: 'Administrator',
-      role: 'ADMIN',
+      role: Role.ADMIN as Role,
       password: process.env.SEED_ADMIN_PASSWORD || 'Admin@123!',
     },
     {
       email: 'manager@legalflow.local',
       fullName: 'Manager User',
-      role: 'MANAGER',
+      role: Role.MANAGER as Role,
       password: process.env.SEED_MANAGER_PASSWORD || 'Manager@123!',
     },
     {
       email: 'staff@legalflow.local',
       fullName: 'Staff User',
-      role: 'STAFF',
+      role: Role.STAFF as Role,
       password: process.env.SEED_STAFF_PASSWORD || 'Staff@123!',
     },
     {
       email: 'viewer@legalflow.local',
       fullName: 'Viewer User',
-      role: 'VIEWER',
+      role: Role.VIEWER as Role,
       password: process.env.SEED_VIEWER_PASSWORD || 'Viewer@123!',
     },
   ];

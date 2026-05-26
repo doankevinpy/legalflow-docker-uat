@@ -148,10 +148,10 @@ export class CasesService {
       })
     ]);
 
-    // parse documents JSON string back to object array
+    // parse documents JSON string back to object array if it's a string (SQLite fallback), otherwise use directly
     const mappedData = data.map(c => ({
       ...c,
-      documents: JSON.parse(c.documents)
+      documents: typeof c.documents === 'string' ? JSON.parse(c.documents) : (c.documents || [])
     }));
 
     return {
@@ -187,7 +187,7 @@ export class CasesService {
 
     return {
       ...caseObj,
-      documents: JSON.parse(caseObj.documents)
+      documents: typeof caseObj.documents === 'string' ? JSON.parse(caseObj.documents) : (caseObj.documents || [])
     };
   }
 

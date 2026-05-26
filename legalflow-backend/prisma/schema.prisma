@@ -3,11 +3,53 @@
 
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum CaseStatus {
+  NEW
+  NEEDS_MORE_INFO
+  IN_PROGRESS
+  RESPONDED
+  CLOSED
+}
+
+enum CaseType {
+  KN
+  TC
+  KNG
+  PA
+  TVPL
+  KHAC
+}
+
+enum CaseField {
+  DAT_DAI
+  DAN_SU
+  LAO_DONG
+  HON_NHAN_GIA_DINH
+  DOANH_NGHIEP
+  HANH_CHINH
+  KHAC
+}
+
+enum Neighborhood {
+  KP1
+  KP2
+  KP3
+  KP4
+  KP5
+  KHAC
 }
 
 model User {
@@ -15,7 +57,7 @@ model User {
   email        String   @unique
   passwordHash String
   fullName     String
-  role         String   @default("VIEWER")
+  role         Role     @default(VIEWER)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -29,25 +71,25 @@ model User {
 }
 
 model LegalCase {
-  id           String    @id @default(uuid())
-  caseCode     String    @unique
+  id           String       @id @default(uuid())
+  caseCode     String       @unique
   senderName   String
   contact      String?
-  type         String
-  field        String
-  neighborhood String
+  type         CaseType
+  field        CaseField
+  neighborhood Neighborhood
   summary      String
   request      String
-  documents    String    @default("[]")
-  receivedDate DateTime  @default(now())
+  documents    Json         @default("[]")
+  receivedDate DateTime     @default(now())
   deadline     DateTime?
-  status       String    @default("NEW")
+  status       CaseStatus   @default(NEW)
 
   assignedToId String?
-  assignedTo   User?     @relation("AssignedCases", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   User?        @relation("AssignedCases", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   createdById String?
-  createdBy   User?     @relation("CreatedCases", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?        @relation("CreatedCases", fields: [createdById], references: [id], onDelete: SetNull)
 
   deletedAt   DateTime?
   deletedById String?
@@ -83,7 +125,7 @@ model CaseHistory {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   action    String
-  details   String    @default("{}")
+  details   Json      @default("{}")
   createdAt DateTime  @default(now())
 }
 
@@ -106,7 +148,7 @@ model AdminAuditLog {
   action       String
   targetUserId String?
   targetEmail  String?
-  details      String   @default("{}")
+  details      Json     @default("{}")
   createdAt    DateTime @default(now())
 
   @@index([action])
