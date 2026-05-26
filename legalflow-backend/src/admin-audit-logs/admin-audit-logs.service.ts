@@ -39,7 +39,7 @@ export class AdminAuditLogsService {
           action: params.action,
           targetUserId: params.targetUserId || null,
           targetEmail: params.targetEmail || null,
-          details: JSON.stringify(safeDetails),
+          details: safeDetails, // Pass object directly to Postgres Json field
         },
       });
     } catch (error: any) {
@@ -57,10 +57,10 @@ export class AdminAuditLogsService {
       where.action = action;
     }
     if (actor) {
-      where.actorEmail = { contains: actor };
+      where.actorEmail = { contains: actor, mode: 'insensitive' };
     }
     if (target) {
-      where.targetEmail = { contains: target };
+      where.targetEmail = { contains: target, mode: 'insensitive' };
     }
     if (startDate || endDate) {
       where.createdAt = {};
@@ -82,8 +82,13 @@ export class AdminAuditLogsService {
       }),
     ]);
 
+    const mappedData = data.map(item => ({
+      ...item,
+      details: typeof item.details === 'string' ? JSON.parse(item.details) : (item.details || {})
+    }));
+
     return {
-      data,
+      data: mappedData,
       meta: {
         page: pageNumber,
         limit: limitNumber,

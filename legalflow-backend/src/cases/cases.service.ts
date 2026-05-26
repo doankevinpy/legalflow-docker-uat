@@ -58,16 +58,13 @@ export class CasesService {
       try {
         createdCase = await this.prisma.$transaction(async (tx) => {
           const seqYear = receivedDate ? new Date(receivedDate).getFullYear() : new Date().getFullYear();
-          
-          let seq = await tx.caseSequence.findUnique({ where: { year: seqYear } });
-          if (!seq) {
-            seq = await tx.caseSequence.create({ data: { year: seqYear, lastSequence: 1 } });
-          } else {
-            seq = await tx.caseSequence.update({
-              where: { year: seqYear },
-              data: { lastSequence: { increment: 1 } }
-            });
-          }
+
+          // Atomic upsert to prevent race condition on concurrent case creation
+          const seq = await tx.caseSequence.upsert({
+            where: { year: seqYear },
+            create: { year: seqYear, lastSequence: 1 },
+            update: { lastSequence: { increment: 1 } },
+          });
 
           const seqStr = seq.lastSequence.toString().padStart(3, '0');
           const code = `${seqYear}-${rest.type}-${seqStr}-${rest.neighborhood}`;
@@ -76,7 +73,7 @@ export class CasesService {
             data: {
               ...rest,
               caseCode: code,
-              documents: documents ? JSON.stringify(documents) : '[]',
+              documents: (documents ?? []) as unknown as Prisma.InputJsonValue,
               receivedDate: receivedDate ? new Date(receivedDate) : undefined,
               deadline: rest.deadline ? new Date(rest.deadline) : undefined,
               assignedToId: finalAssignedToId,
@@ -88,7 +85,7 @@ export class CasesService {
                 create: {
                   userId: user.id,
                   action: CaseHistoryAction.CREATE_CASE,
-                  details: JSON.stringify({ message: 'Case created' })
+                  details: { message: 'Case created' }
                 }
               }
             }
@@ -128,9 +125,9 @@ export class CasesService {
 
     if (search) {
       where.OR = [
-        { caseCode: { contains: search } },
-        { senderName: { contains: search } },
-        { summary: { contains: search } },
+        { caseCode: { contains: search, mode: 'insensitive' } },
+        { senderName: { contains: search, mode: 'insensitive' } },
+        { summary: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -198,7 +195,7 @@ export class CasesService {
     const { documents, deadline, receivedDate, assignedToId, ...rest } = updateCaseDto;
 
     const updateData: any = { ...rest };
-    if (documents) updateData.documents = JSON.stringify(documents);
+    if (documents) updateData.documents = documents as unknown as Prisma.InputJsonValue; // Pass array directly to Postgres Json field
     if (deadline) updateData.deadline = new Date(deadline);
     if (receivedDate) updateData.receivedDate = new Date(receivedDate);
 
@@ -221,7 +218,7 @@ export class CasesService {
             caseId: id,
             userId: user.id,
             action: CaseHistoryAction.UPDATE_CASE,
-            details: JSON.stringify({ updatedFields: changedFields })
+            details: { updatedFields: changedFields }
           }
         });
       }
@@ -248,7 +245,7 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.SOFT_DELETE_CASE,
-          details: JSON.stringify({ message: 'Case soft deleted' })
+          details: { message: 'Case soft deleted' }
         }
       });
     });
@@ -274,7 +271,7 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.ADD_NOTE,
-          details: JSON.stringify({ noteId: note.id })
+          details: { noteId: note.id }
         }
       });
 
@@ -304,7 +301,7 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.UPDATE_CHECKLIST,
-          details: JSON.stringify({ itemId, isCompleted: dto.isCompleted })
+          details: { itemId, isCompleted: dto.isCompleted }
         }
       });
 
@@ -329,7 +326,7 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.CHANGE_STATUS,
-          details: JSON.stringify({ oldStatus: caseObj.status, newStatus: dto.status })
+          details: { oldStatus: caseObj.status, newStatus: dto.status }
         }
       });
 
