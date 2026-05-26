@@ -2,7 +2,7 @@
 
 Tài liệu này hướng dẫn cách vận hành độc lập hạ tầng (Postgres, MinIO, Caddy) tại môi trường phát triển cục bộ (Local Development).
 
-> **Runtime verification pending:** Docker Engine/Docker Desktop không có trong sandbox hiện tại, nên các lệnh `docker compose config`, `up`, `ps`, và `caddy validate` cần được chạy lại trên máy có Docker Desktop.
+> **Runtime verification status:** Đã vượt qua kiểm thử Runtime Verification trên máy trạm (PASS). Hạ tầng sẵn sàng vận hành.
 
 ## 1. Khởi động (Up)
 Lệnh này sẽ tải image và khởi động các services ở chế độ nền (detached):
