@@ -1,0 +1,7 @@
+:8080 {
+    # Phase 7.1 Skeleton Proxy
+    # Hiện tại chỉ trả về text cứng để verify Caddy hoạt động
+    respond "LegalFlow Caddy Proxy is running (Phase 7.1 Skeleton)" 200 {
+        close
+    }
+}
