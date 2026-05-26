@@ -45,3 +45,4 @@ set-trial-config.ps1
 test_api.cjs 
 auto_trial.cjs  
 diagnostic_api.cjs 
+final_test.cjs
