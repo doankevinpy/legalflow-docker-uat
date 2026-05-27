@@ -1,5 +1,27 @@
 # Release Notes
 
+## v1.4.0-docker-full-stack (27/05/2026)
+
+**Nội dung phát hành:**
+- Dockerized Backend/Frontend
+- `docker-compose.full.yml`
+- Caddy reverse proxy `/api/*`
+- PostgreSQL + MinIO full stack
+- Manual migrate deploy
+- Manual core seed
+- `RUNBOOK_DOCKER_FULL_STACK.md`
+
+### Security notes:
+- Không commit `.env.docker`
+- Không dùng dữ liệu thật nếu chưa Production UAT
+- Không dùng `down -v` trừ khi chủ động xóa volume
+
+### Known limitations:
+- Chưa có production domain/HTTPS thật
+- Chưa CI/CD
+- Chưa MinIO upload integration đầy đủ nếu chưa làm
+- Chưa Production UAT bằng dữ liệu giả quy mô lớn
+
 ## Phase 6 Secure Internet Trial
 
 **Mô hình khuyến nghị:** Private Tunnel / Zero Trust.
