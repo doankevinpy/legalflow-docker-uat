@@ -1,0 +1,10 @@
+node_modules/
+dist/
+legalflow-backend/
+.env*
+*.db
+backups/
+*.zip
+*.log
+tmp/
+coverage/

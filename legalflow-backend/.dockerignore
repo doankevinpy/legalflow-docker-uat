@@ -1,0 +1,8 @@
+node_modules 
+dist 
+.env* 
+dev.db 
+backups 
+*.log 
+coverage 
+tmp

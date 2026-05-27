@@ -1,0 +1,18 @@
+:8080 {
+    # Cấu hình nén
+    encode gzip zstd
+
+    # Xử lý API requests
+    # handle_path sẽ tự động strip (cắt) prefix '/api' khỏi đường dẫn trước khi gửi xuống upstream
+    handle_path /api/* {
+        reverse_proxy backend:3000
+    }
+
+    # Phục vụ Frontend React (Static files)
+    handle {
+        root * /usr/share/caddy
+        file_server
+        # Fallback cho Single Page Application
+        try_files {path} /index.html
+    }
+}
