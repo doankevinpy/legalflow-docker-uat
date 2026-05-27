@@ -89,32 +89,33 @@ async function seedMock() {
     if (!admin) {
       console.log('Cannot seed cases: No admin user found to assign createdById.');
     } else {
-      const mockCases = [
-        {
-          caseCode: '2026-KN-MOCK1',
-          senderName: 'Mock Sender 1',
-          type: 'KN',
-          field: 'DAT_DAI',
-          neighborhood: 'KP1',
-          summary: 'Mock Complaint',
-          request: 'Mock request content 1',
-          status: 'NEW',
-          createdById: admin.id,
-        },
-        {
-          caseCode: '2026-TC-MOCK2',
-          senderName: 'Mock Sender 2',
-          type: 'TC',
-          field: 'DAN_SU',
-          neighborhood: 'KP2',
-          summary: 'Mock Report',
-          request: 'Mock request content 2',
-          status: 'IN_PROGRESS',
-          createdById: admin.id,
-        }
-      ];
+      const neighborhoods = ['KP1', 'KP2', 'KP3', 'KP4', 'KP5'];
+      const fields = ['DAT_DAI', 'DAN_SU', 'LAO_DONG', 'HON_NHAN_GIA_DINH', 'DOANH_NGHIEP', 'HANH_CHINH', 'KHAC'];
+      const types = ['KN', 'TC', 'KNG', 'PA', 'TVPL', 'KHAC'];
+      const statuses = ['NEW', 'IN_PROGRESS', 'RESPONDED', 'CLOSED'];
 
-      for (const mockCase of mockCases) {
+      let seededCount = 0;
+      for (let i = 1; i <= 30; i++) {
+        const caseCode = `2026-MOCK-A${i.toString().padStart(3, '0')}`;
+        
+        // Pseudo-random selection based on index to ensure consistent mock data
+        const neighborhood = neighborhoods[i % neighborhoods.length];
+        const field = fields[(i * 3) % fields.length]; // Skewed a bit for variety
+        const type = types[(i * 5) % types.length];
+        const status = statuses[(i * 7) % statuses.length];
+
+        const mockCase = {
+          caseCode,
+          senderName: `Mock Sender ${i}`,
+          type,
+          field,
+          neighborhood,
+          summary: `Mock summary for analytics ${i}`,
+          request: `Mock request content ${i}`,
+          status,
+          createdById: admin.id,
+        };
+
         await prisma.legalCase.upsert({
           where: { caseCode: mockCase.caseCode },
           update: { summary: mockCase.summary, status: mockCase.status as any },
@@ -128,11 +129,12 @@ async function seedMock() {
             request: mockCase.request,
             status: mockCase.status as any,
             createdById: mockCase.createdById,
-            documents: [{ name: 'mock-doc.pdf', url: 'http://mock.local/doc.pdf' }],
+            documents: [{ name: `mock-doc-${i}.pdf`, url: `http://mock.local/doc${i}.pdf` }],
           },
         });
-        console.log(`Upserted mock case: ${mockCase.caseCode}`);
+        seededCount++;
       }
+      console.log(`Upserted ${seededCount} mock cases for analytics.`);
     }
   } else {
     console.log('Mock cases skipped.');

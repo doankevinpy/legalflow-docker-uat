@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { CasesModule } from './cases/cases.module';
 import { AdminAuditLogsModule } from './admin-audit-logs/admin-audit-logs.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { CustomThrottlerGuard } from './common/custom-throttler.guard';
 
 @Module({
@@ -25,6 +26,7 @@ import { CustomThrottlerGuard } from './common/custom-throttler.guard';
     HealthModule,
     CasesModule,
     AdminAuditLogsModule,
+    AnalyticsModule,
   ],
   controllers: [],
   providers: [
