@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
 # Install dependencies (including devDependencies for build)
 RUN npm ci
@@ -29,6 +30,7 @@ RUN apk add --no-cache curl
 # Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
 # Install only production dependencies
 # Ensure prisma and its adapters are installed
