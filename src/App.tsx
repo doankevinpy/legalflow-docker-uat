@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import Anonymizer from './pages/Anonymizer';
 import UserManagement from './pages/UserManagement';
 import AuditLogs from './pages/AuditLogs';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
                     <Route path="/anonymizer" element={<Anonymizer />} />
                     <Route path="/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><UserManagement /></ProtectedRoute>} />
                     <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={['ADMIN']}><AuditLogs /></ProtectedRoute>} />
+                    <Route path="/analytics" element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}><AnalyticsDashboard /></ProtectedRoute>} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>

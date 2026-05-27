@@ -8,6 +8,7 @@ import {
   Shield,
   Users,
   ClipboardList,
+  BarChart2,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +31,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     { name: 'Công cụ Ẩn danh',  href: '/anonymizer', icon: Shield,          show: true },
     { name: 'Quản lý tài khoản', href: '/users',      icon: Users,           show: role === 'ADMIN' },
     { name: 'Nhật ký hệ thống', href: '/audit-logs', icon: ClipboardList,   show: role === 'ADMIN' },
+    { name: 'Thống kê & Phân tích', href: '/analytics', icon: BarChart2,     show: role === 'ADMIN' || role === 'MANAGER' },
     { name: 'Cài đặt',          href: '/settings',   icon: Settings,        show: true },
   ];
 
