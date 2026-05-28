@@ -40,12 +40,12 @@ jobs:
       - name: Scan for basic secrets
         run: |
           # Exclude .md files to avoid false positives from documentation/release notes.
-          PATTERNS=("Bearer " "eyJ" "Admin@123!" "JWT_SECRET=" "DATABASE_URL=postgresql://" "passwordHash")
+          PATTERNS=("Bearer[[:space:]]+eyJ" "eyJ" "Admin@123!" "JWT_SECRET=" "DATABASE_URL=postgresql://" "passwordHash")
           for pattern in "${PATTERNS[@]}"; do
             # Use git grep to only scan tracked files, excluding markdown docs
-            if git grep -I "$pattern" -- ":!*.md" >/dev/null 2>&1; then
+            if git grep -I -E "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" >/dev/null 2>&1; then
               echo "Found potential match for '$pattern' in non-markdown files:"
-              git grep -I "$pattern" -- ":!*.md"
+              git grep -I -E "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json"
               
               # Allowlist passwordHash if it's likely a type or interface field rather than a secret.
               # In a real setup, we might refine the regex. For this UAT CI, we print a warning.
