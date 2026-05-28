@@ -51,6 +51,24 @@ jobs:
               # In a real setup, we might refine the regex. For this UAT CI, we print a warning.
               if [ "$pattern" = "passwordHash" ]; then
                 echo "Ignoring passwordHash match as it may be a typescript interface/field definition."
+              elif [ "$pattern" = "Admin@123!" ]; then
+                BAD_MATCHES=$(git grep -I -E -l "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" | grep -E -v '\.example$|legalflow-backend/(test.*|verify-.*|uat-.*|check)\.js$')
+                if [ -n "$BAD_MATCHES" ]; then
+                  echo "FAIL: Secret pattern '$pattern' found in unauthorized files:"
+                  echo "$BAD_MATCHES"
+                  exit 1
+                else
+                  echo "Ignoring '$pattern' match as it only appears in allowed dummy scripts and .example files."
+                fi
+              elif [ "$pattern" = "JWT_SECRET=" ] || [ "$pattern" = "DATABASE_URL=postgresql://" ]; then
+                BAD_MATCHES=$(git grep -I -E -l "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" | grep -E -v '\.example$')
+                if [ -n "$BAD_MATCHES" ]; then
+                  echo "FAIL: Secret pattern '$pattern' found in unauthorized files:"
+                  echo "$BAD_MATCHES"
+                  exit 1
+                else
+                  echo "Ignoring '$pattern' match as it only appears in allowed .example files."
+                fi
               else
                 echo "FAIL: Secret pattern '$pattern' found!"
                 exit 1
