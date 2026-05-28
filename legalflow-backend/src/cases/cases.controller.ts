@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CasesService } from './cases.service';
 import { CreateCaseDto } from './dto/create-case.dto';
 import { UpdateCaseDto } from './dto/update-case.dto';
@@ -73,5 +74,26 @@ export class CasesController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   changeStatus(@Param('id') id: string, @Body() changeCaseStatusDto: ChangeCaseStatusDto, @Request() req: any) {
     return this.casesService.changeStatus(id, changeCaseStatusDto, req.user);
+  }
+
+  @Post(':id/documents')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @UseInterceptors(FileInterceptor('file'))
+  uploadDocument(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    return this.casesService.uploadDocument(id, file, req.user);
+  }
+
+  @Get(':id/documents/:docId/download')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  downloadDocument(
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+    @Request() req: any,
+  ) {
+    return this.casesService.downloadDocument(id, docId, req.user);
   }
 }

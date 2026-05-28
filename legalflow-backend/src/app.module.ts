@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { CasesModule } from './cases/cases.module';
 import { AdminAuditLogsModule } from './admin-audit-logs/admin-audit-logs.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { StorageModule } from './storage/storage.module';
 import { CustomThrottlerGuard } from './common/custom-throttler.guard';
 
 @Module({

@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import { v4 as uuidv4 } from 'uuid';
 import { CreateCaseDto } from './dto/create-case.dto';
 import { UpdateCaseDto } from './dto/update-case.dto';
 import { QueryCasesDto } from './dto/query-cases.dto';
@@ -12,7 +14,10 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CasesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storageService: StorageService,
+  ) {}
 
   private getDefaultChecklist(field: CaseField): { title: string }[] {
     switch (field) {
@@ -365,4 +370,101 @@ export class CasesService {
 
     return stats;
   }
+
+  async uploadDocument(id: string, file: Express.Multer.File, user: any) {
+    if (!file) throw new BadRequestException('No file provided');
+
+    // Validate size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('File too large (max 5MB)');
+
+    // Validate extension and MIME
+    const allowedMimes = [
+      'application/pdf', 
+      'application/msword', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+      'image/png', 
+      'image/jpeg'
+    ];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type');
+    }
+
+    // Basic magic bytes check for PDF and images
+    const signature = file.buffer.toString('hex', 0, 4).toUpperCase();
+    if (file.mimetype === 'application/pdf' && signature !== '25504446') {
+      throw new BadRequestException('Invalid PDF signature');
+    }
+    if (file.mimetype === 'image/jpeg' && !signature.startsWith('FFD8')) {
+      throw new BadRequestException('Invalid JPEG signature');
+    }
+    if (file.mimetype === 'image/png' && signature !== '89504E47') {
+      throw new BadRequestException('Invalid PNG signature');
+    }
+
+    const caseObj = await this.findOne(id);
+    this.checkStaffAccess(caseObj, user);
+
+    const documents = Array.isArray(caseObj.documents) ? caseObj.documents : [];
+    if (documents.length >= 10) {
+      throw new BadRequestException('Maximum 10 files per case allowed');
+    }
+
+    const docId = uuidv4();
+    // sanitize original name: replace non-alphanumeric (keep dots and dashes) with underscore
+    const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    const minioKey = `cases/${id}/${docId}-${safeFilename}`;
+
+    await this.storageService.uploadFile(minioKey, file);
+
+    const newDoc = {
+      id: docId,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: user.email,
+      minioKey: minioKey,
+    };
+
+    const updatedDocuments = [...documents, newDoc];
+
+    await this.prisma.legalCase.update({
+      where: { id },
+      data: { documents: updatedDocuments as unknown as Prisma.InputJsonValue },
+    });
+
+    await this.prisma.caseHistory.create({
+      data: {
+        caseId: id,
+        userId: user.id,
+        action: CaseHistoryAction.UPDATE_CASE,
+        details: { message: 'Uploaded document', documentName: file.originalname }
+      }
+    });
+
+    const { minioKey: _, ...safeDoc } = newDoc;
+    return safeDoc;
+  }
+
+  async downloadDocument(id: string, docId: string, user: any) {
+    const caseObj = await this.findOne(id); // findOne checks deletedAt: null
+    
+    // check view right
+    if (user.role === Role.STAFF) {
+      if (caseObj.assignedToId !== user.id && caseObj.createdById !== user.id) {
+        throw new ForbiddenException('STAFF can only view their own or assigned cases');
+      }
+    }
+
+    const documents = Array.isArray(caseObj.documents) ? caseObj.documents : [];
+    const doc = documents.find((d: any) => d.id === docId);
+    
+    if (!doc || !doc.minioKey) {
+      throw new NotFoundException('Document not found or missing minioKey');
+    }
+
+    const presignedUrl = await this.storageService.getPresignedUrl(doc.minioKey);
+    return { url: presignedUrl };
+  }
+
 }
