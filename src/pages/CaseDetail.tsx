@@ -18,6 +18,7 @@ import {
   type CaseTypeCode, type CaseFieldCode, type CaseStatusCode,
 } from '../lib/constants';
 import type { ApiCase } from '../lib/api-types';
+import { DocumentUpload } from '../components/documents/DocumentUpload';
 
 export default function CaseDetail() {
   const { id }      = useParams<{ id: string }>();
@@ -30,7 +31,7 @@ export default function CaseDetail() {
   const [error, setError]             = useState('');
   const [actionError, setActionError] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'notes' | 'history'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'documents' | 'checklist' | 'notes' | 'history'>('info');
   const [noteInput, setNoteInput] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
 
@@ -194,6 +195,7 @@ export default function CaseDetail() {
           <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden flex flex-col">
             {([
               { key: 'info',      label: 'Thông tin chung',    Icon: Info },
+              { key: 'documents', label: `Tài liệu (${currentCase?.documents?.length || 0})`, Icon: FileText },
               { key: 'checklist', label: `Checklist (${checklist.filter(i=>i.isCompleted).length}/${checklist.length})`, Icon: CheckSquare },
               { key: 'notes',     label: `Ghi chú (${notes.length})`, Icon: FileText },
               { key: 'history',   label: `Lịch sử (${histories.length})`, Icon: Clock },
@@ -255,6 +257,18 @@ export default function CaseDetail() {
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Tóm tắt nội dung</h4>
                   <p className="text-base leading-relaxed whitespace-pre-wrap bg-secondary/30 p-4 rounded-lg">{currentCase.summary}</p>
                 </div>
+              </div>
+            )}
+
+            {/* DOCUMENTS */}
+            {activeTab === 'documents' && (
+              <div className="p-6">
+                <DocumentUpload
+                  caseId={currentCase.id}
+                  documents={currentCase.documents || []}
+                  userCanEdit={userCanEdit}
+                  onUploadSuccess={load}
+                />
               </div>
             )}
 

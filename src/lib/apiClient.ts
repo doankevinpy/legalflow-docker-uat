@@ -31,10 +31,14 @@ export function clearToken(): void {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
 
+  const isFormData = init.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(init.headers as Record<string, string> ?? {}),
   };
+
+  if (!isFormData && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -89,13 +93,13 @@ export const apiClient = {
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),
     }),
 
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'PATCH',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),
     }),
 
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),

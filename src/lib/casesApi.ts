@@ -66,4 +66,15 @@ export const casesApi = {
   /** PATCH /cases/:id/checklist/:itemId */
   patchChecklist: (id: string, itemId: string, isCompleted: boolean) =>
     apiClient.patch<ApiChecklistItem>(`/cases/${id}/checklist/${itemId}`, { isCompleted }),
+
+  /** POST /cases/:id/documents */
+  uploadDocument: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<any>(`/cases/${id}/documents`, formData);
+  },
+
+  /** GET /cases/:id/documents/:docId/download */
+  downloadDocument: (id: string, docId: string) =>
+    apiClient.get<{ url: string }>(`/cases/${id}/documents/${docId}/download`),
 };

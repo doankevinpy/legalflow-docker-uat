@@ -14,9 +14,15 @@ export interface ApiUser {
 }
 
 export interface DocumentMeta {
-  name: string;
-  url?: string;
-  note?: string;
+  id?: string;
+  originalName?: string;
+  mimeType?: string;
+  size?: number;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  name?: string; // Fallback cho old mock data
+  url?: string; // Fallback cho old mock data
+  note?: string; // Fallback cho old mock data
 }
 
 export interface ApiCaseNote {
