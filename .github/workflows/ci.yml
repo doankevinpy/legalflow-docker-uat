@@ -52,7 +52,7 @@ jobs:
               if [ "$pattern" = "passwordHash" ]; then
                 echo "Ignoring passwordHash match as it may be a typescript interface/field definition."
               elif [ "$pattern" = "Admin@123!" ]; then
-                BAD_MATCHES=$(git grep -I -E -l "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" | grep -E -v '\.example$|legalflow-backend/(test.*|verify-.*|uat-.*|check)\.js$')
+                BAD_MATCHES=$(git grep -I -E -l "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" | grep -E -v '\.example$|legalflow-backend/(test.*|verify-.*|uat-.*|check)\.js$' || true)
                 if [ -n "$BAD_MATCHES" ]; then
                   echo "FAIL: Secret pattern '$pattern' found in unauthorized files:"
                   echo "$BAD_MATCHES"
@@ -61,7 +61,7 @@ jobs:
                   echo "Ignoring '$pattern' match as it only appears in allowed dummy scripts and .example files."
                 fi
               elif [ "$pattern" = "JWT_SECRET=" ] || [ "$pattern" = "DATABASE_URL=postgresql://" ]; then
-                BAD_MATCHES=$(git grep -I -E -l "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" | grep -E -v '\.example$')
+                BAD_MATCHES=$(git grep -I -E -l "$pattern" -- ":!*.md" ":!.github/workflows/ci.yml" ":!package-lock.json" ":!legalflow-backend/package-lock.json" | grep -E -v '\.example$' || true)
                 if [ -n "$BAD_MATCHES" ]; then
                   echo "FAIL: Secret pattern '$pattern' found in unauthorized files:"
                   echo "$BAD_MATCHES"
