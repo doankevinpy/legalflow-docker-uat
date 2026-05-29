@@ -151,7 +151,7 @@ export class CasesService {
     ]);
 
     // parse documents JSON string back to object array if it's a string (SQLite fallback), otherwise use directly
-    const mappedData = data.map(c => ({
+    const mappedData = data.map(c => this.sanitizeCaseResponse({
       ...c,
       documents: typeof c.documents === 'string' ? JSON.parse(c.documents) : (c.documents || [])
     }));
@@ -167,7 +167,28 @@ export class CasesService {
     };
   }
 
-  async findOne(id: string) {
+  private sanitizeDocument(doc: any) {
+    if (!doc) return doc;
+    const { minioKey, ...safeDoc } = doc;
+    return safeDoc;
+  }
+
+  private sanitizeDocuments(documents: any) {
+    const docsArray = Array.isArray(documents) 
+      ? documents 
+      : (typeof documents === 'string' ? JSON.parse(documents) : []);
+    return docsArray.map((doc: any) => this.sanitizeDocument(doc));
+  }
+
+  private sanitizeCaseResponse(caseObj: any) {
+    if (!caseObj) return caseObj;
+    return {
+      ...caseObj,
+      documents: this.sanitizeDocuments(caseObj.documents)
+    };
+  }
+
+  async findOneInternal(id: string) {
     const caseObj = await this.prisma.legalCase.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -193,8 +214,13 @@ export class CasesService {
     };
   }
 
+  async findOne(id: string) {
+    const caseObj = await this.findOneInternal(id);
+    return this.sanitizeCaseResponse(caseObj);
+  }
+
   async update(id: string, updateCaseDto: UpdateCaseDto, user: any) {
-    const caseObj = await this.findOne(id);
+    const caseObj = await this.findOneInternal(id);
     this.checkStaffAccess(caseObj, user);
 
     const { documents, deadline, receivedDate, assignedToId, ...rest } = updateCaseDto;
@@ -228,7 +254,7 @@ export class CasesService {
         });
       }
 
-      return updated;
+      return this.sanitizeCaseResponse(updated);
     });
   }
 
@@ -259,7 +285,7 @@ export class CasesService {
   }
 
   async addNote(id: string, dto: AddCaseNoteDto, user: any) {
-    const caseObj = await this.findOne(id);
+    const caseObj = await this.findOneInternal(id);
     this.checkStaffAccess(caseObj, user);
 
     return this.prisma.$transaction(async (tx) => {
@@ -285,7 +311,7 @@ export class CasesService {
   }
 
   async updateChecklistItem(id: string, itemId: string, dto: UpdateChecklistItemDto, user: any) {
-    const caseObj = await this.findOne(id);
+    const caseObj = await this.findOneInternal(id);
     this.checkStaffAccess(caseObj, user);
 
     const item = await this.prisma.caseChecklistItem.findUnique({ where: { id: itemId } });
@@ -315,7 +341,7 @@ export class CasesService {
   }
 
   async changeStatus(id: string, dto: ChangeCaseStatusDto, user: any) {
-    const caseObj = await this.findOne(id);
+    const caseObj = await this.findOneInternal(id);
     this.checkStaffAccess(caseObj, user);
 
     if (caseObj.status === dto.status) return caseObj;
@@ -335,7 +361,7 @@ export class CasesService {
         }
       });
 
-      return updated;
+      return this.sanitizeCaseResponse(updated);
     });
   }
 
@@ -447,7 +473,7 @@ export class CasesService {
   }
 
   async downloadDocument(id: string, docId: string, user: any) {
-    const caseObj = await this.findOne(id); // findOne checks deletedAt: null
+    const caseObj = await this.findOneInternal(id); // findOneInternal checks deletedAt: null
     
     // check view right
     if (user.role === Role.STAFF) {

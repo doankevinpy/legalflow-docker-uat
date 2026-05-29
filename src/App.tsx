@@ -35,7 +35,7 @@ function App() {
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/cases" element={<CaseList />} />
-                    <Route path="/cases/new" element={<NewCase />} />
+                    <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'STAFF']}><NewCase /></ProtectedRoute>} />
                     <Route path="/cases/:id" element={<CaseDetail />} />
                     <Route path="/drafts" element={<Drafts />} />
                     <Route path="/anonymizer" element={<Anonymizer />} />
