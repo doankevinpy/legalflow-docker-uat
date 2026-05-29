@@ -47,3 +47,9 @@ test_api.cjs
 auto_trial.cjs  
 diagnostic_api.cjs 
 final_test.cjs
+ 
+# Playwright
+playwright-report/
+test-results/
+.env.e2e
+.e2e/
