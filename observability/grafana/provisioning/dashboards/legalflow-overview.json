@@ -1,0 +1,30 @@
+{
+  "title": "LegalFlow Overview",
+  "tags": ["legalflow"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total HTTP Requests",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(http_requests_total)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Uploads",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(legalflow_upload_total)",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38
+}
