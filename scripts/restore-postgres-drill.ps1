@@ -68,14 +68,14 @@ if (-not $Force) {
 }
 
 Write-Host "[INFO] Recreating target database $TargetDB..."
-$DropCmd = "docker compose -f docker-compose.full.yml --env-file `"$EnvFile`" exec -T $PostgresService dropdb --if-exists -U $PgUser $TargetDB"
+$DropCmd = "docker compose -f docker-compose.full.yml --env-file $EnvFile exec -T $PostgresService dropdb --if-exists -U $PgUser $TargetDB"
 Invoke-Expression $DropCmd | Out-Null
 
-$CreateCmd = "docker compose -f docker-compose.full.yml --env-file `"$EnvFile`" exec -T $PostgresService createdb -U $PgUser $TargetDB"
+$CreateCmd = "docker compose -f docker-compose.full.yml --env-file $EnvFile exec -T $PostgresService createdb -U $PgUser $TargetDB"
 Invoke-Expression $CreateCmd | Out-Null
 
 Write-Host "[INFO] Executing database restore to $TargetDB..."
-$RestoreCmd = "docker compose -f docker-compose.full.yml --env-file `"$EnvFile`" exec -T $PostgresService pg_restore -U $PgUser -d $TargetDB -1"
+$RestoreCmd = "docker compose -f docker-compose.full.yml --env-file $EnvFile exec -T $PostgresService pg_restore -U $PgUser -d $TargetDB -1"
 $FullCmd = "cmd.exe /c `"$RestoreCmd < `"$BackupFile`"`""
 Invoke-Expression $FullCmd
 

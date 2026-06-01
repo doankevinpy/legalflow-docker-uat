@@ -57,10 +57,17 @@ $AbsBackupDir = Resolve-Path $BackupDir | Select-Object -ExpandProperty Path
 
 # Format the path for docker if on windows (Convert \ to / or just let docker handle it)
 # Docker on windows usually handles absolute paths well in recent versions.
-$DockerCmd = "docker run --rm -v `"${AbsBackupDir}:/backup`" --env-file `"$AbsEnvFile`" --network $NetworkName minio/mc sh -c `"mc alias set myalias http://$MinioService:9000 `$MINIO_ACCESS_KEY `$MINIO_SECRET_KEY && mc mirror myalias/$BucketName /backup/`""
+$ArgsList = @(
+    "run", "--rm", "--entrypoint", "sh",
+    "-v", "${AbsBackupDir}:/backup",
+    "--env-file", $AbsEnvFile,
+    "--network", $NetworkName,
+    "minio/mc", "-c",
+    "mc alias set myalias http://$($MinioService):9000 `$MINIO_ACCESS_KEY `$MINIO_SECRET_KEY && mc mirror myalias/$BucketName /backup/"
+)
 
 Write-Host "[INFO] Executing MinIO mirror..."
-Invoke-Expression $DockerCmd
+& docker $ArgsList
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[SUCCESS] Backup completed. Files saved to: $BackupDir" -ForegroundColor Green

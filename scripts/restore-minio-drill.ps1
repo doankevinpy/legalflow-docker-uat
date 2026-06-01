@@ -71,9 +71,16 @@ $AbsBackupDir = Resolve-Path $BackupDir | Select-Object -ExpandProperty Path
 
 Write-Host "[INFO] Recreating and mirroring to target bucket $TargetBucket..."
 
-$DockerCmd = "docker run --rm -v `"${AbsBackupDir}:/backup`" --env-file `"$AbsEnvFile`" --network $NetworkName minio/mc sh -c `"mc alias set myalias http://$MinioService:9000 `$MINIO_ACCESS_KEY `$MINIO_SECRET_KEY && mc mb myalias/$TargetBucket --ignore-existing && mc mirror /backup/ myalias/$TargetBucket`""
+$ArgsList = @(
+    "run", "--rm", "--entrypoint", "sh",
+    "-v", "${AbsBackupDir}:/backup",
+    "--env-file", $AbsEnvFile,
+    "--network", $NetworkName,
+    "minio/mc", "-c",
+    "mc alias set myalias http://$($MinioService):9000 `$MINIO_ACCESS_KEY `$MINIO_SECRET_KEY && mc mb myalias/$TargetBucket --ignore-existing && mc mirror /backup/ myalias/$TargetBucket"
+)
 
-Invoke-Expression $DockerCmd
+& docker $ArgsList
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[SUCCESS] Restore completed successfully." -ForegroundColor Green
