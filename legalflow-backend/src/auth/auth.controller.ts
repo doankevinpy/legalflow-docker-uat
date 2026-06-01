@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -44,7 +53,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
-  async changePassword(@Request() req: any, @Body() changePasswordDto: ChangePasswordDto) {
+  async changePassword(
+    @Request() req: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
     // Luôn lấy userId từ JWT token đã được giải mã req.user.id để chống giả mạo
     return this.authService.changePassword(req.user.id, changePasswordDto);
   }

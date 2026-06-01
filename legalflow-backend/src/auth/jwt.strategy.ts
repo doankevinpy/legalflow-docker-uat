@@ -8,7 +8,7 @@ import { UsersService } from '../users/users.service';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
-    private usersService: UsersService
+    private usersService: UsersService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -23,7 +23,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Tài khoản không tồn tại');
     }
     if (!user.isActive) {
-      throw new UnauthorizedException('Tài khoản này đã bị khóa hoặc ngừng hoạt động');
+      throw new UnauthorizedException(
+        'Tài khoản này đã bị khóa hoặc ngừng hoạt động',
+      );
     }
     // Lấy thông tin vai trò thời gian thực từ database
     return { id: user.id, email: user.email, role: user.role };

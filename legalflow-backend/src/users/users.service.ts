@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -71,8 +77,10 @@ export class UsersService {
       select: this.safeSelect,
     });
 
-    this.logger.log(`[CREATE_USER] Admin (${adminUser.email}) created user (${newUser.email}) with role (${newUser.role})`);
-    
+    this.logger.log(
+      `[CREATE_USER] Admin (${adminUser.email}) created user (${newUser.email}) with role (${newUser.role})`,
+    );
+
     await this.auditLogsService.logAction({
       actorUserId: adminUser.id,
       actorEmail: adminUser.email,
@@ -96,7 +104,9 @@ export class UsersService {
 
     // 1. Check self lock
     if (id === adminUser.id && updateUserDto.isActive === false) {
-      throw new BadRequestException('Quản trị viên không thể tự khóa tài khoản của chính mình');
+      throw new BadRequestException(
+        'Quản trị viên không thể tự khóa tài khoản của chính mình',
+      );
     }
 
     // 2. Protect last admin
@@ -108,11 +118,15 @@ export class UsersService {
       if (activeAdmins.length === 1 && activeAdmins[0].id === targetUser.id) {
         // Checking if deactivating last admin
         if (updateUserDto.isActive === false) {
-          throw new BadRequestException('Không thể khóa tài khoản ADMIN duy nhất còn hoạt động');
+          throw new BadRequestException(
+            'Không thể khóa tài khoản ADMIN duy nhất còn hoạt động',
+          );
         }
         // Checking if demoting last admin
         if (updateUserDto.role && updateUserDto.role !== 'ADMIN') {
-          throw new BadRequestException('Không thể hạ vai trò của tài khoản ADMIN duy nhất còn hoạt động');
+          throw new BadRequestException(
+            'Không thể hạ vai trò của tài khoản ADMIN duy nhất còn hoạt động',
+          );
         }
       }
     }
@@ -121,9 +135,13 @@ export class UsersService {
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
-        ...(updateUserDto.fullName !== undefined && { fullName: updateUserDto.fullName }),
+        ...(updateUserDto.fullName !== undefined && {
+          fullName: updateUserDto.fullName,
+        }),
         ...(updateUserDto.role !== undefined && { role: updateUserDto.role }),
-        ...(updateUserDto.isActive !== undefined && { isActive: updateUserDto.isActive }),
+        ...(updateUserDto.isActive !== undefined && {
+          isActive: updateUserDto.isActive,
+        }),
       },
       select: this.safeSelect,
     });
@@ -131,19 +149,29 @@ export class UsersService {
     // Logging actions
     if (updateUserDto.isActive !== undefined) {
       const action = updateUserDto.isActive ? 'UNLOCK_USER' : 'LOCK_USER';
-      this.logger.log(`[${action}] Admin (${adminUser.email}) ${updateUserDto.isActive ? 'unlocked' : 'locked'} user (${updatedUser.email})`);
+      this.logger.log(
+        `[${action}] Admin (${adminUser.email}) ${updateUserDto.isActive ? 'unlocked' : 'locked'} user (${updatedUser.email})`,
+      );
       await this.auditLogsService.logAction({
         actorUserId: adminUser.id,
         actorEmail: adminUser.email,
         action: action,
         targetUserId: updatedUser.id,
         targetEmail: updatedUser.email,
-        details: { oldIsActive: targetUser.isActive, newIsActive: updatedUser.isActive },
+        details: {
+          oldIsActive: targetUser.isActive,
+          newIsActive: updatedUser.isActive,
+        },
       });
     }
 
-    if (updateUserDto.role !== undefined && updateUserDto.role !== targetUser.role) {
-      this.logger.log(`[CHANGE_ROLE] Admin (${adminUser.email}) changed role of user (${updatedUser.email}) from (${targetUser.role}) to (${updatedUser.role})`);
+    if (
+      updateUserDto.role !== undefined &&
+      updateUserDto.role !== targetUser.role
+    ) {
+      this.logger.log(
+        `[CHANGE_ROLE] Admin (${adminUser.email}) changed role of user (${updatedUser.email}) from (${targetUser.role}) to (${updatedUser.role})`,
+      );
       await this.auditLogsService.logAction({
         actorUserId: adminUser.id,
         actorEmail: adminUser.email,
@@ -154,8 +182,13 @@ export class UsersService {
       });
     }
 
-    if (updateUserDto.fullName !== undefined && updateUserDto.fullName !== targetUser.fullName) {
-      this.logger.log(`[UPDATE_USER] Admin (${adminUser.email}) updated fullName of user (${updatedUser.email})`);
+    if (
+      updateUserDto.fullName !== undefined &&
+      updateUserDto.fullName !== targetUser.fullName
+    ) {
+      this.logger.log(
+        `[UPDATE_USER] Admin (${adminUser.email}) updated fullName of user (${updatedUser.email})`,
+      );
       await this.auditLogsService.logAction({
         actorUserId: adminUser.id,
         actorEmail: adminUser.email,
@@ -184,8 +217,10 @@ export class UsersService {
       data: { passwordHash },
     });
 
-    this.logger.log(`[RESET_PASSWORD] Admin (${adminUser.email}) reset password for user (${targetUser.email})`);
-    
+    this.logger.log(
+      `[RESET_PASSWORD] Admin (${adminUser.email}) reset password for user (${targetUser.email})`,
+    );
+
     await this.auditLogsService.logAction({
       actorUserId: adminUser.id,
       actorEmail: adminUser.email,
@@ -206,7 +241,9 @@ export class UsersService {
 
     // 1. Chặn tự xóa chính mình
     if (id === adminUser.id) {
-      throw new BadRequestException('Quản trị viên không thể tự xóa tài khoản của chính mình');
+      throw new BadRequestException(
+        'Quản trị viên không thể tự xóa tài khoản của chính mình',
+      );
     }
 
     // 2. Chặn xóa ADMIN cuối cùng
@@ -215,7 +252,9 @@ export class UsersService {
         where: { role: 'ADMIN' },
       });
       if (allAdmins.length === 1) {
-        throw new BadRequestException('Không thể xóa tài khoản ADMIN duy nhất còn lại trên hệ thống');
+        throw new BadRequestException(
+          'Không thể xóa tài khoản ADMIN duy nhất còn lại trên hệ thống',
+        );
       }
     }
 
@@ -223,15 +262,14 @@ export class UsersService {
     // a. Check LegalCase (created or assigned)
     const linkedCasesCount = await this.prisma.legalCase.count({
       where: {
-        OR: [
-          { assignedToId: id },
-          { createdById: id },
-        ],
+        OR: [{ assignedToId: id }, { createdById: id }],
       },
     });
 
     if (linkedCasesCount > 0) {
-      throw new ConflictException('Không thể xóa tài khoản này vì đã có dữ liệu hồ sơ liên kết. Hãy khóa tài khoản thay thế.');
+      throw new ConflictException(
+        'Không thể xóa tài khoản này vì đã có dữ liệu hồ sơ liên kết. Hãy khóa tài khoản thay thế.',
+      );
     }
 
     // b. Check CaseNote
@@ -239,7 +277,9 @@ export class UsersService {
       where: { userId: id },
     });
     if (linkedNotesCount > 0) {
-      throw new ConflictException('Không thể xóa tài khoản này vì đã có dữ liệu ghi chú liên kết. Hãy khóa tài khoản thay thế.');
+      throw new ConflictException(
+        'Không thể xóa tài khoản này vì đã có dữ liệu ghi chú liên kết. Hãy khóa tài khoản thay thế.',
+      );
     }
 
     // c. Check CaseHistory
@@ -247,7 +287,9 @@ export class UsersService {
       where: { userId: id },
     });
     if (linkedHistoryCount > 0) {
-      throw new ConflictException('Không thể xóa tài khoản này vì đã có lịch sử thao tác liên kết. Hãy khóa tài khoản thay thế.');
+      throw new ConflictException(
+        'Không thể xóa tài khoản này vì đã có lịch sử thao tác liên kết. Hãy khóa tài khoản thay thế.',
+      );
     }
 
     // d. Check CaseChecklistItem (completed)
@@ -255,7 +297,9 @@ export class UsersService {
       where: { completedById: id },
     });
     if (linkedChecklistCount > 0) {
-      throw new ConflictException('Không thể xóa tài khoản này vì đã có dữ liệu checklist hoàn thành liên kết. Hãy khóa tài khoản thay thế.');
+      throw new ConflictException(
+        'Không thể xóa tài khoản này vì đã có dữ liệu checklist hoàn thành liên kết. Hãy khóa tài khoản thay thế.',
+      );
     }
 
     // Thực hiện Hard Delete
@@ -263,8 +307,10 @@ export class UsersService {
       where: { id },
     });
 
-    this.logger.log(`[DELETE_USER] Admin (${adminUser.email}) deleted user (${targetUser.email})`);
-    
+    this.logger.log(
+      `[DELETE_USER] Admin (${adminUser.email}) deleted user (${targetUser.email})`,
+    );
+
     await this.auditLogsService.logAction({
       actorUserId: adminUser.id,
       actorEmail: adminUser.email,
@@ -284,4 +330,3 @@ export class UsersService {
     });
   }
 }
-

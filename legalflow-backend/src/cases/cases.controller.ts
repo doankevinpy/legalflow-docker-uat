@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+  Request,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CasesService } from './cases.service';
 import { CreateCaseDto } from './dto/create-case.dto';
@@ -43,7 +56,11 @@ export class CasesController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
-  update(@Param('id') id: string, @Body() updateCaseDto: UpdateCaseDto, @Request() req: any) {
+  update(
+    @Param('id') id: string,
+    @Body() updateCaseDto: UpdateCaseDto,
+    @Request() req: any,
+  ) {
     return this.casesService.update(id, updateCaseDto, req.user);
   }
 
@@ -55,7 +72,11 @@ export class CasesController {
 
   @Post(':id/notes')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
-  addNote(@Param('id') id: string, @Body() addCaseNoteDto: AddCaseNoteDto, @Request() req: any) {
+  addNote(
+    @Param('id') id: string,
+    @Body() addCaseNoteDto: AddCaseNoteDto,
+    @Request() req: any,
+  ) {
     return this.casesService.addNote(id, addCaseNoteDto, req.user);
   }
 
@@ -65,14 +86,23 @@ export class CasesController {
     @Param('id') id: string,
     @Param('itemId') itemId: string,
     @Body() updateChecklistItemDto: UpdateChecklistItemDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
-    return this.casesService.updateChecklistItem(id, itemId, updateChecklistItemDto, req.user);
+    return this.casesService.updateChecklistItem(
+      id,
+      itemId,
+      updateChecklistItemDto,
+      req.user,
+    );
   }
 
   @Patch(':id/status')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
-  changeStatus(@Param('id') id: string, @Body() changeCaseStatusDto: ChangeCaseStatusDto, @Request() req: any) {
+  changeStatus(
+    @Param('id') id: string,
+    @Body() changeCaseStatusDto: ChangeCaseStatusDto,
+    @Request() req: any,
+  ) {
     return this.casesService.changeStatus(id, changeCaseStatusDto, req.user);
   }
 

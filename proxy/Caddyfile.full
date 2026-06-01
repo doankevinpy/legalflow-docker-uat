@@ -2,6 +2,11 @@
     # Cấu hình nén
     encode gzip zstd
 
+    # Cấm truy cập /api/metrics từ public
+    handle /api/metrics* {
+        respond 403
+    }
+
     # Xử lý API requests
     # handle_path sẽ tự động strip (cắt) prefix '/api' khỏi đường dẫn trước khi gửi xuống upstream
     handle_path /api/* {

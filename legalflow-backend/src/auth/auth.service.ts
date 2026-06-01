@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -19,7 +25,7 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const normalizedEmail = loginDto.email.trim().toLowerCase();
     const user = await this.usersService.findByEmail(normalizedEmail);
-    
+
     if (!user) {
       await this.auditLogsService.logAction({
         actorUserId: undefined,
@@ -27,12 +33,20 @@ export class AuthService {
         action: 'LOGIN_FAILED',
         targetUserId: undefined,
         targetEmail: normalizedEmail,
-        details: { email: normalizedEmail, result: 'failed', reason: 'Email not found', timestamp: new Date().toISOString() },
+        details: {
+          email: normalizedEmail,
+          result: 'failed',
+          reason: 'Email not found',
+          timestamp: new Date().toISOString(),
+        },
       });
       throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       await this.auditLogsService.logAction({
         actorUserId: user.id,
@@ -40,7 +54,12 @@ export class AuthService {
         action: 'LOGIN_FAILED',
         targetUserId: user.id,
         targetEmail: user.email,
-        details: { email: user.email, result: 'failed', reason: 'Invalid password', timestamp: new Date().toISOString() },
+        details: {
+          email: user.email,
+          result: 'failed',
+          reason: 'Invalid password',
+          timestamp: new Date().toISOString(),
+        },
       });
       throw new UnauthorizedException('Thông tin đăng nhập không chính xác');
     }
@@ -52,13 +71,20 @@ export class AuthService {
         action: 'LOGIN_FAILED',
         targetUserId: user.id,
         targetEmail: user.email,
-        details: { email: user.email, result: 'failed', reason: 'Account locked', timestamp: new Date().toISOString() },
+        details: {
+          email: user.email,
+          result: 'failed',
+          reason: 'Account locked',
+          timestamp: new Date().toISOString(),
+        },
       });
-      throw new UnauthorizedException('Tài khoản này đã bị khóa hoặc ngừng hoạt động');
+      throw new UnauthorizedException(
+        'Tài khoản này đã bị khóa hoặc ngừng hoạt động',
+      );
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };
-    
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...userWithoutPassword } = user;
 
@@ -68,7 +94,11 @@ export class AuthService {
       action: 'LOGIN_SUCCESS',
       targetUserId: user.id,
       targetEmail: user.email,
-      details: { email: user.email, result: 'success', timestamp: new Date().toISOString() },
+      details: {
+        email: user.email,
+        result: 'success',
+        timestamp: new Date().toISOString(),
+      },
     });
 
     return {
@@ -94,22 +124,31 @@ export class AuthService {
 
     // 2. Kiểm tra mật khẩu mới không được trùng mật khẩu cũ
     if (changePasswordDto.currentPassword === changePasswordDto.newPassword) {
-      throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu hiện tại');
+      throw new BadRequestException(
+        'Mật khẩu mới không được trùng với mật khẩu hiện tại',
+      );
     }
 
     // 3. Kiểm tra mật khẩu mới và xác nhận mật khẩu khớp nhau
     if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
-      throw new BadRequestException('Mật khẩu mới và mật khẩu xác nhận không khớp');
+      throw new BadRequestException(
+        'Mật khẩu mới và mật khẩu xác nhận không khớp',
+      );
     }
 
     // 4. Băm mật khẩu mới và lưu
     const salt = await bcrypt.genSalt(10);
-    const newPasswordHash = await bcrypt.hash(changePasswordDto.newPassword, salt);
+    const newPasswordHash = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      salt,
+    );
 
     await this.usersService.updatePassword(userId, newPasswordHash);
 
     // In log quản trị sử dụng NestJS Logger
-    this.logger.log(`[CHANGE_PASSWORD] User (${user.email}) changed password successfully`);
+    this.logger.log(
+      `[CHANGE_PASSWORD] User (${user.email}) changed password successfully`,
+    );
 
     await this.auditLogsService.logAction({
       actorUserId: user.id,

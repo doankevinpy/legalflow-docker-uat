@@ -1,6 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, CreateBucketCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -9,7 +17,7 @@ export class StorageService implements OnModuleInit {
   private s3PresignClient: S3Client;
   private bucket: string;
 
-  constructor() {
+  constructor(private readonly metricsService: MetricsService) {
     const endpoint = process.env.MINIO_ENDPOINT || 'http://127.0.0.1:9000';
     const publicEndpoint = process.env.MINIO_PUBLIC_ENDPOINT || endpoint;
     const accessKeyId = process.env.MINIO_ACCESS_KEY || 'minioadmin';
@@ -38,16 +46,23 @@ export class StorageService implements OnModuleInit {
   async onModuleInit() {
     if (process.env.MINIO_AUTO_CREATE_BUCKET === 'true') {
       try {
-        await this.s3Client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+        await this.s3Client.send(
+          new HeadBucketCommand({ Bucket: this.bucket }),
+        );
         this.logger.log(`Bucket ${this.bucket} already exists.`);
       } catch (error: any) {
         if (error.$metadata?.httpStatusCode === 404) {
           this.logger.log(`Bucket ${this.bucket} not found. Creating...`);
           try {
-            await this.s3Client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+            await this.s3Client.send(
+              new CreateBucketCommand({ Bucket: this.bucket }),
+            );
             this.logger.log(`Bucket ${this.bucket} created successfully.`);
           } catch (createError) {
-            this.logger.error(`Failed to create bucket ${this.bucket}`, createError);
+            this.logger.error(
+              `Failed to create bucket ${this.bucket}`,
+              createError,
+            );
           }
         } else {
           this.logger.error(`Error checking bucket ${this.bucket}`, error);
@@ -62,7 +77,9 @@ export class StorageService implements OnModuleInit {
       return true;
     } catch (error: any) {
       try {
-        await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucket, MaxKeys: 1 }));
+        await this.s3Client.send(
+          new ListObjectsV2Command({ Bucket: this.bucket, MaxKeys: 1 }),
+        );
         return true;
       } catch (fallbackError: any) {
         this.logger.error('MinIO readiness check failed');
@@ -78,7 +95,13 @@ export class StorageService implements OnModuleInit {
       Body: file.buffer,
       ContentType: file.mimetype,
     });
-    await this.s3Client.send(command);
+    try {
+      await this.s3Client.send(command);
+      this.metricsService.incUpload('success');
+    } catch (error) {
+      this.metricsService.incUpload('fail');
+      throw error;
+    }
   }
 
   async getPresignedUrl(key: string, expiresIn = 900): Promise<string> {
@@ -86,7 +109,15 @@ export class StorageService implements OnModuleInit {
       Bucket: this.bucket,
       Key: key,
     });
-    // Use the public client so the generated URL uses MINIO_PUBLIC_ENDPOINT
-    return getSignedUrl(this.s3PresignClient, command, { expiresIn });
+    try {
+      const url = await getSignedUrl(this.s3PresignClient, command, {
+        expiresIn,
+      });
+      this.metricsService.incDownload('success');
+      return url;
+    } catch (error) {
+      this.metricsService.incDownload('fail');
+      throw error;
+    }
   }
 }

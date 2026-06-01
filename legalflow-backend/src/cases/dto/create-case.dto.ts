@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsDateString, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  IsDateString,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { CaseType, CaseField, CaseNeighborhood } from '../enums/case.enum';
 

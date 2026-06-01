@@ -6,13 +6,15 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
-  app.use(helmet({
-    contentSecurityPolicy: false, // Nới lỏng CSP cho môi trường dev/localhost
-  }));
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // Nới lỏng CSP cho môi trường dev/localhost
+    }),
+  );
 
   const configService = app.get(ConfigService);
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -21,13 +23,16 @@ async function bootstrap() {
     }),
   );
 
-  const frontendOriginStr = configService.get<string>('FRONTEND_ORIGIN', 'http://localhost:5173');
-  
+  const frontendOriginStr = configService.get<string>(
+    'FRONTEND_ORIGIN',
+    'http://localhost:5173',
+  );
+
   // Xử lý origin thành mảng
   const allowedOrigins = frontendOriginStr
     .split(',')
-    .map(o => o.trim())
-    .filter(o => o && o !== '*');
+    .map((o) => o.trim())
+    .filter((o) => o && o !== '*');
 
   if (frontendOriginStr.includes('*')) {
     console.warn(
@@ -38,7 +43,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin: string, callback: Function) => {
-      // Cho phép request không có origin (ví dụ: server-to-server, curl, Postman local) 
+      // Cho phép request không có origin (ví dụ: server-to-server, curl, Postman local)
       // Tuy nhiên nếu bạn muốn cực kỳ khắt khe, hãy bỏ dòng này và luôn reject nếu !origin
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);

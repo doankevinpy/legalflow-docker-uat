@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  InternalServerErrorException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -42,7 +48,9 @@ export class CasesService {
   private checkStaffAccess(caseObj: any, user: any) {
     if (user.role === Role.STAFF) {
       if (caseObj.assignedToId !== user.id && caseObj.createdById !== user.id) {
-        throw new ForbiddenException('STAFF can only modify their own or assigned cases');
+        throw new ForbiddenException(
+          'STAFF can only modify their own or assigned cases',
+        );
       }
     }
   }
@@ -62,7 +70,9 @@ export class CasesService {
     while (retries < 5) {
       try {
         createdCase = await this.prisma.$transaction(async (tx) => {
-          const seqYear = receivedDate ? new Date(receivedDate).getFullYear() : new Date().getFullYear();
+          const seqYear = receivedDate
+            ? new Date(receivedDate).getFullYear()
+            : new Date().getFullYear();
 
           // Atomic upsert to prevent race condition on concurrent case creation
           const seq = await tx.caseSequence.upsert({
@@ -84,16 +94,16 @@ export class CasesService {
               assignedToId: finalAssignedToId,
               createdById: user.id,
               checklist: {
-                create: this.getDefaultChecklist(rest.field)
+                create: this.getDefaultChecklist(rest.field),
               },
               histories: {
                 create: {
                   userId: user.id,
                   action: CaseHistoryAction.CREATE_CASE,
-                  details: { message: 'Case created' }
-                }
-              }
-            }
+                  details: { message: 'Case created' },
+                },
+              },
+            },
           });
           return newCase;
         });
@@ -108,14 +118,27 @@ export class CasesService {
     }
 
     if (!createdCase) {
-      throw new InternalServerErrorException('Cannot generate unique case code');
+      throw new InternalServerErrorException(
+        'Cannot generate unique case code',
+      );
     }
 
     return this.findOne(createdCase.id);
   }
 
   async findAll(query: QueryCasesDto) {
-    const { search, status, type, field, neighborhood, assignedToId, page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      search,
+      status,
+      type,
+      field,
+      neighborhood,
+      assignedToId,
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.LegalCaseWhereInput = {
@@ -145,16 +168,21 @@ export class CasesService {
         orderBy: { [sortBy]: sortOrder },
         include: {
           assignedTo: { select: { id: true, fullName: true, email: true } },
-          createdBy: { select: { id: true, fullName: true, email: true } }
-        }
-      })
+          createdBy: { select: { id: true, fullName: true, email: true } },
+        },
+      }),
     ]);
 
     // parse documents JSON string back to object array if it's a string (SQLite fallback), otherwise use directly
-    const mappedData = data.map(c => this.sanitizeCaseResponse({
-      ...c,
-      documents: typeof c.documents === 'string' ? JSON.parse(c.documents) : (c.documents || [])
-    }));
+    const mappedData = data.map((c) =>
+      this.sanitizeCaseResponse({
+        ...c,
+        documents:
+          typeof c.documents === 'string'
+            ? JSON.parse(c.documents)
+            : c.documents || [],
+      }),
+    );
 
     return {
       data: mappedData,
@@ -162,8 +190,8 @@ export class CasesService {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -174,9 +202,11 @@ export class CasesService {
   }
 
   private sanitizeDocuments(documents: any) {
-    const docsArray = Array.isArray(documents) 
-      ? documents 
-      : (typeof documents === 'string' ? JSON.parse(documents) : []);
+    const docsArray = Array.isArray(documents)
+      ? documents
+      : typeof documents === 'string'
+        ? JSON.parse(documents)
+        : [];
     return docsArray.map((doc: any) => this.sanitizeDocument(doc));
   }
 
@@ -184,7 +214,7 @@ export class CasesService {
     if (!caseObj) return caseObj;
     return {
       ...caseObj,
-      documents: this.sanitizeDocuments(caseObj.documents)
+      documents: this.sanitizeDocuments(caseObj.documents),
     };
   }
 
@@ -196,21 +226,24 @@ export class CasesService {
         createdBy: { select: { id: true, fullName: true, email: true } },
         notes: {
           include: { user: { select: { id: true, fullName: true } } },
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         },
         checklist: { orderBy: { createdAt: 'asc' } },
         histories: {
           include: { user: { select: { id: true, fullName: true } } },
-          orderBy: { createdAt: 'desc' }
-        }
-      }
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     });
 
     if (!caseObj) throw new NotFoundException('Case not found');
 
     return {
       ...caseObj,
-      documents: typeof caseObj.documents === 'string' ? JSON.parse(caseObj.documents) : (caseObj.documents || [])
+      documents:
+        typeof caseObj.documents === 'string'
+          ? JSON.parse(caseObj.documents)
+          : caseObj.documents || [],
     };
   }
 
@@ -223,24 +256,28 @@ export class CasesService {
     const caseObj = await this.findOneInternal(id);
     this.checkStaffAccess(caseObj, user);
 
-    const { documents, deadline, receivedDate, assignedToId, ...rest } = updateCaseDto;
+    const { documents, deadline, receivedDate, assignedToId, ...rest } =
+      updateCaseDto;
 
     const updateData: any = { ...rest };
-    if (documents) updateData.documents = documents as unknown as Prisma.InputJsonValue; // Pass array directly to Postgres Json field
+    if (documents) updateData.documents = documents; // Pass array directly to Postgres Json field
     if (deadline) updateData.deadline = new Date(deadline);
     if (receivedDate) updateData.receivedDate = new Date(receivedDate);
 
     // Only Admin/Manager can change assign
-    if (assignedToId !== undefined && (user.role === Role.ADMIN || user.role === Role.MANAGER)) {
+    if (
+      assignedToId !== undefined &&
+      (user.role === Role.ADMIN || user.role === Role.MANAGER)
+    ) {
       updateData.assignedToId = assignedToId;
     }
 
     const changedFields = Object.keys(updateData);
-    
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.legalCase.update({
         where: { id },
-        data: updateData
+        data: updateData,
       });
 
       if (changedFields.length > 0) {
@@ -249,8 +286,8 @@ export class CasesService {
             caseId: id,
             userId: user.id,
             action: CaseHistoryAction.UPDATE_CASE,
-            details: { updatedFields: changedFields }
-          }
+            details: { updatedFields: changedFields },
+          },
         });
       }
 
@@ -261,26 +298,27 @@ export class CasesService {
   async softDelete(id: string, user: any) {
     // Only Admin/Manager handled by RolesGuard in Controller
     const caseObj = await this.prisma.legalCase.findUnique({ where: { id } });
-    if (!caseObj || caseObj.deletedAt) throw new NotFoundException('Case not found');
+    if (!caseObj || caseObj.deletedAt)
+      throw new NotFoundException('Case not found');
 
     await this.prisma.$transaction(async (tx) => {
       await tx.legalCase.update({
         where: { id },
         data: {
           deletedAt: new Date(),
-          deletedById: user.id
-        }
+          deletedById: user.id,
+        },
       });
       await tx.caseHistory.create({
         data: {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.SOFT_DELETE_CASE,
-          details: { message: 'Case soft deleted' }
-        }
+          details: { message: 'Case soft deleted' },
+        },
       });
     });
-    
+
     return { success: true };
   }
 
@@ -293,8 +331,8 @@ export class CasesService {
         data: {
           caseId: id,
           userId: user.id,
-          content: dto.content
-        }
+          content: dto.content,
+        },
       });
 
       await tx.caseHistory.create({
@@ -302,20 +340,28 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.ADD_NOTE,
-          details: { noteId: note.id }
-        }
+          details: { noteId: note.id },
+        },
       });
 
       return note;
     });
   }
 
-  async updateChecklistItem(id: string, itemId: string, dto: UpdateChecklistItemDto, user: any) {
+  async updateChecklistItem(
+    id: string,
+    itemId: string,
+    dto: UpdateChecklistItemDto,
+    user: any,
+  ) {
     const caseObj = await this.findOneInternal(id);
     this.checkStaffAccess(caseObj, user);
 
-    const item = await this.prisma.caseChecklistItem.findUnique({ where: { id: itemId } });
-    if (!item || item.caseId !== id) throw new NotFoundException('Checklist item not found');
+    const item = await this.prisma.caseChecklistItem.findUnique({
+      where: { id: itemId },
+    });
+    if (!item || item.caseId !== id)
+      throw new NotFoundException('Checklist item not found');
 
     return this.prisma.$transaction(async (tx) => {
       const updatedItem = await tx.caseChecklistItem.update({
@@ -323,8 +369,8 @@ export class CasesService {
         data: {
           isCompleted: dto.isCompleted,
           completedAt: dto.isCompleted ? new Date() : null,
-          completedById: dto.isCompleted ? user.id : null
-        }
+          completedById: dto.isCompleted ? user.id : null,
+        },
       });
 
       await tx.caseHistory.create({
@@ -332,8 +378,8 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.UPDATE_CHECKLIST,
-          details: { itemId, isCompleted: dto.isCompleted }
-        }
+          details: { itemId, isCompleted: dto.isCompleted },
+        },
       });
 
       return updatedItem;
@@ -349,7 +395,7 @@ export class CasesService {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.legalCase.update({
         where: { id },
-        data: { status: dto.status }
+        data: { status: dto.status },
       });
 
       await tx.caseHistory.create({
@@ -357,8 +403,8 @@ export class CasesService {
           caseId: id,
           userId: user.id,
           action: CaseHistoryAction.CHANGE_STATUS,
-          details: { oldStatus: caseObj.status, newStatus: dto.status }
-        }
+          details: { oldStatus: caseObj.status, newStatus: dto.status },
+        },
       });
 
       return this.sanitizeCaseResponse(updated);
@@ -367,8 +413,17 @@ export class CasesService {
 
   async getStats() {
     const where: Prisma.LegalCaseWhereInput = { deletedAt: null };
-    
-    const allCases = await this.prisma.legalCase.findMany({ where, select: { status: true, type: true, field: true, neighborhood: true, deadline: true } });
+
+    const allCases = await this.prisma.legalCase.findMany({
+      where,
+      select: {
+        status: true,
+        type: true,
+        field: true,
+        neighborhood: true,
+        deadline: true,
+      },
+    });
 
     const stats = {
       total: allCases.length,
@@ -377,7 +432,7 @@ export class CasesService {
       byField: {} as Record<string, number>,
       byNeighborhood: {} as Record<string, number>,
       overdue: 0,
-      needsMoreInfo: 0
+      needsMoreInfo: 0,
     };
 
     const now = new Date();
@@ -386,10 +441,16 @@ export class CasesService {
       stats.byStatus[c.status] = (stats.byStatus[c.status] || 0) + 1;
       stats.byType[c.type] = (stats.byType[c.type] || 0) + 1;
       stats.byField[c.field] = (stats.byField[c.field] || 0) + 1;
-      stats.byNeighborhood[c.neighborhood] = (stats.byNeighborhood[c.neighborhood] || 0) + 1;
+      stats.byNeighborhood[c.neighborhood] =
+        (stats.byNeighborhood[c.neighborhood] || 0) + 1;
 
       if (c.status === CaseStatus.NEEDS_MORE_INFO) stats.needsMoreInfo++;
-      if (c.deadline && new Date(c.deadline) < now && c.status !== CaseStatus.CLOSED && c.status !== CaseStatus.RESPONDED) {
+      if (
+        c.deadline &&
+        new Date(c.deadline) < now &&
+        c.status !== CaseStatus.CLOSED &&
+        c.status !== CaseStatus.RESPONDED
+      ) {
         stats.overdue++;
       }
     }
@@ -401,15 +462,16 @@ export class CasesService {
     if (!file) throw new BadRequestException('No file provided');
 
     // Validate size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('File too large (max 5MB)');
+    if (file.size > 5 * 1024 * 1024)
+      throw new BadRequestException('File too large (max 5MB)');
 
     // Validate extension and MIME
     const allowedMimes = [
-      'application/pdf', 
-      'application/msword', 
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
-      'image/png', 
-      'image/jpeg'
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/png',
+      'image/jpeg',
     ];
     if (!allowedMimes.includes(file.mimetype)) {
       throw new BadRequestException('Invalid file type');
@@ -456,7 +518,7 @@ export class CasesService {
 
     await this.prisma.legalCase.update({
       where: { id },
-      data: { documents: updatedDocuments as unknown as Prisma.InputJsonValue },
+      data: { documents: updatedDocuments },
     });
 
     await this.prisma.caseHistory.create({
@@ -464,8 +526,11 @@ export class CasesService {
         caseId: id,
         userId: user.id,
         action: CaseHistoryAction.UPDATE_CASE,
-        details: { message: 'Uploaded document', documentName: file.originalname }
-      }
+        details: {
+          message: 'Uploaded document',
+          documentName: file.originalname,
+        },
+      },
     });
 
     const { minioKey: _, ...safeDoc } = newDoc;
@@ -474,23 +539,26 @@ export class CasesService {
 
   async downloadDocument(id: string, docId: string, user: any) {
     const caseObj = await this.findOneInternal(id); // findOneInternal checks deletedAt: null
-    
+
     // check view right
     if (user.role === Role.STAFF) {
       if (caseObj.assignedToId !== user.id && caseObj.createdById !== user.id) {
-        throw new ForbiddenException('STAFF can only view their own or assigned cases');
+        throw new ForbiddenException(
+          'STAFF can only view their own or assigned cases',
+        );
       }
     }
 
     const documents = Array.isArray(caseObj.documents) ? caseObj.documents : [];
     const doc = documents.find((d: any) => d.id === docId);
-    
+
     if (!doc || !doc.minioKey) {
       throw new NotFoundException('Document not found or missing minioKey');
     }
 
-    const presignedUrl = await this.storageService.getPresignedUrl(doc.minioKey);
+    const presignedUrl = await this.storageService.getPresignedUrl(
+      doc.minioKey,
+    );
     return { url: presignedUrl };
   }
-
 }

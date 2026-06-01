@@ -18,13 +18,19 @@ export class AdminAuditLogsService {
 
   async logAction(params: LogActionParams) {
     try {
-      let safeDetails = params.details ? { ...params.details } : {};
+      const safeDetails = params.details ? { ...params.details } : {};
       const sensitiveKeys = [
-        'password', 'passwordHash', 'passwordTemp', 
-        'currentPassword', 'newPassword', 'confirmPassword', 
-        'accessToken', 'JWT_SECRET', 'DATABASE_URL'
+        'password',
+        'passwordHash',
+        'passwordTemp',
+        'currentPassword',
+        'newPassword',
+        'confirmPassword',
+        'accessToken',
+        'JWT_SECRET',
+        'DATABASE_URL',
       ];
-      
+
       // Deep sanitize if needed, but shallow is usually enough if we pass structured objects
       for (const key of sensitiveKeys) {
         if (key in safeDetails) {
@@ -43,12 +49,23 @@ export class AdminAuditLogsService {
         },
       });
     } catch (error: any) {
-      this.logger.error(`Failed to create audit log: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create audit log: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
   async findAll(query: any) {
-    const { page = 1, limit = 20, action, actor, target, startDate, endDate } = query;
+    const {
+      page = 1,
+      limit = 20,
+      action,
+      actor,
+      target,
+      startDate,
+      endDate,
+    } = query;
     const pageNumber = Number(page);
     const limitNumber = Number(limit);
 
@@ -82,9 +99,12 @@ export class AdminAuditLogsService {
       }),
     ]);
 
-    const mappedData = data.map(item => ({
+    const mappedData = data.map((item) => ({
       ...item,
-      details: typeof item.details === 'string' ? JSON.parse(item.details) : (item.details || {})
+      details:
+        typeof item.details === 'string'
+          ? JSON.parse(item.details)
+          : item.details || {},
     }));
 
     return {

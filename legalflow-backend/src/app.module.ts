@@ -11,16 +11,19 @@ import { AdminAuditLogsModule } from './admin-audit-logs/admin-audit-logs.module
 import { AnalyticsModule } from './analytics/analytics.module';
 import { StorageModule } from './storage/storage.module';
 import { CustomThrottlerGuard } from './common/custom-throttler.guard';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 60,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 60,
+      },
+    ]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -28,6 +31,7 @@ import { CustomThrottlerGuard } from './common/custom-throttler.guard';
     CasesModule,
     AdminAuditLogsModule,
     AnalyticsModule,
+    MetricsModule,
   ],
   controllers: [],
   providers: [

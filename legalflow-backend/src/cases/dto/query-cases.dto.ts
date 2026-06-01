@@ -1,6 +1,11 @@
 import { IsOptional, IsString, IsEnum, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CaseType, CaseField, CaseNeighborhood, CaseStatus } from '../enums/case.enum';
+import {
+  CaseType,
+  CaseField,
+  CaseNeighborhood,
+  CaseStatus,
+} from '../enums/case.enum';
 
 export class QueryCasesDto {
   @IsOptional()

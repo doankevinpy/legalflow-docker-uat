@@ -10,4 +10,3 @@ import { AdminAuditLogsModule } from '../admin-audit-logs/admin-audit-logs.modul
   exports: [UsersService],
 })
 export class UsersModule {}
-

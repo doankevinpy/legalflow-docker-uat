@@ -18,7 +18,12 @@ import { AdminAuditLogsModule } from '../admin-audit-logs/admin-audit-logs.modul
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: parseInt(configService.get<string>('JWT_EXPIRES_IN', '28800'), 10) },
+        signOptions: {
+          expiresIn: parseInt(
+            configService.get<string>('JWT_EXPIRES_IN', '28800'),
+            10,
+          ),
+        },
       }),
     }),
   ],

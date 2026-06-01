@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, IsEnum, Matches, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsEnum,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { Role } from '../../common/role.enum';
 import { PASSWORD_REGEX, PASSWORD_MESSAGE_VI } from '../../common/constants';
 
