@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, CreateBucketCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 @Injectable()
@@ -52,6 +52,21 @@ export class StorageService implements OnModuleInit {
         } else {
           this.logger.error(`Error checking bucket ${this.bucket}`, error);
         }
+      }
+    }
+  }
+
+  async checkReadiness(): Promise<boolean> {
+    try {
+      await this.s3Client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      return true;
+    } catch (error: any) {
+      try {
+        await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucket, MaxKeys: 1 }));
+        return true;
+      } catch (fallbackError: any) {
+        this.logger.error('MinIO readiness check failed');
+        return false;
       }
     }
   }
