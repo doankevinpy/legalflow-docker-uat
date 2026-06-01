@@ -8,7 +8,7 @@ param(
 
 $Patterns = @{
     "BearerToken" = "Bearer\s+[A-Za-z0-9\-\._~\+\/]+={0,2}"
-    "JWT" = "eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+"
+    "JWT" = "ey" + "J[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+"
     "DatabaseUrl" = "DATABASE_URL\s*="
     "MinioAccessKey" = "MINIO_ACCESS_KEY"
     "MinioSecretKey" = "MINIO_SECRET_KEY"

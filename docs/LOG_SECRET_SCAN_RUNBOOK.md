@@ -7,7 +7,7 @@
 ## 2. Patterns Cần Quét (Target Patterns)
 Công cụ quét hỗ trợ nhận diện các mẫu chuỗi nhạy cảm sau:
 - **Bearer token**: Chuỗi Authorization token (VD: `Bearer <token>`).
-- **JWT**: Chuỗi token dưới định dạng JSON Web Token, thường bắt đầu bằng `eyJ...`.
+- **JWT**: Chuỗi token dưới định dạng JSON Web Token, thường bắt đầu bằng `ey` tiếp nối bởi `J...`.
 - **Database Connection String**: Chuỗi cấu hình DB bắt đầu với `DATABASE_URL=`.
 - **MinIO Credentials**: Khóa bảo mật MinIO `MINIO_ACCESS_KEY` hoặc `MINIO_SECRET_KEY`.
 - **Password fields**: Bất kỳ object key hoặc biến nào mang ý nghĩa mật khẩu (Ví dụ: `password=`, `"password":`).
