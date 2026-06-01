@@ -11,7 +11,7 @@ $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $PgBackupScript = Join-Path $ScriptDir "backup-postgres.ps1"
 $MinioBackupScript = Join-Path $ScriptDir "backup-minio.ps1"
 
-$ScriptVersion = "1.1.0"
+$ScriptVersion = "1.2.0"
 $StatusSuccess = $null
 $StatusFailed = $null
 
@@ -56,6 +56,7 @@ if ($Execute) {
     Write-Host "[INFO] Created backup directory: $CurrentBackupDir"
 } else {
     Write-Host "[DRY-RUN] Would create directory: $CurrentBackupDir"
+    Write-Host "[DRY-RUN] Would write manifest.sha256 covering all data files in backup folder."
     Write-Host "[DRY-RUN] Would write status.success if backup succeeds."
 }
 
@@ -72,6 +73,28 @@ Function Write-StatusFailed {
         if (Test-Path $StatusSuccess) { Remove-Item -LiteralPath $StatusSuccess -Force }
         Write-Host "[INFO] Written status.failed marker." -ForegroundColor Red
     }
+}
+
+Function Generate-Manifest {
+    param([string]$BackupDir, [string]$ManifestPath)
+    $ExcludedNames = @('manifest.sha256', 'status.success', 'status.failed')
+    $files = Get-ChildItem -LiteralPath $BackupDir -Recurse -File | Where-Object {
+        $ExcludedNames -notcontains $_.Name
+    }
+    if ($files.Count -eq 0) {
+        Write-Host "[ERROR] No data files found to include in manifest." -ForegroundColor Red
+        return $false
+    }
+    $lines = foreach ($f in $files) {
+        $hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+        # Build relative path from BackupDir, using forward slashes
+        $rel = $f.FullName.Substring($BackupDir.Length).TrimStart('\', '/')
+        $rel = $rel.Replace('\', '/')
+        "$hash  *$rel"
+    }
+    $lines | Out-File -FilePath $ManifestPath -Encoding ASCII
+    Write-Host "[INFO] manifest.sha256 written ($($files.Count) entries)." -ForegroundColor Green
+    return $true
 }
 
 Write-Host "--- Running PostgreSQL Backup ---"
@@ -100,7 +123,21 @@ if ($Execute) {
     & powershell -ExecutionPolicy Bypass -File $MinioBackupScript -EnvFile $EnvFile -BackupRoot $CurrentBackupDir
 }
 
-# 4. Write status marker
+# 4. Generate manifest.sha256
+Write-Host "--- Generating manifest.sha256 ---"
+$ManifestPath = Join-Path $CurrentBackupDir "manifest.sha256"
+if ($Execute) {
+    $ok = Generate-Manifest -BackupDir $CurrentBackupDir -ManifestPath $ManifestPath
+    if (-not $ok) {
+        Write-Host "[ERROR] manifest.sha256 generation failed. Aborting." -ForegroundColor Red
+        Write-StatusFailed -Reason "manifest_generation_failed"
+        exit 1
+    }
+} else {
+    Write-Host "[DRY-RUN] Would write manifest.sha256 covering all data files in backup folder."
+}
+
+# 5. Write status marker
 if ($Execute) {
     Write-Host "--- Writing Status Marker ---"
     # Mutual exclusion: remove status.failed if it somehow exists
@@ -113,7 +150,7 @@ if ($Execute) {
     Write-Host "[INFO] Written status.success marker." -ForegroundColor Green
 }
 
-# 5. Verify & Remote Sync
+# 6. Verify & Remote Sync
 Write-Host "--- Verification & Remote Sync ---"
 Write-Host "[INFO] Verify step reserved for Phase 9.3C/9.3D"
 
