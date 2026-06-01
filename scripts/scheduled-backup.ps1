@@ -11,6 +11,10 @@ $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $PgBackupScript = Join-Path $ScriptDir "backup-postgres.ps1"
 $MinioBackupScript = Join-Path $ScriptDir "backup-minio.ps1"
 
+$ScriptVersion = "1.1.0"
+$StatusSuccess = $null
+$StatusFailed = $null
+
 if (-not $Execute) {
     Write-Host "[DRY-RUN] Starting scheduled backup plan." -ForegroundColor Cyan
 } else {
@@ -42,6 +46,9 @@ if ($Execute) {
 # 2. Output Folders
 Write-Host "--- Output Folders Setup ---"
 $CurrentBackupDir = Join-Path $LocalBackupRoot $Timestamp
+$StatusSuccess = Join-Path $CurrentBackupDir "status.success"
+$StatusFailed = Join-Path $CurrentBackupDir "status.failed"
+
 if ($Execute) {
     if (-not (Test-Path $CurrentBackupDir)) {
         New-Item -ItemType Directory -Path $CurrentBackupDir | Out-Null
@@ -49,15 +56,30 @@ if ($Execute) {
     Write-Host "[INFO] Created backup directory: $CurrentBackupDir"
 } else {
     Write-Host "[DRY-RUN] Would create directory: $CurrentBackupDir"
+    Write-Host "[DRY-RUN] Would write status.success if backup succeeds."
 }
 
 # 3. Run Sub-Scripts
+Function Write-StatusFailed {
+    param([string]$Reason)
+    if ($StatusFailed) {
+        @(
+            "timestamp=$((Get-Date).ToString('yyyy-MM-ddTHH:mm:ssZ'))",
+            "status=failed",
+            "reason=$Reason",
+            "script_version=$ScriptVersion"
+        ) | Out-File -FilePath $StatusFailed -Encoding ASCII
+        if (Test-Path $StatusSuccess) { Remove-Item -LiteralPath $StatusSuccess -Force }
+        Write-Host "[INFO] Written status.failed marker." -ForegroundColor Red
+    }
+}
+
 Write-Host "--- Running PostgreSQL Backup ---"
 if ($Execute) {
-    # We pass Execute to the child script
     & powershell -ExecutionPolicy Bypass -File $PgBackupScript -EnvFile $EnvFile -BackupRoot $CurrentBackupDir -Execute
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] PostgreSQL backup failed. Aborting." -ForegroundColor Red
+        Write-StatusFailed -Reason "postgres_backup_failed"
         exit 1
     }
 } else {
@@ -70,6 +92,7 @@ if ($Execute) {
     & powershell -ExecutionPolicy Bypass -File $MinioBackupScript -EnvFile $EnvFile -BackupRoot $CurrentBackupDir -Execute
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] MinIO backup failed. Aborting." -ForegroundColor Red
+        Write-StatusFailed -Reason "minio_backup_failed"
         exit 1
     }
 } else {
@@ -77,7 +100,20 @@ if ($Execute) {
     & powershell -ExecutionPolicy Bypass -File $MinioBackupScript -EnvFile $EnvFile -BackupRoot $CurrentBackupDir
 }
 
-# 4. Verify & Remote Sync (Mock in Phase 9.3B)
+# 4. Write status marker
+if ($Execute) {
+    Write-Host "--- Writing Status Marker ---"
+    # Mutual exclusion: remove status.failed if it somehow exists
+    if (Test-Path $StatusFailed) { Remove-Item -LiteralPath $StatusFailed -Force }
+    @(
+        "timestamp=$((Get-Date).ToString('yyyy-MM-ddTHH:mm:ssZ'))",
+        "status=success",
+        "script_version=$ScriptVersion"
+    ) | Out-File -FilePath $StatusSuccess -Encoding ASCII
+    Write-Host "[INFO] Written status.success marker." -ForegroundColor Green
+}
+
+# 5. Verify & Remote Sync
 Write-Host "--- Verification & Remote Sync ---"
 Write-Host "[INFO] Verify step reserved for Phase 9.3C/9.3D"
 
@@ -87,7 +123,7 @@ if ($Execute) {
     Write-Host "[DRY-RUN] Would sync $CurrentBackupDir to $RemoteMockRoot upon verification success."
 }
 
-# 5. Cleanup (Mock in Phase 9.3B)
+# 6. Cleanup
 Write-Host "--- Cleanup ---"
 Write-Host "[INFO] Cleanup step reserved for future phase"
 
