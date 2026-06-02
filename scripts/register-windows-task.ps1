@@ -1,8 +1,11 @@
 param(
     [string]$TaskName = "LegalFlow_AutomatedBackup",
     [string]$ScriptPath = "$((Split-Path -Parent $MyInvocation.MyCommand.Path))\scheduled-backup.ps1",
-    [string]$Time = "02:00",
-    [string]$Frequency = "Daily",
+    [string]$Time = "09:00",
+    [string]$Frequency = "Weekdays",
+    [int]$RetryCount = 3,
+    [int]$RetryIntervalMinutes = 30,
+    [int]$ExecutionTimeLimitHours = 2,
     [switch]$Execute,
     [switch]$TaskExecuteMode,
     [switch]$Force,
@@ -94,10 +97,17 @@ if ($Execute) {
     Write-Host "[INFO] Registering task '$TaskName'..."
     $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $Arguments
     
-    # We map 'Daily' for now.
-    $Trigger = New-ScheduledTaskTrigger -Daily -At $Time
+    if ($Frequency -eq "Weekdays") {
+        $Trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At $Time
+    } else {
+        $Trigger = New-ScheduledTaskTrigger -Daily -At $Time
+    }
     
-    $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+        -MultipleInstances IgnoreNew `
+        -ExecutionTimeLimit (New-TimeSpan -Hours $ExecutionTimeLimitHours) `
+        -RestartCount $RetryCount `
+        -RestartInterval (New-TimeSpan -Minutes $RetryIntervalMinutes)
     
     Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -User $env:USERNAME | Out-Null
     
@@ -105,7 +115,15 @@ if ($Execute) {
 } else {
     Write-Host "--- Task Configuration Preview ---"
     Write-Host "Task Name : $TaskName"
-    Write-Host "Trigger   : $Frequency at $Time"
+    if ($Frequency -eq "Weekdays") {
+        Write-Host "Trigger   : $Frequency at $Time"
+        Write-Host "Days      : Monday-Friday"
+    } else {
+        Write-Host "Trigger   : $Frequency at $Time"
+    }
+    Write-Host "Retry     : $RetryCount times every $RetryIntervalMinutes minutes on failure"
+    Write-Host "Timeout   : $ExecutionTimeLimitHours hours limit"
+    Write-Host "MultipleInstances : IgnoreNew"
     Write-Host "Action    : powershell.exe $Arguments"
     Write-Host "User      : $env:USERNAME (Interactive, No secret stored)"
     Write-Host "----------------------------------"
