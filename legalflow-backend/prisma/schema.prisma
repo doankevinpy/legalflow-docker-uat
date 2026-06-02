@@ -100,6 +100,131 @@ model LegalCase {
   notes     CaseNote[]
   histories CaseHistory[]
   checklist CaseChecklistItem[]
+
+  landProfile LandProfile?
+}
+
+enum LandProcedureType {
+  CAP_GIAY_CHUNG_NHAN
+  CHUYEN_MUC_DICH_SD
+  TRANH_CHAP_DAT_DAI
+  GIAO_DAT_CHO_THUE_DAT
+  THU_HOI_DAT_BOI_THUONG
+  KHAC
+}
+
+enum LandType {
+  DAT_O_DO_THI
+  DAT_O_NONG_THON
+  DAT_TRONG_LUA
+  DAT_TRONG_CAY_LAU_NAM
+  DAT_RUNG_PHONG_HO
+  DAT_SAN_XUAT_KINH_DOANH
+  KHAC
+}
+
+enum PlanningStatus {
+  TRONG_QUY_HOACH
+  NGOAI_QUY_HOACH
+  CAN_XAC_MINH_THEM
+}
+
+enum DisputeStatus {
+  DANG_TRANH_CHAP
+  KHONG_TRANH_CHAP
+  CAN_XAC_MINH_THEM
+}
+
+enum OriginOfLandStatus {
+  NHAN_CHUYEN_NHUONG
+  DUOC_THUA_KE
+  DUOC_TANG_CHO
+  DAT_KHAI_HOANG
+  NHA_NUOC_GIAO_DAT
+  NHA_NUOC_CHO_THUE_DAT
+  KHAC
+}
+
+enum DocumentCompleteness {
+  DU_HO_SO
+  THIEU_HO_SO
+}
+
+enum FinancialObligationStatus {
+  HOAN_THANH
+  CHUA_HOAN_THANH
+  MIEN_GIAM
+}
+
+enum LandOutcome {
+  CHAP_THUAN
+  TU_CHOI
+  CHUYEN_TRA
+}
+
+enum LandReasonCode {
+  QUY_HOACH_XUNG_DOT
+  TRANH_CHAP_CHUA_GIAI_QUYET
+  THIEU_GIAY_TO_PHAP_LY
+  CHUA_HOAN_THANH_NGHIA_VU_TAI_CHINH
+  HO_SO_KHONG_HOP_LE
+  KHAC
+}
+
+enum ComplaintType {
+  KN
+  TC
+  PA
+}
+
+enum RiskReviewStatus {
+  AN_TOAN
+  CAN_RA_SOAT
+  DA_XAC_MINH_BINH_THUONG
+  DA_XU_LY_DIEU_CHINH
+}
+
+model LandProfile {
+  id                        String                     @id @default(uuid())
+  caseId                    String                     @unique
+  case                      LegalCase                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  
+  procedureType             LandProcedureType          @default(KHAC)
+  landType                  LandType
+  currentLandUseType        LandType
+  requestedLandUseType      LandType?                  
+  area                      Float                      
+  neighborhood              Neighborhood               
+  planningStatus            PlanningStatus             @default(NGOAI_QUY_HOACH)
+  disputeStatus             DisputeStatus              @default(KHONG_TRANH_CHAP)
+  originOfLandStatus        OriginOfLandStatus         @default(KHAC)
+  documentCompleteness      DocumentCompleteness       @default(DU_HO_SO)
+  financialObligationStatus FinancialObligationStatus  @default(HOAN_THANH)
+  outcome                   LandOutcome?               
+  reasonCode                LandReasonCode?            
+  
+  complaintFlag             Boolean                    @default(false)
+  complaintType             ComplaintType?             
+  
+  processingDays            Int?                       
+  overdueDays               Int?                       
+  riskReviewStatus          RiskReviewStatus           @default(AN_TOAN)
+  
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  @@index([procedureType])
+  @@index([landType])
+  @@index([neighborhood])
+  @@index([outcome])
+  @@index([reasonCode])
+  @@index([complaintFlag])
+  @@index([planningStatus])
+
+  @@index([procedureType, outcome])
+  @@index([neighborhood, outcome])
+  @@index([landType, outcome])
+  @@index([complaintFlag, outcome])
 }
 
 model CaseSequence {
