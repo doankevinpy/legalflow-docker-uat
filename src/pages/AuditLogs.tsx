@@ -167,7 +167,17 @@ export default function AuditLogs() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                     <pre className="whitespace-pre-wrap max-w-xs overflow-x-auto text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded">
-                      {log.details !== '{}' ? JSON.stringify(JSON.parse(log.details), null, 2) : '{}'}
+                      {(() => {
+                        if (!log.details) return '{}';
+                        if (typeof log.details === 'object') {
+                          return JSON.stringify(log.details, null, 2);
+                        }
+                        try {
+                          return JSON.stringify(JSON.parse(log.details), null, 2);
+                        } catch (e) {
+                          return log.details;
+                        }
+                      })()}
                     </pre>
                   </td>
                 </tr>
