@@ -12,6 +12,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { StorageModule } from './storage/storage.module';
 import { CustomThrottlerGuard } from './common/custom-throttler.guard';
 import { MetricsModule } from './metrics/metrics.module';
+import { LandProfileModule } from './land-profile/land-profile.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MetricsModule } from './metrics/metrics.module';
     AdminAuditLogsModule,
     AnalyticsModule,
     MetricsModule,
+    LandProfileModule,
   ],
   controllers: [],
   providers: [
