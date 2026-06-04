@@ -140,3 +140,35 @@ export interface ChangePasswordDto {
   confirmPassword: string;
 }
 
+export interface ApiLandProfile {
+  id: string;
+  caseId: string;
+  procedureType: string;
+  landType: string;
+  currentLandUseType: string;
+  requestedLandUseType?: string;
+  area: number;
+  neighborhood: string;
+  planningStatus: string;
+  disputeStatus: string;
+  originOfLandStatus: string;
+  documentCompleteness: string;
+  financialObligationStatus: string;
+  outcome?: string;
+  reasonCode?: string;
+  complaintFlag: boolean;
+  complaintType?: string;
+  processingDays?: number;
+  overdueDays?: number;
+  riskReviewStatus: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateLandProfilePayload = Omit<
+  ApiLandProfile,
+  'id' | 'caseId' | 'createdAt' | 'updatedAt'
+>;
+
+export type UpdateLandProfilePayload = Partial<CreateLandProfilePayload>;
+

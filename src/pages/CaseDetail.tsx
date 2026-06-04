@@ -19,6 +19,7 @@ import {
 } from '../lib/constants';
 import type { ApiCase } from '../lib/api-types';
 import { DocumentUpload } from '../components/documents/DocumentUpload';
+import { LandProfileTab } from '../components/cases/LandProfileTab';
 
 export default function CaseDetail() {
   const { id }      = useParams<{ id: string }>();
@@ -31,7 +32,7 @@ export default function CaseDetail() {
   const [error, setError]             = useState('');
   const [actionError, setActionError] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'info' | 'documents' | 'checklist' | 'notes' | 'history'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history'>('info');
   const [noteInput, setNoteInput] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
 
@@ -195,11 +196,12 @@ export default function CaseDetail() {
           <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden flex flex-col">
             {([
               { key: 'info',      label: 'Thông tin chung',    Icon: Info },
+              ...(currentCase?.field === 'DAT_DAI' ? [{ key: 'land-profile', label: 'Thông tin đất đai', Icon: FileText }] : []),
               { key: 'documents', label: `Tài liệu (${currentCase?.documents?.length || 0})`, Icon: FileText },
               { key: 'checklist', label: `Checklist (${checklist.filter(i=>i.isCompleted).length}/${checklist.length})`, Icon: CheckSquare },
               { key: 'notes',     label: `Ghi chú (${notes.length})`, Icon: FileText },
               { key: 'history',   label: `Lịch sử (${histories.length})`, Icon: Clock },
-            ] as const).map(({ key, label, Icon }) => (
+            ] as Array<{ key: 'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history'; label: string; Icon: any }>).map(({ key, label, Icon }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
@@ -258,6 +260,14 @@ export default function CaseDetail() {
                   <p className="text-base leading-relaxed whitespace-pre-wrap bg-secondary/30 p-4 rounded-lg">{currentCase.summary}</p>
                 </div>
               </div>
+            )}
+
+            {/* LAND PROFILE */}
+            {activeTab === 'land-profile' && currentCase.field === 'DAT_DAI' && (
+              <LandProfileTab
+                caseId={currentCase.id}
+                userCanEdit={userCanEdit}
+              />
             )}
 
             {/* DOCUMENTS */}
