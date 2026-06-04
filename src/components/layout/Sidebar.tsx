@@ -86,6 +86,14 @@ export function Sidebar({ onClose }: SidebarProps) {
             <p className="text-xs text-muted-foreground truncate">{user?.role ?? 'VIEWER'}</p>
           </div>
         </div>
+        {/* Environment & Version Label */}
+        <div className="mt-3 pt-3 border-t border-muted/50 text-[10px] text-muted-foreground text-center">
+          {import.meta.env.VITE_APP_ENV_LABEL === 'OFFICIAL_PILOT' ? (
+            <span>LegalFlow Official Pilot {import.meta.env.VITE_APP_VERSION || 'v1.15.0-uat-landprofile-e2e'}</span>
+          ) : (
+            <span>LegalFlow {import.meta.env.VITE_APP_VERSION || 'v1.15.0-uat-landprofile-e2e'}</span>
+          )}
+        </div>
       </div>
     </div>
   );
