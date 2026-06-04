@@ -37,6 +37,21 @@ test.describe('Authentication and Roles Smoke Tests', () => {
     await expect(page.locator('.max-w-7xl').first()).toBeVisible({ timeout: 5000 }).catch(() => {});
   });
 
+  test('Official Pilot warning banner and browser title are displayed correctly', async ({ page }) => {
+    await login(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+
+    // 1. Verify Browser Title
+    await expect(page).toHaveTitle(/\[OFFICIAL PILOT\]/i);
+
+    // 2. Verify Warning Banner Text
+    const banner = page.locator('text=HỆ THỐNG LEGALFLOW ĐANG VẬN HÀNH THEO MÔ HÌNH PILOT CHÍNH THỨC CÓ KIỂM SOÁT');
+    await expect(banner).toBeVisible();
+
+    // 3. Verify Version Label in Sidebar Footer
+    const versionLabel = page.locator('text=LegalFlow Official Pilot');
+    await expect(versionLabel).toBeVisible();
+  });
+
   test('Staff is blocked from Analytics', async ({ page }) => {
     await login(page, STAFF_EMAIL, STAFF_PASSWORD);
     

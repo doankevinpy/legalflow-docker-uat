@@ -119,6 +119,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        VITE_APP_ENV_LABEL: ${VITE_APP_ENV_LABEL:-MVP}
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-v1.15.0-uat-landprofile-e2e}
+        VITE_SHOW_ENV_BANNER: ${VITE_SHOW_ENV_BANNER:-true}
     container_name: legalflow_frontend
     restart: unless-stopped
     ports:
