@@ -6,7 +6,7 @@ services:
     container_name: legalflow_postgres
     restart: unless-stopped
     env_file:
-      - .env.docker.example
+      - .env.docker
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -22,7 +22,7 @@ services:
     container_name: legalflow_minio
     restart: unless-stopped
     env_file:
-      - .env.docker.example
+      - .env.docker
     command: server /data --console-address ":9001"
     ports:
       - "127.0.0.1:9000:9000"

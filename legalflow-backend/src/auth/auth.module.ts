@@ -16,15 +16,21 @@ import { AdminAuditLogsModule } from '../admin-audit-logs/admin-audit-logs.modul
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: parseInt(
-            configService.get<string>('JWT_EXPIRES_IN', '28800'),
-            10,
-          ),
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new Error('JWT_SECRET is missing in environment variables');
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn: parseInt(
+              configService.get<string>('JWT_EXPIRES_IN', '28800'),
+              10,
+            ),
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
