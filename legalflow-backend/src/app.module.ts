@@ -13,6 +13,7 @@ import { StorageModule } from './storage/storage.module';
 import { CustomThrottlerGuard } from './common/custom-throttler.guard';
 import { MetricsModule } from './metrics/metrics.module';
 import { LandProfileModule } from './land-profile/land-profile.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { LandProfileModule } from './land-profile/land-profile.module';
     AnalyticsModule,
     MetricsModule,
     LandProfileModule,
+    AiModule,
   ],
   controllers: [],
   providers: [

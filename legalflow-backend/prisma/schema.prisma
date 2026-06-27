@@ -68,6 +68,7 @@ model User {
   caseNotes               CaseNote[]
   caseHistories           CaseHistory[]
   completedChecklistItems CaseChecklistItem[]
+  aiAuditLogs             AiAuditLog[]
 }
 
 model LegalCase {
@@ -101,7 +102,9 @@ model LegalCase {
   histories CaseHistory[]
   checklist CaseChecklistItem[]
 
-  landProfile LandProfile?
+  landProfile  LandProfile?
+  aiAuditLogs  AiAuditLog[]
+  aiSuggestion AiCaseSuggestion?
 }
 
 enum LandProcedureType {
@@ -280,4 +283,72 @@ model AdminAuditLog {
   @@index([actorEmail])
   @@index([targetEmail])
   @@index([createdAt])
+}
+
+enum AiActionType {
+  SUMMARIZE
+  CLASSIFY
+  CHECKLIST
+  DRAFT
+}
+
+enum AiLogStatus {
+  SUCCESS
+  ERROR
+}
+
+enum AiFeedbackStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  MODIFIED
+}
+
+model AiAuditLog {
+  id               String           @id @default(uuid())
+  caseId           String?
+  case             LegalCase?       @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  actionType       AiActionType
+  modelName        String
+  promptTokens     Int?
+  completionTokens Int?
+  latencyMs        Int?
+  
+  inputPayload     Json
+  outputPayload    Json
+  
+  status           AiLogStatus
+  errorMessage     String?
+  
+  userFeedback     AiFeedbackStatus @default(PENDING)
+  appliedAt        DateTime?
+  
+  createdAt        DateTime         @default(now())
+
+  @@index([caseId])
+  @@index([userId])
+  @@index([actionType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AiCaseSuggestion {
+  id               String     @id @default(uuid())
+  caseId           String     @unique
+  case             LegalCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  
+  suggestedSummary String?
+  suggestedType    CaseType?
+  suggestedField   CaseField?
+  confidenceScore  Float?
+  legalRationale   String?
+  
+  isApplied        Boolean    @default(false)
+  lastGeneratedAt  DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([isApplied])
 }
