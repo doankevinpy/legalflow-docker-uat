@@ -1,34 +1,21 @@
-# Cẩm nang Vận hành và Bảo mật LegalFlow v0.6.0 (RUNBOOK)
+# Cẩm nang Vận hành và Bảo mật LegalFlow (RUNBOOK)
 
-Tài liệu này cung cấp hướng dẫn từng bước và toàn diện cho các quản trị viên để cài đặt, cấu hình, vận hành và khôi phục hệ thống **LegalFlow MVP** một cách an toàn nhất trên môi trường Windows.
+> [!IMPORTANT]
+> **Khôi phục Nhanh Môi trường Local**: Nếu bạn đang cài đặt lại dự án trên máy mới hoặc khôi phục hạ tầng từ đầu, vui lòng xem hướng dẫn lệnh chuẩn tại [docs/LOCAL_RESTORE_QUICKSTART.md](file:///c:/Users/Admin/legalflow-docker-uat/docs/LOCAL_RESTORE_QUICKSTART.md).
+
+Tài liệu này cung cấp hướng dẫn từng bước và toàn diện cho các quản trị viên để cài đặt, cấu hình, vận hành và bảo mật kiến trúc chính thức **LegalFlow (PostgreSQL & MinIO Docker)** trên môi trường Windows.
 
 ---
 
-## Phase 6 - Secure Internet Trial / Public Access Setup
+## Kiến trúc Môi trường Chuẩn (Local & UAT)
 
 > [!WARNING]
-> **CẢNH BÁO CAO ĐỘ**:
-> - Đây là Public Access Trial qua Private Tunnel / Zero Trust, không phải production chính thức.
-> - **Không dùng dữ liệu pháp lý thật**.
-> - **Không upload tài liệu thật**.
-> - Backend mặc định dùng `HOST=127.0.0.1`, không bind `0.0.0.0`.
-> - Không expose trực tiếp port backend 3000 ra internet.
-> - Public trial phải dùng **HTTPS**.
-> - Không dùng Vite dev server để public. Frontend phải dùng production build (`npm run build`).
-> - Backend phải dùng production start (`npm run start:prod`).
-> - CORS không wildcard, chỉ allow domain cụ thể.
-> - SQLite chỉ dùng cho trial nhỏ. Backup DB trước và sau trial.
-> - Đổi `JWT_SECRET` và mật khẩu Admin trước trial.
-> - Yêu cầu rà soát: Dùng `DEPLOYMENT_PLAN.md`, `PRE_PUBLIC_TRIAL_SECURITY_CHECKLIST.md` và `UAT_PUBLIC_TRIAL_CHECKLIST.md` trước khi chạy thử.
-
----
-> [!CAUTION]
-> **QUY TẮC AN TOÀN DỮ LIỆU THỬ NGHIỆM (CỰC KỲ QUAN TRỌNG)**:
-> 1. **Trạng thái sẵn sàng**: Hệ thống đã đủ điều kiện chạy thử nội bộ cục bộ bằng dữ liệu giả.
-> 2. **Chưa dùng dữ liệu pháp lý thật**: Tuyệt đối nghiêm cấm nhập thông tin cá nhân khách hàng (PII) hoặc hồ sơ vụ việc thực tế trong giai đoạn dùng thử nội bộ này.
-> 3. **Chưa deploy public internet**: Hệ thống chỉ chạy cục bộ (Offline/Intranet) thông qua cổng localhost. Tuyệt đối không triển khai ra môi trường mạng công cộng.
-> 4. **Chưa có upload file thật**: Các tệp đính kèm trong hồ sơ vẫn ở dạng thông tin metadata JSON giả lập, chưa tải file vật lý thật lên máy chủ.
-> 5. **SQLite chỉ dùng cho MVP/local trial**: SQLite là hệ quản trị cơ sở dữ liệu dạng tệp tin cục bộ, chỉ phục vụ cho giai đoạn thử nghiệm MVP hiện hành.
+> **LƯU Ý KIẾN TRÚC QUAN TRỌNG**:
+> - **PostgreSQL Docker** là hệ quản trị cơ sở dữ liệu chuẩn duy nhất (`legalflow_postgres:5432`). Đã loại bỏ hoàn toàn SQLite.
+> - **MinIO Docker** là chuẩn lưu trữ tài liệu đối tượng S3 (`legalflow_minio:9000`).
+> - Cấu hình hạ tầng local được khởi tạo tự động bằng lệnh `docker compose -f docker-compose.infra.yml up -d`.
+> - Không expose trực tiếp cổng database và storage ra mạng công cộng mà không có lớp bảo mật hoặc VPN.
+> - Trước khi triển khai Public Trial / UAT, rà soát kỹ các checklist bảo mật trong `docs/`.
 
 ---
 
@@ -43,82 +30,61 @@ Trước khi bắt đầu, đảm bảo máy tính của bạn đã cài đặt 
 
 ## 2. Thiết lập Biến môi trường (.env)
 
-Trước khi khởi chạy hệ thống, bạn cần khởi tạo các file môi trường.
+Trước khi khởi chạy hệ thống, bạn cần khởi tạo cấu hình môi trường từ các tệp mẫu chuẩn.
 
-### 2.1. Cấu hình Frontend
-1. Tại thư mục gốc `LegalFlow/`, sao chép file cấu hình mẫu:
-   ```powershell
-   # PowerShell
-   Copy-Item .env.local.example .env.local
-   
-   # CMD
-   copy .env.local.example .env.local
-   ```
-2. Mở file `.env.local` vừa tạo và cấu hình địa chỉ của API Backend:
-   ```env
-   VITE_API_BASE_URL=http://localhost:3000
-   ```
+### 2.1. Cấu hình Hạ tầng Docker (.env.docker)
+Tại thư mục gốc, sao chép cấu hình hạ tầng từ tệp mẫu:
+```powershell
+Copy-Item .env.docker.example .env.docker -Force
+```
 
-### 2.2. Cấu hình Backend
-1. Di chuyển vào thư mục backend `legalflow-backend/` và sao chép file cấu hình mẫu:
-   ```powershell
-   # PowerShell
-   cd legalflow-backend
-   Copy-Item .env.example .env
-   
-   # CMD
-   cd legalflow-backend
-   copy .env.example .env
-   ```
-2. Mở file `.env` vừa tạo và cấu hình các thông số bảo mật bắt buộc:
-   ```env
-   DATABASE_URL="file:./dev.db"
-   PORT=3000
-   FRONTEND_ORIGIN="http://localhost:5173"
-   
-   # Thay đổi JWT_SECRET mặc định thành mã hash ngẫu nhiên dài ít nhất 32 ký tự
-   JWT_SECRET="change-me-to-a-very-strong-secret-key-32-chars"
-   JWT_EXPIRES_IN="28800"
+### 2.2. Cấu hình Backend (PostgreSQL & MinIO)
+Di chuyển vào thư mục `legalflow-backend/` và sao chép cấu hình mẫu chuẩn Postgres:
+```powershell
+cd legalflow-backend
+Copy-Item .env.postgres.example .env -Force
+```
+Tệp cấu hình `.env` chuẩn bao gồm các thông số kết nối chính:
+```env
+DATABASE_URL="postgresql://legalflow_admin:change_me_in_local_only@127.0.0.1:5432/legalflow_prod?schema=public"
+JWT_SECRET=legalflow_local_dev_secret_2026_change_later
+FRONTEND_ORIGIN=http://localhost:5173
 
-   # Mật khẩu Seed tùy chỉnh cho các tài khoản dùng thử
-   SEED_ADMIN_PASSWORD="Admin@123!"
-   SEED_MANAGER_PASSWORD="Manager@123!"
-   SEED_STAFF_PASSWORD="Staff@123!"
-   SEED_VIEWER_PASSWORD="Viewer@123!"
-   ```
+MINIO_ENDPOINT=http://127.0.0.1:9000
+MINIO_ACCESS_KEY=admin_minio
+MINIO_SECRET_KEY=change_me_in_local_only
+MINIO_BUCKET=legalflow-docs
+```
 
 ---
 
-## 3. Cài đặt và Khởi chạy ứng dụng
+## 3. Khởi chạy Hạ tầng và Ứng dụng
 
-### 3.1. Chạy Frontend
-1. Mở PowerShell tại thư mục gốc `LegalFlow/` và cài đặt thư viện:
-   ```powershell
-   npm install
-   ```
-2. Khởi chạy server phát triển Frontend:
-   ```powershell
-   npm run dev
-   ```
-   Frontend mặc định chạy tại địa chỉ `http://localhost:5173/`.
+### 3.1. Khởi chạy Hạ tầng Docker (Postgres & MinIO)
+Mở PowerShell tại thư mục gốc và bật các container dịch vụ nền:
+```powershell
+docker compose -f docker-compose.infra.yml up -d
+```
 
-### 3.2. Chạy Backend
-1. Mở cửa sổ PowerShell mới, di chuyển vào `legalflow-backend/` và cài đặt thư viện:
-   ```powershell
-   cd legalflow-backend
-   npm install
-   ```
-2. Thực thi các lệnh khởi tạo Cơ sở dữ liệu SQLite và Seed tài khoản mẫu:
-   ```powershell
-   npx prisma migrate dev
-   npx prisma generate
-   npx prisma db seed
-   ```
-3. Khởi chạy server phát triển Backend:
-   ```powershell
-   npm run start:dev
-   ```
-   Backend mặc định chạy tại địa chỉ `http://localhost:3000/`.
+### 3.2. Khởi chạy Backend & Seed dữ liệu
+Di chuyển vào `legalflow-backend/`, cài đặt thư viện và khởi tạo DB:
+```powershell
+cd legalflow-backend
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npx prisma db seed
+npm run start:dev
+```
+Backend mặc định chạy tại địa chỉ `http://localhost:3000/`.
+
+### 3.3. Khởi chạy Frontend
+Mở một cửa sổ PowerShell mới tại thư mục gốc:
+```powershell
+npm install
+npm run dev
+```
+Frontend giao diện mặc định chạy tại `http://localhost:5173/`.
 
 ---
 
@@ -149,56 +115,38 @@ Backend được lập trình để phát hiện nếu quản trị viên cấu 
 
 ---
 
-## 5. Hướng dẫn Sao lưu dữ liệu an toàn (Backup SQLite)
+## 5. Hướng dẫn Sao lưu dữ liệu an toàn (PostgreSQL Dump)
 
-Hệ thống cung cấp công cụ sao lưu dữ liệu tự động, đọc trực tiếp đường dẫn DB từ cấu hình `DATABASE_URL` trong file `.env`.
+Hệ thống sử dụng cơ sở dữ liệu PostgreSQL container hóa. Dữ liệu được lưu giữ an toàn trong volume Docker `postgres_data`.
 
-### Cách thực hiện
-1. Di chuyển vào thư mục `legalflow-backend/`.
-2. Thực thi lệnh sao lưu:
-   ```powershell
-   npm run db:backup
-   ```
-3. Kết quả:
-   - File sao lưu được đóng gói tại thư mục: `legalflow-backend/backups/`.
-   - File có định dạng tên kèm timestamp chi tiết: `backup_YYYYMMDD_HHMMSS.db` (Ví dụ: `backup_20260521_172000.db`).
-   - Lệnh in thông báo xác nhận kích thước tệp (KB) lớn hơn 0 và đường dẫn lưu trữ tuyệt đối.
+### Sao lưu bằng pg_dump
+Để tạo bản sao lưu toàn bộ cơ sở dữ liệu ra tệp `.sql`, chạy lệnh sau từ terminal:
+```powershell
+docker exec -t legalflow_postgres pg_dump -U legalflow_admin -d legalflow_prod > backup_postgres_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql
+```
 
 ---
 
-## 6. Hướng dẫn Phục hồi dữ liệu an toàn (Restore SQLite)
+## 6. Hướng dẫn Phục hồi dữ liệu (PostgreSQL Restore)
 
-Cơ chế khôi phục dữ liệu tích hợp quy trình kiểm soát lỗi khóa tệp và xác nhận 2 lớp để bảo đảm an toàn dữ liệu.
-
-### Cách thực hiện
-1. Di chuyển vào thư mục `legalflow-backend/`.
-2. Thực thi lệnh khôi phục:
-   ```powershell
-   npm run db:restore
-   ```
-3. **Các bước tương tác trên màn hình**:
-   - Hệ thống quét thư mục `backups/` và hiển thị danh sách 10 bản sao lưu gần nhất.
-   - Nhập số thứ tự (Ví dụ: `1` để chọn bản mới nhất) hoặc nhập trực tiếp tên tệp sao lưu muốn phục hồi (Ví dụ: `backup_20260521_172000.db`).
-   - **Xác nhận Lớp 1**: Hệ thống yêu cầu xác nhận ghi đè dữ liệu. Gõ `y` hoặc `yes` để tiếp tục.
-   - **Xác nhận Lớp 2 (Double Confirmation)**: Hệ thống yêu cầu nhập từ khóa bảo mật. Bạn phải gõ chính xác:
-     ```text
-     RESTORE-CONFIRM
-     ```
-   - **Tạo mốc Khôi phục An toàn (`pre_restore_*`)**: Trước khi ghi đè, script khôi phục tự động sao lưu dữ liệu hiện tại thành `pre_restore_YYYYMMDD_HHMMSS.db` trong thư mục `backups/`.
-   - **Ghi đè DB**: Hệ thống thực hiện khôi phục dữ liệu đè lên tệp database chính.
-   - **Khởi động lại**: Vui lòng tắt server backend hiện tại và bật lại để hệ thống tải lại toàn bộ trạng thái dữ liệu mới.
+Để khôi phục dữ liệu từ tệp bản sao lưu `.sql` vào container PostgreSQL:
+```powershell
+Get-Content backup_postgres_YYYYMMDD_HHMMSS.sql | docker exec -i legalflow_postgres psql -U legalflow_admin -d legalflow_prod
+```
+*Lưu ý: Trước khi khôi phục, đảm bảo container `legalflow_postgres` đang chạy ổn định.*
 
 ---
 
-## 7. Phục hồi khẩn cấp (Rollback từ pre-restore)
+## 7. Khôi phục trắng (Reset Database & Volume)
 
-Nếu quá trình khôi phục bị gián đoạn hoặc bạn nhận ra bản khôi phục chọn nhầm dữ liệu, bạn có thể lập tức quay lại trạng thái ngay trước thời điểm restore:
-1. Vào thư mục `legalflow-backend/backups/` tìm file backup dự phòng khẩn cấp được sinh ra tự động trước lúc restore. Tên file có dạng: `pre_restore_YYYYMMDD_HHMMSS.db`.
-2. Thực hiện lệnh khôi phục truyền trực tiếp tên file này:
-   ```powershell
-   npm run db:restore pre_restore_YYYYMMDD_HHMMSS.db
-   ```
-3. Làm theo quy trình xác nhận 2 lớp tương tự để khôi phục lại trạng thái cũ.
+Trong trường hợp môi trường thử nghiệm bị lỗi hoặc muốn dọn dẹp làm lại từ đầu:
+```powershell
+docker compose -f docker-compose.infra.yml down -v
+docker compose -f docker-compose.infra.yml up -d
+cd legalflow-backend
+npx prisma migrate deploy
+npx prisma db seed
+```
 
 ---
 
@@ -229,9 +177,9 @@ Nếu server không khởi động được do cổng bị chiếm dụng, hãy 
    taskkill /PID 12456 /F
    ```
 
-### 8.2. Lỗi khóa tệp tin DB khi Restore (EBUSY hoặc EPERM)
-- **Nguyên nhân**: Bạn cố gắng chạy lệnh khôi phục (`db:restore`) trong khi server Backend (`npm run start:dev`) vẫn đang hoạt động. Hệ điều hành Windows khóa tệp cơ sở dữ liệu SQLite nhằm bảo vệ dữ liệu, ngăn chặn việc ghi đè trực tiếp.
-- **Cách khắc phục**: Nhấn `Ctrl + C` tại terminal đang chạy backend hoặc kill port 3000 theo hướng dẫn bên trên, sau đó thực hiện lại lệnh restore. Sau khi restore thành công, bật lại server backend.
+### 8.2. Lỗi kết nối Cơ sở dữ liệu hoặc MinIO Storage
+- **Nguyên nhân**: Container Docker chưa khởi chạy hoặc bị dừng do lỗi tài nguyên/cổng.
+- **Cách khắc phục**: Kiểm tra trạng thái container bằng lệnh `docker ps`. Nếu dịch vụ chưa chạy, khởi động lại hạ tầng bằng lệnh `docker compose -f docker-compose.infra.yml up -d`.
 
 ---
 
@@ -311,9 +259,20 @@ Hệ thống cho phép tất cả người dùng đang hoạt động (không ph
    - Ghi nhận Audit Log phía Backend: `[CHANGE_PASSWORD] User (email) changed password successfully` (Tuyệt đối không log thông tin clear-text của mật khẩu cũ/mới).
 
 
-ECHO is on.
-  
-### X? ly L?i Rate Limiting (HTTP 429)  
-- Khi ngu?i d�ng b�o l?i 'B?n da thao t�c qu� nhi?u l?n. Vui l�ng th? l?i sau �t ph�t.', nghia l� h? da g?i qu� 5 request login/d?i m?t kh?u trong 1 ph�t.  
-- **Kh?c ph?c**: Ngu?i d�ng ch? c?n ch? 60 gi�y v� th? l?i. Backend kh�ng kh�a vinh vi?n t�i kho?n trong CSDL.  
-- **Log**: L?i 429 du?c ghi ? Server Console (RATE_LIMIT_HIT), kh�ng luu v�o b?ng AdminAuditLog. 
+### Xử lý Lỗi Rate Limiting (HTTP 429)
+- Khi người dùng báo lỗi *"Bạn đã thao tác quá nhiều lần. Vui lòng thử lại sau ít phút."*, nghĩa là họ đã gọi quá 5 request login/đổi mật khẩu trong 1 phút.
+- **Khắc phục**: Người dùng chỉ cần chờ 60 giây và thử lại. Backend không khóa vĩnh viễn tài khoản trong cơ sở dữ liệu.
+- **Log**: Lỗi 429 được ghi nhận ở Server Console (`RATE_LIMIT_HIT`), không lưu vào bảng AdminAuditLog. 
+
+---
+
+## 11. Checklist Kiểm thử sau Phục hồi (Post-Restoration Checklist)
+
+Để đảm bảo hệ thống đã phục hồi trọn vẹn và sẵn sàng hoạt động sau khi cài đặt trên máy mới, hãy tuần tự thực hiện các bước kiểm tra sau:
+
+- [ ] **1. Kiểm tra Hạ tầng Docker**: Đảm bảo container `legalflow_postgres`, `legalflow_minio` và `legalflow_caddy` đều có trạng thái `Up` (kiểm tra bằng `docker ps`).
+- [ ] **2. Kiểm tra Đăng nhập & Xác thực JWT**: Truy cập `http://localhost:5173/login`, đăng nhập thành công bằng tài khoản `admin@legalflow.local` và mật khẩu trong `.env`.
+- [ ] **3. Kiểm tra Duy trì Phiên làm việc**: Làm mới trang (F5) tại `/dashboard` và xác minh không bị văng ra trang đăng nhập.
+- [ ] **4. Kiểm tra Quản lý Người dùng & RBAC**: Vào menu **Quản lý tài khoản**, thử tạo mới một người dùng thử nghiệm và kiểm tra quyền truy cập tương ứng.
+- [ ] **5. Kiểm tra Tải lên Tài liệu MinIO**: Vào nghiệp vụ quản lý tài liệu, thử tải lên 1 tệp PDF thử nghiệm và bấm tải về để xác minh kết nối cổng `9000`.
+- [ ] **6. Kiểm tra Endpoint Metrics**: Gửi request tới `GET http://127.0.0.1:3000/metrics` kèm header `x-internal-metrics-token` để đảm bảo hệ thống giám sát Prometheus nhận dữ liệu.
