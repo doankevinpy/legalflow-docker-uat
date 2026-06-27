@@ -13,9 +13,15 @@ describe('AiService', () => {
   const mockPrismaService = {
     aiAuditLog: {
       create: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     aiCaseSuggestion: {
       upsert: jest.fn().mockResolvedValue({ id: 'sug-1' }),
+      findUnique: jest.fn(),
+      update: jest.fn().mockResolvedValue({ id: 'sug-1' }),
+    },
+    legalCase: {
+      update: jest.fn().mockResolvedValue({ id: 'case-1' }),
     },
   };
 
@@ -78,5 +84,88 @@ describe('AiService', () => {
     expect(res.suggestedType).toEqual(CaseType.KN);
     expect(mockPrismaService.aiAuditLog.create).toHaveBeenCalled();
     expect(mockPrismaService.aiCaseSuggestion.upsert).not.toHaveBeenCalled(); // No caseId provided
+  });
+
+  it('should submit feedback ACCEPTED with applyToCase=true without modifying status and updating isApplied=true', async () => {
+    mockPrismaService.aiCaseSuggestion.findUnique.mockResolvedValue({
+      caseId: 'case-1',
+      suggestedType: CaseType.KN,
+      suggestedField: CaseField.DAT_DAI,
+      suggestedSummary: 'Tóm tắt gợi ý',
+    });
+
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'ACCEPTED' as any,
+        applyToCase: true,
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(true);
+    expect(mockPrismaService.aiCaseSuggestion.update).toHaveBeenCalledWith({
+      where: { caseId: 'case-1' },
+      data: expect.objectContaining({ isApplied: true }),
+    });
+    expect(mockPrismaService.legalCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        type: CaseType.KN,
+        field: CaseField.DAT_DAI,
+        summary: 'Tóm tắt gợi ý',
+      },
+    });
+    const updateArgs = mockPrismaService.legalCase.update.mock.calls[0][0];
+    expect(updateArgs.data).not.toHaveProperty('status');
+  });
+
+  it('should not update legalCase when applyToCase=false', async () => {
+    mockPrismaService.aiCaseSuggestion.findUnique.mockResolvedValue({
+      caseId: 'case-1',
+      suggestedType: CaseType.KN,
+    });
+
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'ACCEPTED' as any,
+        applyToCase: false,
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(false);
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
+    expect(mockPrismaService.aiCaseSuggestion.update).toHaveBeenCalledWith({
+      where: { caseId: 'case-1' },
+      data: expect.objectContaining({ isApplied: false }),
+    });
+  });
+
+  it('should not update legalCase when REJECTED', async () => {
+    mockPrismaService.aiCaseSuggestion.findUnique.mockResolvedValue({
+      caseId: 'case-1',
+      suggestedType: CaseType.KN,
+    });
+
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'REJECTED' as any,
+        applyToCase: true,
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(false);
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
+    expect(mockPrismaService.aiCaseSuggestion.update).toHaveBeenCalledWith({
+      where: { caseId: 'case-1' },
+      data: expect.objectContaining({ isApplied: false }),
+    });
   });
 });

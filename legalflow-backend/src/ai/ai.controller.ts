@@ -4,6 +4,7 @@ import { SummarizePetitionDto } from './dto/summarize-petition.dto';
 import { ClassifyPetitionDto } from './dto/classify-petition.dto';
 import { SuggestChecklistDto } from './dto/suggest-checklist.dto';
 import { DraftResponseDto } from './dto/draft-response.dto';
+import { AiFeedbackDto } from './dto/ai-feedback.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
@@ -36,5 +37,11 @@ export class AiController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async draftResponse(@Body() dto: DraftResponseDto, @Request() req: any) {
     return this.aiService.draftResponse(dto, req.user.id);
+  }
+
+  @Post('feedback')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  async submitFeedback(@Body() dto: AiFeedbackDto, @Request() req: any) {
+    return this.aiService.submitFeedback(dto, req.user.id);
   }
 }

@@ -12,6 +12,8 @@ import type {
   PaginatedResponse,
   QueryCasesParams,
   UpdateCaseDto,
+  AiSummarizeResponse,
+  AiClassifyResponse,
 } from './api-types';
 
 function buildQuery(params: QueryCasesParams): string {
@@ -77,4 +79,16 @@ export const casesApi = {
   /** GET /cases/:id/documents/:docId/download */
   downloadDocument: (id: string, docId: string) =>
     apiClient.get<{ url: string }>(`/cases/${id}/documents/${docId}/download`),
+
+  /** POST /ai/summarize */
+  aiSummarize: (text: string, caseId?: string) =>
+    apiClient.post<AiSummarizeResponse>('/ai/summarize', { text, caseId }),
+
+  /** POST /ai/classify */
+  aiClassify: (text: string, caseId?: string) =>
+    apiClient.post<AiClassifyResponse>('/ai/classify', { text, caseId }),
+
+  /** POST /ai/feedback */
+  aiSubmitFeedback: (caseId: string, feedback: 'ACCEPTED' | 'REJECTED', applyToCase?: boolean) =>
+    apiClient.post<{ success: boolean; caseUpdated: boolean }>('/ai/feedback', { caseId, feedback, applyToCase }),
 };

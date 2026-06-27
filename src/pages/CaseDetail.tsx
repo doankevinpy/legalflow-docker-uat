@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   ArrowLeft, CheckSquare, Clock, FileText, Info, Trash2, CalendarClock,
-  Loader2, Send, AlertCircle,
+  Loader2, Send, AlertCircle, Sparkles,
 } from 'lucide-react';
 import { getDeadlineStatus } from '../utils/deadline';
 import { casesApi } from '../lib/casesApi';
@@ -20,6 +20,7 @@ import {
 import type { ApiCase } from '../lib/api-types';
 import { DocumentUpload } from '../components/documents/DocumentUpload';
 import { LandProfileTab } from '../components/cases/LandProfileTab';
+import { AiAssistantWidget } from '../components/cases/AiAssistantWidget';
 
 export default function CaseDetail() {
   const { id }      = useParams<{ id: string }>();
@@ -32,7 +33,7 @@ export default function CaseDetail() {
   const [error, setError]             = useState('');
   const [actionError, setActionError] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history' | 'ai'>('info');
   const [noteInput, setNoteInput] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
 
@@ -51,6 +52,54 @@ export default function CaseDetail() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentCase?.aiSuggestion) {
+      setAiSuggestion(currentCase.aiSuggestion);
+    }
+  }, [currentCase]);
+
+  const handleAnalyzeAiDetail = async () => {
+    if (!currentCase || !id) return;
+    setIsAnalyzingAi(true);
+    try {
+      const text = currentCase.summary || currentCase.request;
+      const [sumRes, clsRes] = await Promise.all([
+        casesApi.aiSummarize(text, id),
+        casesApi.aiClassify(text, id),
+      ]);
+      setAiSuggestion({
+        suggestedSummary: sumRes.content,
+        suggestedType: clsRes.suggestedType,
+        suggestedField: clsRes.suggestedField,
+        confidenceScore: clsRes.confidenceScore,
+        legalRationale: clsRes.legalRationale,
+        isApplied: false,
+      });
+    } catch (err) {
+      alert('Không thể phân tích AI cho hồ sơ này.');
+    } finally {
+      setIsAnalyzingAi(false);
+    }
+  };
+
+  const handleFeedbackAi = async (feedback: 'ACCEPTED' | 'REJECTED') => {
+    if (!id) return;
+    setIsSubmittingFeedback(true);
+    try {
+      await casesApi.aiSubmitFeedback(id, feedback, feedback === 'ACCEPTED');
+      await load();
+      alert(feedback === 'ACCEPTED' ? 'Đã áp dụng đề xuất vào hồ sơ.' : 'Đã từ chối đề xuất AI.');
+    } catch (err) {
+      alert('Ghi nhận phản hồi thất bại.');
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
 
   const userCanEdit  = currentCase
     ? canEdit(role, currentCase.createdById, currentCase.assignedToId, user?.id)
@@ -201,7 +250,8 @@ export default function CaseDetail() {
               { key: 'checklist', label: `Checklist (${checklist.filter(i=>i.isCompleted).length}/${checklist.length})`, Icon: CheckSquare },
               { key: 'notes',     label: `Ghi chú (${notes.length})`, Icon: FileText },
               { key: 'history',   label: `Lịch sử (${histories.length})`, Icon: Clock },
-            ] as Array<{ key: 'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history'; label: string; Icon: any }>).map(({ key, label, Icon }) => (
+              { key: 'ai',        label: '✨ Trợ lý AI',             Icon: Sparkles },
+            ] as Array<{ key: 'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history' | 'ai'; label: string; Icon: any }>).map(({ key, label, Icon }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
@@ -406,6 +456,62 @@ export default function CaseDetail() {
                     <p className="text-muted-foreground text-sm">Chưa có lịch sử.</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'ai' && (
+              <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm space-y-6">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-amber-600" />
+                      Trợ lý AI LegalFlow (Phase 2)
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Phân tích nội dung đơn thư, gợi ý phân loại và tóm tắt hồ sơ.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleAnalyzeAiDetail}
+                    disabled={isAnalyzingAi}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    {isAnalyzingAi ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang phân tích...</>
+                    ) : (
+                      <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Phân tích Lại</>
+                    )}
+                  </Button>
+                </div>
+
+                {aiSuggestion ? (
+                  <AiAssistantWidget
+                    summary={aiSuggestion.suggestedSummary}
+                    suggestedType={aiSuggestion.suggestedType}
+                    suggestedField={aiSuggestion.suggestedField}
+                    confidenceScore={aiSuggestion.confidenceScore}
+                    legalRationale={aiSuggestion.legalRationale}
+                    onAccept={() => handleFeedbackAi('ACCEPTED')}
+                    onReject={() => handleFeedbackAi('REJECTED')}
+                    isSubmittingFeedback={isSubmittingFeedback}
+                    feedbackStatus={aiSuggestion.isApplied ? 'ACCEPTED' : null}
+                  />
+                ) : (
+                  <div className="text-center py-10 bg-secondary/20 rounded-xl border border-dashed p-6">
+                    <Sparkles className="h-10 w-10 text-amber-500 mx-auto mb-3 animate-bounce" />
+                    <h4 className="font-medium text-base mb-1">Chưa có kết quả phân tích AI</h4>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+                      Nhấn nút bên dưới để Trợ lý AI đọc tóm tắt đơn thư và đưa ra gợi ý phân loại chuẩn xác.
+                    </p>
+                    <Button
+                      onClick={handleAnalyzeAiDetail}
+                      disabled={isAnalyzingAi}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {isAnalyzingAi ? 'Đang xử lý...' : '✨ Phân tích ngay'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Button } from '../components/ui/Button';
 import { useNavigate, Link } from 'react-router-dom';
-import { Save, ArrowLeft, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { casesApi } from '../lib/casesApi';
+import { AiAssistantWidget } from '../components/cases/AiAssistantWidget';
 import { ApiError } from '../lib/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { canCreate } from '../lib/rbac';
@@ -42,6 +43,58 @@ export default function NewCase() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<{
+    summary?: string;
+    suggestedType?: string;
+    suggestedField?: string;
+    confidenceScore?: number;
+    legalRationale?: string;
+  } | null>(null);
+  const [feedbackStatus, setFeedbackStatus] = useState<'ACCEPTED' | 'REJECTED' | null>(null);
+
+  const handleAiAnalyze = async () => {
+    if (!formData.summary.trim()) {
+      alert('Vui lòng nhập nội dung đơn thư trước khi phân tích AI.');
+      return;
+    }
+    setIsAnalyzing(true);
+    setAiResult(null);
+    setFeedbackStatus(null);
+    try {
+      const [sumRes, clsRes] = await Promise.all([
+        casesApi.aiSummarize(formData.summary),
+        casesApi.aiClassify(formData.summary),
+      ]);
+      setAiResult({
+        summary: sumRes.content,
+        suggestedType: clsRes.suggestedType,
+        suggestedField: clsRes.suggestedField,
+        confidenceScore: clsRes.confidenceScore,
+        legalRationale: clsRes.legalRationale,
+      });
+    } catch (err) {
+      alert('Không thể phân tích AI. Vui lòng thử lại sau.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAcceptAi = () => {
+    if (!aiResult) return;
+    setFormData(prev => ({
+      ...prev,
+      summary: aiResult.summary || prev.summary,
+      type: (aiResult.suggestedType as CaseTypeCode) || prev.type,
+      field: (aiResult.suggestedField as CaseFieldCode) || prev.field,
+    }));
+    setFeedbackStatus('ACCEPTED');
+  };
+
+  const handleRejectAi = () => {
+    setFeedbackStatus('REJECTED');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +235,36 @@ export default function NewCase() {
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               placeholder="Mô tả ngắn gọn nội dung yêu cầu của khách hàng..."
             />
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">Nhập chi tiết đơn hoặc yêu cầu của công dân để trợ lý AI phân tích.</span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleAiAnalyze}
+                disabled={isAnalyzing || !formData.summary.trim()}
+                className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-medium"
+              >
+                {isAnalyzing ? (
+                  <><Loader2 className="mr-1.5 h-4 w-4 animate-spin text-amber-600" /> Đang phân tích AI...</>
+                ) : (
+                  <><Sparkles className="mr-1.5 h-4 w-4 text-amber-600 animate-pulse" /> ✨ AI Phân tích Đơn</>
+                )}
+              </Button>
+            </div>
+
+            {aiResult && (
+              <AiAssistantWidget
+                summary={aiResult.summary}
+                suggestedType={aiResult.suggestedType}
+                suggestedField={aiResult.suggestedField}
+                confidenceScore={aiResult.confidenceScore}
+                legalRationale={aiResult.legalRationale}
+                onAccept={handleAcceptAi}
+                onReject={handleRejectAi}
+                feedbackStatus={feedbackStatus}
+              />
+            )}
           </div>
 
           <div className="pt-4 flex justify-end gap-4 border-t">

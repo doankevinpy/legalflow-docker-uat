@@ -229,6 +229,7 @@ export class CasesService {
           orderBy: { createdAt: 'desc' },
         },
         checklist: { orderBy: { createdAt: 'asc' } },
+        aiSuggestion: true,
         histories: {
           include: { user: { select: { id: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },

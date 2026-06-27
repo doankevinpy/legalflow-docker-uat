@@ -13,6 +13,7 @@ import { SummarizePetitionDto } from './dto/summarize-petition.dto';
 import { ClassifyPetitionDto } from './dto/classify-petition.dto';
 import { SuggestChecklistDto } from './dto/suggest-checklist.dto';
 import { DraftResponseDto } from './dto/draft-response.dto';
+import { AiFeedbackDto } from './dto/ai-feedback.dto';
 import { AiActionType, AiLogStatus, AiFeedbackStatus } from '@prisma/client';
 
 @Injectable()
@@ -252,5 +253,58 @@ export class AiService {
       );
       throw error;
     }
+  }
+
+  async submitFeedback(dto: AiFeedbackDto, userId: string) {
+    const suggestion = await this.prisma.aiCaseSuggestion.findUnique({
+      where: { caseId: dto.caseId },
+    });
+
+    const isAccepted = dto.feedback === AiFeedbackStatus.ACCEPTED;
+    const shouldApply = isAccepted && !!dto.applyToCase;
+
+    if (suggestion) {
+      await this.prisma.aiCaseSuggestion.update({
+        where: { caseId: dto.caseId },
+        data: {
+          isApplied: shouldApply ? true : false,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    await this.prisma.aiAuditLog.updateMany({
+      where: {
+        caseId: dto.caseId,
+        userFeedback: AiFeedbackStatus.PENDING,
+      },
+      data: {
+        userFeedback: dto.feedback,
+        appliedAt: shouldApply ? new Date() : null,
+      },
+    });
+
+    let caseUpdated = false;
+    if (shouldApply && suggestion) {
+      const updateData: any = {};
+      if (suggestion.suggestedType) updateData.type = suggestion.suggestedType;
+      if (suggestion.suggestedField) updateData.field = suggestion.suggestedField;
+      if (suggestion.suggestedSummary) updateData.summary = suggestion.suggestedSummary;
+
+      if (Object.keys(updateData).length > 0) {
+        await this.prisma.legalCase.update({
+          where: { id: dto.caseId },
+          data: updateData,
+        });
+        caseUpdated = true;
+      }
+    }
+
+    return {
+      success: true,
+      caseId: dto.caseId,
+      feedback: dto.feedback,
+      caseUpdated,
+    };
   }
 }

@@ -77,6 +77,7 @@ export interface ApiCase {
   notes?: ApiCaseNote[];
   checklist?: ApiChecklistItem[];
   histories?: ApiCaseHistory[];
+  aiSuggestion?: ApiAiSuggestion | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,3 +173,32 @@ export type CreateLandProfilePayload = Omit<
 
 export type UpdateLandProfilePayload = Partial<CreateLandProfilePayload>;
 
+export interface ApiAiSuggestion {
+  id: string;
+  caseId: string;
+  suggestedType?: string;
+  suggestedField?: string;
+  suggestedSummary?: string;
+  suggestedChecklist?: any;
+  confidenceScore?: number;
+  legalRationale?: string;
+  isApplied: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiSummarizeResponse {
+  content: string;
+  modelName: string;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface AiClassifyResponse {
+  content: string;
+  suggestedType: string;
+  suggestedField: string;
+  confidenceScore: number;
+  legalRationale: string;
+  modelName: string;
+}
