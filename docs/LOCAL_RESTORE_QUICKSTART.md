@@ -67,3 +67,36 @@ Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{"email":"admin@legalflow.local","password":"change_me_in_local_only"}'
 ```
+
+---
+
+## 4. Đổi Mật Khẩu Admin Local An Toàn (`reset-admin-password.ts`)
+
+Trong quá trình phát triển cục bộ (Local Development), nếu mật khẩu cũ bị lộ trong log hoặc cần thay đổi, bạn có thể sử dụng kịch bản chuyên dụng `legalflow-backend/scripts/reset-admin-password.ts` mà không làm mất dữ liệu hiện có.
+
+> [!WARNING]
+> **Nguyên Tắc Bảo Mật Bắt Buộc:**
+> - **Chỉ dùng cho Local Development:** Kịch bản này được thiết kế dành riêng cho môi trường phát triển cục bộ.
+> - **Không hardcode vào Git:** Tuyệt đối không ghi chết (hardcode) mật khẩu thật vào bất kỳ file source code hay script nào trước khi commit.
+> - **Đăng xuất / Đăng nhập lại:** Sau khi đổi mật khẩu thành công, bạn cần nhấn **Đăng xuất (Logout)** trên trình duyệt hoặc xóa token cũ để tiến hành đăng nhập lại bằng mật khẩu mới.
+
+### Cách 1: Chạy Tương Tác trực tiếp trên Terminal (Ưu tiên khuyên dùng)
+Cách này đảm bảo mật khẩu không bị lưu vào lịch sử lệnh shell:
+```powershell
+cd C:\Users\Admin\legalflow-docker-uat\legalflow-backend
+npx ts-node scripts/reset-admin-password.ts
+```
+*Hệ thống sẽ hỏi email (mặc định `admin@legalflow.local`) và yêu cầu bạn gõ mật khẩu mới trực tiếp vào màn hình.*
+
+### Cách 2: Truyền qua Biến môi trường (`NEW_ADMIN_PASSWORD`)
+Phù hợp khi cần viết script tự động hóa trong môi trường local:
+```powershell
+cd C:\Users\Admin\legalflow-docker-uat\legalflow-backend
+
+# Thiết lập biến môi trường tạm thời
+$env:NEW_ADMIN_PASSWORD = "MatKhauMoiCuaBan@2026!"
+npx ts-node scripts/reset-admin-password.ts
+
+# Xóa biến môi trường ngay sau khi chạy xong để bảo mật
+Remove-Item Env:\NEW_ADMIN_PASSWORD
+```
