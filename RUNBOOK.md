@@ -60,13 +60,34 @@ MINIO_BUCKET=legalflow-docs
 
 ## 3. Khởi chạy Hạ tầng và Ứng dụng
 
-### 3.1. Khởi chạy Hạ tầng Docker (Postgres & MinIO)
+Bạn có thể vận hành hệ thống bằng **Bộ Script Tự động Chuẩn** (khuyên dùng) hoặc chạy thủ công từng dịch vụ.
+
+### 3.1. Chạy Tự động bằng Script (Khuyên dùng)
+Tại thư mục gốc `LegalFlow/`, thao tác nhanh toàn bộ vòng đời hệ thống bằng các PowerShell script chuẩn trong thư mục `scripts/`:
+- **Khởi chạy toàn bộ hệ thống (Infra + Backend + Frontend)**:
+  ```powershell
+  .\scripts\start-legalflow.ps1
+  ```
+- **Kiểm tra tình trạng sức khỏe dịch vụ (Health Check)**:
+  ```powershell
+  .\scripts\health-check.ps1
+  ```
+- **Dừng toàn bộ dịch vụ và container**:
+  ```powershell
+  .\scripts\stop-legalflow.ps1
+  ```
+
+*(Hoặc khởi chạy riêng lẻ từng phần bằng `.\scripts\start-infra.ps1`, `.\scripts\start-backend.ps1`, `.\scripts\start-frontend.ps1`).*
+
+### 3.2. Khởi chạy Thủ công từng dịch vụ
+
+#### 3.2.1. Khởi chạy Hạ tầng Docker (Postgres & MinIO)
 Mở PowerShell tại thư mục gốc và bật các container dịch vụ nền:
 ```powershell
 docker compose -f docker-compose.infra.yml up -d
 ```
 
-### 3.2. Khởi chạy Backend & Seed dữ liệu
+#### 3.2.2. Khởi chạy Backend & Seed dữ liệu
 Di chuyển vào `legalflow-backend/`, cài đặt thư viện và khởi tạo DB:
 ```powershell
 cd legalflow-backend
@@ -78,7 +99,7 @@ npm run start:dev
 ```
 Backend mặc định chạy tại địa chỉ `http://localhost:3000/`.
 
-### 3.3. Khởi chạy Frontend
+#### 3.2.3. Khởi chạy Frontend
 Mở một cửa sổ PowerShell mới tại thư mục gốc:
 ```powershell
 npm install
