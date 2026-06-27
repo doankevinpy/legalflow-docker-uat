@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean, IsArray } from 'class-validator';
 import { AiFeedbackStatus } from '@prisma/client';
 
 export class AiFeedbackDto {
@@ -12,4 +12,13 @@ export class AiFeedbackDto {
   @IsOptional()
   @IsBoolean()
   applyToCase?: boolean;
+
+  @IsOptional()
+  @IsString()
+  feedbackType?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  checklistItems?: string[];
 }

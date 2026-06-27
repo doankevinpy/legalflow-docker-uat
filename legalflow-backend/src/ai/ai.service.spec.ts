@@ -22,6 +22,11 @@ describe('AiService', () => {
     },
     legalCase: {
       update: jest.fn().mockResolvedValue({ id: 'case-1' }),
+      findUnique: jest.fn().mockResolvedValue({ id: 'case-1', type: 'KN', field: 'DAT_DAI', summary: 'test', request: 'test' }),
+    },
+    caseChecklistItem: {
+      findMany: jest.fn().mockResolvedValue([]),
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   };
 
@@ -167,5 +172,25 @@ describe('AiService', () => {
       where: { caseId: 'case-1' },
       data: expect.objectContaining({ isApplied: false }),
     });
+  });
+
+  it('should create case checklist items when feedbackType is CHECKLIST and ACCEPTED', async () => {
+    mockPrismaService.caseChecklistItem.findMany.mockResolvedValue([]);
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'ACCEPTED' as any,
+        feedbackType: 'CHECKLIST',
+        checklistItems: ['[AI - Việc cần làm] Bước 1'],
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(true);
+    expect(mockPrismaService.caseChecklistItem.createMany).toHaveBeenCalledWith({
+      data: [{ caseId: 'case-1', title: '[AI - Việc cần làm] Bước 1', isCompleted: false }],
+    });
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,7 @@ import type {
   UpdateCaseDto,
   AiSummarizeResponse,
   AiClassifyResponse,
+  AiChecklistResponse,
 } from './api-types';
 
 function buildQuery(params: QueryCasesParams): string {
@@ -88,7 +89,11 @@ export const casesApi = {
   aiClassify: (text: string, caseId?: string) =>
     apiClient.post<AiClassifyResponse>('/ai/classify', { text, caseId }),
 
+  /** POST /ai/checklist */
+  aiSuggestChecklist: (params: { text?: string; caseId?: string; type?: string; field?: string; summary?: string; request?: string }) =>
+    apiClient.post<AiChecklistResponse>('/ai/checklist', params),
+
   /** POST /ai/feedback */
-  aiSubmitFeedback: (caseId: string, feedback: 'ACCEPTED' | 'REJECTED', applyToCase?: boolean) =>
-    apiClient.post<{ success: boolean; caseUpdated: boolean }>('/ai/feedback', { caseId, feedback, applyToCase }),
+  aiSubmitFeedback: (caseId: string, feedback: 'ACCEPTED' | 'REJECTED', applyToCase?: boolean, feedbackType?: string, checklistItems?: string[]) =>
+    apiClient.post<{ success: boolean; caseUpdated: boolean }>('/ai/feedback', { caseId, feedback, applyToCase, feedbackType, checklistItems }),
 };

@@ -101,6 +101,76 @@ export default function CaseDetail() {
     }
   };
 
+  const [isSuggestingChecklist, setIsSuggestingChecklist] = useState(false);
+  const [aiChecklistGroups, setAiChecklistGroups] = useState<any>(null);
+  const [selectedChecklistItems, setSelectedChecklistItems] = useState<string[]>([]);
+  const [isSubmittingChecklistFeedback, setIsSubmittingChecklistFeedback] = useState(false);
+
+  const handleSuggestChecklist = async () => {
+    if (!currentCase || !id) return;
+    setIsSuggestingChecklist(true);
+    try {
+      const res = await casesApi.aiSuggestChecklist({
+        caseId: id,
+        type: currentCase.type,
+        field: currentCase.field,
+        summary: currentCase.summary,
+        request: currentCase.request,
+      });
+      if (res.checklistGroups) {
+        setAiChecklistGroups(res.checklistGroups);
+        setSelectedChecklistItems([]);
+      } else if (res.items) {
+        setAiChecklistGroups({ tasks: res.items, documents: [], coordination: [], deadlines: [], risks: [], nextSteps: [] });
+        setSelectedChecklistItems([]);
+      }
+    } catch (err) {
+      alert('Không thể gợi ý quy trình xử lý cho hồ sơ này.');
+    } finally {
+      setIsSuggestingChecklist(false);
+    }
+  };
+
+  const handleToggleSuggestItem = (item: string) => {
+    setSelectedChecklistItems(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const handleApplyChecklist = async () => {
+    if (!id) return;
+    if (selectedChecklistItems.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 mục để áp dụng vào checklist hồ sơ.');
+      return;
+    }
+    setIsSubmittingChecklistFeedback(true);
+    try {
+      await casesApi.aiSubmitFeedback(id, 'ACCEPTED', true, 'CHECKLIST', selectedChecklistItems);
+      await load();
+      alert('Đã tạo các đầu việc vào checklist của hồ sơ.');
+      setAiChecklistGroups(null);
+      setActiveTab('checklist');
+    } catch (err) {
+      alert('Áp dụng checklist thất bại.');
+    } finally {
+      setIsSubmittingChecklistFeedback(false);
+    }
+  };
+
+  const handleRejectChecklist = async () => {
+    if (!id) return;
+    setIsSubmittingChecklistFeedback(true);
+    try {
+      await casesApi.aiSubmitFeedback(id, 'REJECTED', false, 'CHECKLIST', []);
+      setAiChecklistGroups(null);
+      alert('Đã từ chối gợi ý quy trình AI.');
+    } catch (err) {
+      alert('Ghi nhận phản hồi thất bại.');
+    } finally {
+      setIsSubmittingChecklistFeedback(false);
+    }
+  };
+
   const userCanEdit  = currentCase
     ? canEdit(role, currentCase.createdById, currentCase.assignedToId, user?.id)
     : false;
@@ -188,6 +258,40 @@ export default function CaseDetail() {
     ADD_NOTE: 'Thêm ghi chú',
     UPDATE_CHECKLIST: 'Cập nhật checklist',
     SOFT_DELETE_CASE: 'Xóa hồ sơ',
+  };
+
+  const renderChecklistGroup = (title: string, icon: string, badgeColor: string, items?: string[]) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="border rounded-lg p-4 bg-card shadow-sm space-y-3 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center justify-between border-b pb-2 mb-2">
+            <h4 className="font-semibold text-sm flex items-center gap-2">
+              <span>{icon}</span> {title}
+            </h4>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+              {items.length} mục
+            </span>
+          </div>
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {items.map((item, idx) => {
+              const isChecked = selectedChecklistItems.includes(item);
+              return (
+                <label key={idx} className="flex items-start gap-2.5 p-2 rounded hover:bg-secondary/60 cursor-pointer text-sm transition-colors border border-transparent hover:border-border">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleToggleSuggestItem(item)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shrink-0"
+                  />
+                  <span className={isChecked ? 'font-medium text-foreground leading-snug' : 'text-muted-foreground leading-snug'}>{item}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -460,58 +564,149 @@ export default function CaseDetail() {
             )}
 
             {activeTab === 'ai' && (
-              <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-amber-600" />
-                      Trợ lý AI LegalFlow (Phase 2)
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Phân tích nội dung đơn thư, gợi ý phân loại và tóm tắt hồ sơ.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={handleAnalyzeAiDetail}
-                    disabled={isAnalyzingAi}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
-                  >
-                    {isAnalyzingAi ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang phân tích...</>
-                    ) : (
-                      <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Phân tích Lại</>
-                    )}
-                  </Button>
-                </div>
-
-                {aiSuggestion ? (
-                  <AiAssistantWidget
-                    summary={aiSuggestion.suggestedSummary}
-                    suggestedType={aiSuggestion.suggestedType}
-                    suggestedField={aiSuggestion.suggestedField}
-                    confidenceScore={aiSuggestion.confidenceScore}
-                    legalRationale={aiSuggestion.legalRationale}
-                    onAccept={() => handleFeedbackAi('ACCEPTED')}
-                    onReject={() => handleFeedbackAi('REJECTED')}
-                    isSubmittingFeedback={isSubmittingFeedback}
-                    feedbackStatus={aiSuggestion.isApplied ? 'ACCEPTED' : null}
-                  />
-                ) : (
-                  <div className="text-center py-10 bg-secondary/20 rounded-xl border border-dashed p-6">
-                    <Sparkles className="h-10 w-10 text-amber-500 mx-auto mb-3 animate-bounce" />
-                    <h4 className="font-medium text-base mb-1">Chưa có kết quả phân tích AI</h4>
-                    <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
-                      Nhấn nút bên dưới để Trợ lý AI đọc tóm tắt đơn thư và đưa ra gợi ý phân loại chuẩn xác.
-                    </p>
+              <div className="space-y-6">
+                <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-amber-600" />
+                        Trợ lý AI LegalFlow (Phase 2)
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Phân tích nội dung đơn thư, gợi ý phân loại và tóm tắt hồ sơ.
+                      </p>
+                    </div>
                     <Button
                       onClick={handleAnalyzeAiDetail}
                       disabled={isAnalyzingAi}
                       className="bg-amber-600 hover:bg-amber-700 text-white"
                     >
-                      {isAnalyzingAi ? 'Đang xử lý...' : '✨ Phân tích ngay'}
+                      {isAnalyzingAi ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang phân tích...</>
+                      ) : (
+                        <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Phân tích Lại</>
+                      )}
                     </Button>
                   </div>
-                )}
+
+                  {aiSuggestion ? (
+                    <AiAssistantWidget
+                      summary={aiSuggestion.suggestedSummary}
+                      suggestedType={aiSuggestion.suggestedType}
+                      suggestedField={aiSuggestion.suggestedField}
+                      confidenceScore={aiSuggestion.confidenceScore}
+                      legalRationale={aiSuggestion.legalRationale}
+                      onAccept={() => handleFeedbackAi('ACCEPTED')}
+                      onReject={() => handleFeedbackAi('REJECTED')}
+                      isSubmittingFeedback={isSubmittingFeedback}
+                      feedbackStatus={aiSuggestion.isApplied ? 'ACCEPTED' : null}
+                    />
+                  ) : (
+                    <div className="text-center py-10 bg-secondary/20 rounded-xl border border-dashed p-6">
+                      <Sparkles className="h-10 w-10 text-amber-500 mx-auto mb-3 animate-bounce" />
+                      <h4 className="font-medium text-base mb-1">Chưa có kết quả phân tích AI</h4>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+                        Nhấn nút bên dưới để Trợ lý AI đọc tóm tắt đơn thư và đưa ra gợi ý phân loại chuẩn xác.
+                      </p>
+                      <Button
+                        onClick={handleAnalyzeAiDetail}
+                        disabled={isAnalyzingAi}
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                      >
+                        {isAnalyzingAi ? 'Đang xử lý...' : '✨ Phân tích ngay'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Phase 3 Checklist block */}
+                <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <CheckSquare className="h-5 w-5 text-indigo-600" />
+                        📋 Đề xuất Quy trình & Checklist xử lý đơn
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Gợi ý lộ trình xác minh, tài liệu và mốc thời gian giải quyết theo luật định.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleSuggestChecklist}
+                      disabled={isSuggestingChecklist}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      {isSuggestingChecklist ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang tạo quy trình...</>
+                      ) : (
+                        <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Gợi ý Quy trình Xử lý</>
+                      )}
+                    </Button>
+                  </div>
+
+                  {aiChecklistGroups ? (
+                    <div className="space-y-6">
+                      <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="text-sm text-amber-800 dark:text-amber-200">
+                          <p className="font-semibold mb-1">⚠️ AI chỉ hỗ trợ, cán bộ phải kiểm tra trước khi áp dụng</p>
+                          <p>Hãy tick chọn từng mục muốn áp dụng vào checklist của hồ sơ. Hệ thống không tự động giao việc cho cán bộ, không gửi văn bản cho công dân và không làm thay đổi trạng thái hồ sơ.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {renderChecklistGroup('Việc cần làm', '📋', 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300', aiChecklistGroups.tasks)}
+                        {renderChecklistGroup('Tài liệu cần kiểm tra', '📁', 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300', aiChecklistGroups.documents)}
+                        {renderChecklistGroup('Bộ phận/cán bộ phối hợp', '🤝', 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300', aiChecklistGroups.coordination)}
+                        {renderChecklistGroup('Thời hạn lưu ý', '⏰', 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300', aiChecklistGroups.deadlines)}
+                        {renderChecklistGroup('Rủi ro nghiệp vụ/pháp lý', '⚠️', 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300', aiChecklistGroups.risks)}
+                        {renderChecklistGroup('Đề xuất bước tiếp theo', '🚀', 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300', aiChecklistGroups.nextSteps)}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Đã chọn: <strong className="text-foreground">{selectedChecklistItems.length}</strong> mục
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={handleRejectChecklist}
+                            disabled={isSubmittingChecklistFeedback}
+                            className="border-destructive text-destructive hover:bg-destructive/10"
+                          >
+                            ❌ Không áp dụng
+                          </Button>
+                          <Button
+                            onClick={handleApplyChecklist}
+                            disabled={isSubmittingChecklistFeedback || selectedChecklistItems.length === 0}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                          >
+                            {isSubmittingChecklistFeedback ? (
+                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu...</>
+                            ) : (
+                              `✔️ Áp dụng checklist vào hồ sơ (${selectedChecklistItems.length})`
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 bg-secondary/20 rounded-xl border border-dashed p-6">
+                      <CheckSquare className="h-10 w-10 text-indigo-500 mx-auto mb-3 opacity-80" />
+                      <h4 className="font-medium text-base mb-1">Chưa có đề xuất quy trình xử lý</h4>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+                        Nhấn nút phía trên để Trợ lý AI tự động phân tích đơn thư và đề xuất bộ checklist thụ lý theo 6 nhóm nghiệp vụ chuẩn.
+                      </p>
+                      <Button
+                        onClick={handleSuggestChecklist}
+                        disabled={isSuggestingChecklist}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        {isSuggestingChecklist ? 'Đang phân tích...' : '✨ Gợi ý ngay'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

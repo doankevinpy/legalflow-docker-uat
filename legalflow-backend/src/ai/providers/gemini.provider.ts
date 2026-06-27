@@ -151,15 +151,38 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
 
   async suggestChecklist(text: string): Promise<AiChecklistResponse> {
     const startTime = Date.now();
+    const mockGroups = {
+      tasks: [
+        '[AI - Việc cần làm] Thẩm tra hiện trạng ranh giới khu đất tranh chấp tại thực địa',
+        '[AI - Việc cần làm] Lập biên bản làm việc ban đầu với người có đơn khiếu nại',
+      ],
+      documents: [
+        '[AI - Tài liệu] Kiểm tra Giấy chứng nhận quyền sử dụng đất và trích lục bản đồ địa chính cũ',
+        '[AI - Tài liệu] Sổ mục kê và sổ địa chính lưu trữ tại UBND xã',
+      ],
+      coordination: [
+        '[AI - Phối hợp] Cán bộ Địa chính - Xây dựng xã',
+        '[AI - Phối hợp] Trưởng thôn/khu phố và Tổ hòa giải cơ sở',
+      ],
+      deadlines: [
+        '[AI - Thời hạn] Tổ chức hòa giải tranh chấp đất đai tại UBND xã không quá 45 ngày kể từ ngày nhận đơn',
+      ],
+      risks: [
+        '[AI - Rủi ro] Nguy cơ phát sinh mâu thuẫn gay gắt, khiếu nại vượt cấp nếu chậm trễ giải quyết',
+        '[AI - Rủi ro] Các bên tự ý xây dựng, thay đổi hiện trạng đất trong quá trình thụ lý',
+      ],
+      nextSteps: [
+        '[AI - Bước tiếp theo] Phát hành giấy mời các bên liên quan lên UBND xã tiến hành làm việc và kiểm tra thực địa',
+      ],
+    };
+    const allMockItems = Object.values(mockGroups).flat();
+
     if (this.isMockMode()) {
       await new Promise((resolve) => setTimeout(resolve, 450));
       return {
         content: 'Mock checklist generated',
-        items: [
-          'Kiểm tra giấy tờ tùy thân và giấy chứng nhận quyền sử dụng đất của công dân',
-          'Khảo sát thực địa và lập biên bản hiện trạng ranh giới khu đất tại khu phố',
-          'Mời các hộ gia đình liên quan tổ chức hòa giải cơ sở lần 1 theo quy định',
-        ],
+        items: allMockItems,
+        checklistGroups: mockGroups,
         promptTokens: 180,
         completionTokens: 70,
         latencyMs: Date.now() - startTime,
@@ -167,19 +190,40 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
       };
     }
 
-    const systemPrompt = `Bạn là trợ lý thụ lý hồ sơ cấp xã. Hãy đưa ra danh sách các bước xác minh thực tế (dưới dạng mảng JSON các chuỗi string) cần thực hiện đối với đơn thư này. Trả về format JSON: { "items": ["Bước 1...", "Bước 2..."] }`;
+    const systemPrompt = `Bạn là trợ lý thụ lý hồ sơ cấp xã. Hãy đưa ra gợi ý quy trình xử lý đơn thư dưới dạng JSON gồm 6 nhóm mảng chuỗi (chuỗi không cần chứa tiền tố): "tasks" (Việc cần làm), "documents" (Tài liệu cần kiểm tra), "coordination" (Bộ phận/cán bộ phối hợp), "deadlines" (Thời hạn lưu ý), "risks" (Rủi ro nghiệp vụ/pháp lý), "nextSteps" (Đề xuất bước tiếp theo). Trả về format JSON: { "tasks": ["..."], "documents": ["..."], "coordination": ["..."], "deadlines": ["..."], "risks": ["..."], "nextSteps": ["..."] }`;
     const rawResponse = await this.generateText(systemPrompt, text);
     try {
       const jsonStr = rawResponse.content.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
+
+      const ensurePrefix = (arr: any[], prefix: string) =>
+        Array.isArray(arr)
+          ? arr.map(i => {
+              const str = String(i).trim();
+              return str.startsWith(prefix) ? str : `${prefix} ${str}`;
+            })
+          : [];
+
+      const checklistGroups = {
+        tasks: ensurePrefix(parsed.tasks, '[AI - Việc cần làm]'),
+        documents: ensurePrefix(parsed.documents, '[AI - Tài liệu]'),
+        coordination: ensurePrefix(parsed.coordination, '[AI - Phối hợp]'),
+        deadlines: ensurePrefix(parsed.deadlines, '[AI - Thời hạn]'),
+        risks: ensurePrefix(parsed.risks, '[AI - Rủi ro]'),
+        nextSteps: ensurePrefix(parsed.nextSteps, '[AI - Bước tiếp theo]'),
+      };
+      const items = Object.values(checklistGroups).flat();
+
       return {
         ...rawResponse,
-        items: Array.isArray(parsed.items) ? parsed.items : ['Kiểm tra hồ sơ gốc và xác minh thực tế'],
+        items: items.length > 0 ? items : allMockItems,
+        checklistGroups: items.length > 0 ? checklistGroups : mockGroups,
       };
     } catch {
       return {
         ...rawResponse,
-        items: ['Kiểm tra hồ sơ pháp lý đính kèm', 'Lập kế hoạch làm việc trực tiếp với đương sự'],
+        items: allMockItems,
+        checklistGroups: mockGroups,
       };
     }
   }

@@ -202,3 +202,19 @@ export interface AiClassifyResponse {
   legalRationale: string;
   modelName: string;
 }
+
+export interface AiChecklistGroups {
+  tasks: string[];
+  documents: string[];
+  coordination: string[];
+  deadlines: string[];
+  risks: string[];
+  nextSteps: string[];
+}
+
+export interface AiChecklistResponse {
+  content: string;
+  items: string[];
+  checklistGroups?: AiChecklistGroups;
+  modelName: string;
+}

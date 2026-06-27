@@ -176,7 +176,17 @@ export class AiService {
   }
 
   async suggestChecklist(dto: SuggestChecklistDto, userId: string): Promise<AiChecklistResponse> {
-    const inputPayload = this.promptBuilder.prepareInput(dto.text);
+    let promptText = dto.text;
+    if (!promptText && dto.caseId) {
+      const c = await this.prisma.legalCase.findUnique({ where: { id: dto.caseId } });
+      if (c) {
+        promptText = `Loại đơn: ${c.type}, Lĩnh vực: ${c.field}, Tóm tắt: ${c.summary}, Yêu cầu: ${c.request}`;
+      }
+    }
+    if (!promptText) {
+      promptText = `Loại đơn: ${dto.type || 'N/A'}, Lĩnh vực: ${dto.field || 'N/A'}, Tóm tắt: ${dto.summary || 'N/A'}, Yêu cầu: ${dto.request || 'N/A'}`;
+    }
+    const inputPayload = this.promptBuilder.prepareInput(promptText);
     const startTime = Date.now();
 
     try {
@@ -256,11 +266,57 @@ export class AiService {
   }
 
   async submitFeedback(dto: AiFeedbackDto, userId: string) {
+    const isAccepted = dto.feedback === AiFeedbackStatus.ACCEPTED;
+
+    if (dto.feedbackType === 'CHECKLIST') {
+      await this.prisma.aiAuditLog.updateMany({
+        where: {
+          caseId: dto.caseId,
+          actionType: AiActionType.CHECKLIST,
+          userFeedback: AiFeedbackStatus.PENDING,
+        },
+        data: {
+          userFeedback: dto.feedback,
+          appliedAt: isAccepted ? new Date() : null,
+        },
+      });
+
+      let caseUpdated = false;
+      if (isAccepted && dto.checklistItems && dto.checklistItems.length > 0) {
+        const existingItems = await this.prisma.caseChecklistItem.findMany({
+          where: { caseId: dto.caseId },
+          select: { title: true },
+        });
+        const existingTitles = new Set(existingItems.map(i => i.title.trim()));
+
+        const itemsToCreate = dto.checklistItems
+          .map(item => item.trim())
+          .filter(title => title.length > 0 && !existingTitles.has(title));
+
+        if (itemsToCreate.length > 0) {
+          await this.prisma.caseChecklistItem.createMany({
+            data: itemsToCreate.map(title => ({
+              caseId: dto.caseId,
+              title,
+              isCompleted: false,
+            })),
+          });
+          caseUpdated = true;
+        }
+      }
+
+      return {
+        success: true,
+        caseId: dto.caseId,
+        feedback: dto.feedback,
+        caseUpdated,
+      };
+    }
+
     const suggestion = await this.prisma.aiCaseSuggestion.findUnique({
       where: { caseId: dto.caseId },
     });
 
-    const isAccepted = dto.feedback === AiFeedbackStatus.ACCEPTED;
     const shouldApply = isAccepted && !!dto.applyToCase;
 
     if (suggestion) {

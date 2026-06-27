@@ -15,8 +15,18 @@ export interface AiClassificationResponse extends AiCompletionResponse {
   legalRationale: string;
 }
 
+export interface AiChecklistGroups {
+  tasks: string[];
+  documents: string[];
+  coordination: string[];
+  deadlines: string[];
+  risks: string[];
+  nextSteps: string[];
+}
+
 export interface AiChecklistResponse extends AiCompletionResponse {
   items: string[];
+  checklistGroups?: AiChecklistGroups;
 }
 
 export interface AiDraftResponse extends AiCompletionResponse {
