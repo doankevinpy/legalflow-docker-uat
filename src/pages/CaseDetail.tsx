@@ -853,22 +853,43 @@ export default function CaseDetail() {
                           )}
                         </Button>
                       </div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {[
+                          'Soạn ngắn gọn, trang trọng',
+                          'Nhấn mạnh cần bổ sung hồ sơ',
+                          'Giữ nguyên vai trò bản nháp nội bộ',
+                          'Nêu rõ nội dung cần cán bộ kiểm tra',
+                        ].map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => setCustomDraftInstructions(prev => prev ? `${prev}. ${suggestion}` : suggestion)}
+                            className="text-[11px] bg-secondary/60 hover:bg-secondary text-secondary-foreground px-2 py-1 rounded border transition-colors"
+                          >
+                            + {suggestion}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
                   {generatedDraftContent && (
                     <div className="mt-6 border rounded-lg p-4 bg-secondary/10">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-3">
                         <span className="text-sm font-semibold text-foreground">{generatedDraftTitle || 'Dự thảo văn bản'}</span>
                         <span className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 px-2.5 py-0.5 rounded font-medium">
                           Chưa phát hành
                         </span>
                       </div>
+                      <div className="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 text-amber-900 dark:text-amber-200 p-3 mb-3 rounded-r text-xs font-medium flex items-center gap-2">
+                        <span>⚠️</span>
+                        <span>BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG.</span>
+                      </div>
                       <textarea
                         value={generatedDraftContent}
                         onChange={(e) => setGeneratedDraftContent(e.target.value)}
-                        rows={12}
-                        className="w-full font-mono text-sm p-3 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-y leading-relaxed"
+                        rows={16}
+                        className="w-full min-h-[320px] font-mono text-sm p-3 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-y leading-relaxed"
                       />
                       <div className="flex items-center justify-end gap-3 mt-4 pt-3 border-t">
                         <Button
