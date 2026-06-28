@@ -103,4 +103,22 @@ export const apiClient = {
     }),
 
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+
+  downloadBlob: async (path: string): Promise<{ blob: Blob; filename?: string }> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE_URL}${path}`, { headers });
+    if (!res.ok) throw new ApiError(res.status, 'Không thể tải xuống tài liệu.');
+
+    const disposition = res.headers.get('Content-Disposition');
+    let filename: string | undefined;
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) filename = decodeURIComponent(match[1]);
+    }
+    const blob = await res.blob();
+    return { blob, filename };
+  },
 };

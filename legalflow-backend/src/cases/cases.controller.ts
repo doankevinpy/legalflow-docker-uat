@@ -11,6 +11,8 @@ import {
   Request,
   UseInterceptors,
   UploadedFile,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CasesService } from './cases.service';
@@ -125,5 +127,21 @@ export class CasesController {
     @Request() req: any,
   ) {
     return this.casesService.downloadDocument(id, docId, req.user);
+  }
+
+  @Get(':id/notes/:noteId/export-docx')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  async exportDocx(
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @Request() req: any,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    const { buffer, filename } = await this.casesService.exportDocx(id, noteId, req.user);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    return new StreamableFile(buffer);
   }
 }

@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   ArrowLeft, CheckSquare, Clock, FileText, Info, Trash2, CalendarClock,
-  Loader2, Send, AlertCircle, Sparkles, FileEdit,
+  Loader2, Send, AlertCircle, Sparkles, FileEdit, Download,
 } from 'lucide-react';
 import { getDeadlineStatus } from '../utils/deadline';
 import { casesApi } from '../lib/casesApi';
@@ -36,6 +36,7 @@ export default function CaseDetail() {
   const [activeTab, setActiveTab] = useState<'info' | 'land-profile' | 'documents' | 'checklist' | 'notes' | 'history' | 'ai'>('info');
   const [noteInput, setNoteInput] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [exportingNoteId, setExportingNoteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -297,6 +298,27 @@ export default function CaseDetail() {
       setActionError(err instanceof ApiError ? err.message : 'Lỗi thêm ghi chú');
     } finally {
       setIsSavingNote(false);
+    }
+  };
+
+  const handleExportDocx = async (noteId: string) => {
+    if (!currentCase) return;
+    try {
+      setExportingNoteId(noteId);
+      const { blob, filename } = await casesApi.exportDocx(currentCase.id, noteId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename || `Ban_Nhap_AI_${currentCase.caseCode || currentCase.id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      alert('Đã xuất Word (.docx) thành công!');
+    } catch (err: any) {
+      alert(err instanceof ApiError ? err.message : 'Không thể xuất file Word');
+    } finally {
+      setExportingNoteId(null);
     }
   };
 
@@ -575,14 +597,32 @@ export default function CaseDetail() {
 
                 {/* Note list */}
                 <div className="space-y-3 max-h-72 overflow-y-auto">
-                  {notes.map(note => (
-                    <div key={note.id} className="bg-secondary/30 rounded-lg p-3 border">
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {note.user?.fullName ?? 'Người dùng'} – {format(new Date(note.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })}
-                      </p>
-                    </div>
-                  ))}
+                  {notes.map(note => {
+                    const isAiDraft = note.content && note.content.startsWith('[AI Dự thảo -');
+                    const isExporting = exportingNoteId === note.id;
+                    return (
+                      <div key={note.id} className="bg-secondary/30 rounded-lg p-3 border">
+                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                          <p className="text-xs text-muted-foreground">
+                            {note.user?.fullName ?? 'Người dùng'} – {format(new Date(note.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })}
+                          </p>
+                          {isAiDraft && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs flex items-center gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                              onClick={() => handleExportDocx(note.id)}
+                              disabled={isExporting}
+                            >
+                              {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                              <span>📄 Tải Word (.docx)</span>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                   {notes.length === 0 && (
                     <p className="text-muted-foreground text-sm py-4 text-center">Chưa có ghi chú nào.</p>
                   )}

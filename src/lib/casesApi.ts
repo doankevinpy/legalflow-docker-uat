@@ -82,6 +82,10 @@ export const casesApi = {
   downloadDocument: (id: string, docId: string) =>
     apiClient.get<{ url: string }>(`/cases/${id}/documents/${docId}/download`),
 
+  /** GET /cases/:id/notes/:noteId/export-docx */
+  exportDocx: (id: string, noteId: string) =>
+    apiClient.downloadBlob(`/cases/${id}/notes/${noteId}/export-docx`),
+
   /** POST /ai/summarize */
   aiSummarize: (text: string, caseId?: string) =>
     apiClient.post<AiSummarizeResponse>('/ai/summarize', { text, caseId }),
