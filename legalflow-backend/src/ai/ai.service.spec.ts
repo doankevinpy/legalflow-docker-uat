@@ -237,5 +237,75 @@ describe('AiService', () => {
     });
     expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
   });
+
+  it('should submit feedback DRAFT ACCEPTED for THONG_BAO_THU_LY with correct prefix', async () => {
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'ACCEPTED' as any,
+        feedbackType: 'DRAFT',
+        draftType: 'THONG_BAO_THU_LY',
+        draftTitle: 'Thông báo thụ lý',
+        draftContent: 'Nội dung thông báo thụ lý...',
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(true);
+    expect(mockPrismaService.caseNote.create).toHaveBeenCalledWith({
+      data: {
+        caseId: 'case-1',
+        userId: 'user-1',
+        content: '[AI Dự thảo - Thông báo thụ lý]\n\nNội dung thông báo thụ lý...',
+      },
+    });
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
+  });
+
+  it('should submit feedback DRAFT ACCEPTED for VAN_BAN_CHUYEN_DON with correct prefix', async () => {
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'ACCEPTED' as any,
+        feedbackType: 'DRAFT',
+        draftType: 'VAN_BAN_CHUYEN_DON',
+        draftTitle: 'Văn bản chuyển đơn',
+        draftContent: 'Nội dung chuyển đơn...',
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(true);
+    expect(mockPrismaService.caseNote.create).toHaveBeenCalledWith({
+      data: {
+        caseId: 'case-1',
+        userId: 'user-1',
+        content: '[AI Dự thảo - Văn bản chuyển đơn]\n\nNội dung chuyển đơn...',
+      },
+    });
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
+  });
+
+  it('should submit feedback DRAFT REJECTED without creating CaseNote or updating status', async () => {
+    mockPrismaService.caseNote.create.mockClear();
+    mockPrismaService.legalCase.update.mockClear();
+
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'REJECTED' as any,
+        feedbackType: 'DRAFT',
+        draftType: 'TRA_LOI_CONG_DAN_DU_THAO',
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(false);
+    expect(mockPrismaService.caseNote.create).not.toHaveBeenCalled();
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
+  });
 });
 

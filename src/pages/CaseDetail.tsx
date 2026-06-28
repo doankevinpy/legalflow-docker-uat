@@ -188,7 +188,18 @@ export default function CaseDetail() {
         draftType: selectedDraftType,
         customInstructions: customDraftInstructions,
       });
-      setGeneratedDraftTitle(res.draftTitle || (selectedDraftType === 'PHIEU_XU_LY' ? 'Phiếu xử lý đơn' : 'Giấy mời làm việc/đối thoại'));
+      const getTitle = (type: string) => {
+        switch (type) {
+          case 'PHIEU_XU_LY': return 'Phiếu xử lý đơn';
+          case 'GIAY_MOI_LAM_VIEC': return 'Giấy mời làm việc/đối thoại';
+          case 'THONG_BAO_THU_LY': return 'Thông báo thụ lý';
+          case 'THONG_BAO_KHONG_THU_LY': return 'Thông báo không thụ lý';
+          case 'VAN_BAN_CHUYEN_DON': return 'Văn bản chuyển đơn';
+          case 'TRA_LOI_CONG_DAN_DU_THAO': return 'Trả lời công dân';
+          default: return `Dự thảo: ${type}`;
+        }
+      };
+      setGeneratedDraftTitle(res.draftTitle || getTitle(selectedDraftType));
       setGeneratedDraftContent(res.draftContent || res.content);
     } catch (err) {
       alert('Không thể tạo bản nháp văn bản cho hồ sơ này.');
@@ -814,6 +825,10 @@ export default function CaseDetail() {
                       >
                         <option value="PHIEU_XU_LY">Phiếu xử lý đơn</option>
                         <option value="GIAY_MOI_LAM_VIEC">Giấy mời làm việc / đối thoại</option>
+                        <option value="THONG_BAO_THU_LY">Thông báo thụ lý</option>
+                        <option value="THONG_BAO_KHONG_THU_LY">Thông báo không thụ lý</option>
+                        <option value="VAN_BAN_CHUYEN_DON">Văn bản chuyển đơn</option>
+                        <option value="TRA_LOI_CONG_DAN_DU_THAO">Trả lời công dân (dự thảo)</option>
                       </select>
                     </div>
                     <div className="md:col-span-2">

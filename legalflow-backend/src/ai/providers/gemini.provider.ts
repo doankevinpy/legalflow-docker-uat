@@ -233,20 +233,42 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
     const warningLabel = "--- BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG. ---\n\n";
     const customNote = petitionContext.customInstructions ? `\n\n[Ghi chú / Hướng dẫn thêm: ${petitionContext.customInstructions}]` : '';
 
+    const getDraftTitle = (type: string) => {
+      switch (type) {
+        case 'PHIEU_XU_LY': return 'Phiếu xử lý đơn';
+        case 'GIAY_MOI_LAM_VIEC': return 'Giấy mời làm việc/đối thoại';
+        case 'THONG_BAO_THU_LY': return 'Thông báo thụ lý';
+        case 'THONG_BAO_KHONG_THU_LY': return 'Thông báo không thụ lý';
+        case 'VAN_BAN_CHUYEN_DON': return 'Văn bản chuyển đơn';
+        case 'TRA_LOI_CONG_DAN_DU_THAO': return 'Trả lời công dân';
+        default: return `Dự thảo: ${type}`;
+      }
+    };
+
     if (this.isMockMode()) {
       await new Promise((resolve) => setTimeout(resolve, 700));
-      let draftTitle = `Dự thảo: ${draftType}`;
+      let draftTitle = getDraftTitle(draftType);
       let draftContent = `${warningLabel}Nội dung bản nháp cho ${draftType}...`;
       let legalReferences = ['Luật Tiếp công dân 2013', 'Luật Đất đai 2024'];
 
       if (draftType === 'PHIEU_XU_LY') {
-        draftTitle = 'Phiếu xử lý đơn';
         draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nPHIẾU ĐỀ XUẤT XỬ LÝ ĐƠN\n\n1. Thông tin tiếp nhận:\n- Mã hồ sơ: ${petitionContext.caseCode || 'N/A'}\n- Người nộp đơn: ${petitionContext.senderName || 'Công dân'}\n- Tóm tắt nội dung: ${petitionContext.summary || 'Đơn khiếu nại / kiến nghị phản ánh'}\n\n2. Đề xuất thụ lý và phân công:\n- Đơn thuộc thẩm quyền giải quyết của UBND cấp xã.\n- Đề xuất thụ lý giải quyết và giao công chức Địa chính - Tư pháp tiến hành thẩm tra thực tế hiện trạng.${customNote}\n\n3. Ý kiến phê duyệt của Lãnh đạo:\n....................................................................................`;
         legalReferences = ['Luật Khiếu nại 2011', 'Luật Đất đai 2024', 'Nghị định 124/2020/NĐ-CP'];
       } else if (draftType === 'GIAY_MOI_LAM_VIEC') {
-        draftTitle = 'Giấy mời làm việc/đối thoại';
         draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGIẤY MỜI LÀM VIỆC\n\nKính gửi: Ông/Bà ${petitionContext.senderName || 'Người có quyền lợi, nghĩa vụ liên quan'}\n\nUBND phường/xã trân trọng kính mời Ông/Bà đến làm việc để đối thoại và làm rõ nội dung đơn thư kiến nghị/tranh chấp:\n\n1. Thời gian làm việc: 08 giờ 30 phút, ngày ... tháng ... năm 2026\n2. Địa điểm: Phòng Tiếp công dân / Hội trường UBND phường/xã\n3. Thành phần tham dự: Lãnh đạo UBND xã, Công chức Địa chính, Trưởng thôn và các bên liên quan.\n4. Nội dung: Làm rõ ranh giới đất đai và hòa giải tranh chấp.${customNote}\n\nĐề nghị Ông/Bà mang theo CMND/CCCD và các giấy tờ, hồ sơ đất đai bản gốc để đối chiếu.`;
         legalReferences = ['Luật Đất đai 2024', 'Luật Hòa giải ở cơ sở 2013'];
+      } else if (draftType === 'THONG_BAO_THU_LY') {
+        draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nTHÔNG BÁO\nVề việc thụ lý giải quyết đơn thư\n\nKính gửi: Ông/Bà ${petitionContext.senderName || 'Công dân'}\n\nUBND phường/xã thông báo đã tiếp nhận đơn thư với mã hồ sơ ${petitionContext.caseCode || 'N/A'}, nội dung: ${petitionContext.summary || 'Kiến nghị phản ánh'}.\n\nSau khi xem xét nội dung đơn, UBND phường/xã thông báo vụ việc đã đủ điều kiện thụ lý giải quyết theo quy định.\n\n[Cán bộ bổ sung số thông báo, ngày tháng ban hành]\n[Cán bộ bổ sung thời hạn giải quyết theo luật định]\n[Cán bộ bổ sung bộ phận/công chức được giao xác minh]${customNote}\n\nTrân trọng thông báo đến Ông/Bà được biết.`;
+        legalReferences = ['Luật Khiếu nại 2011', 'Luật Tố cáo 2018', 'Luật Tiếp công dân 2013'];
+      } else if (draftType === 'THONG_BAO_KHONG_THU_LY') {
+        draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nTHÔNG BÁO\nVề việc không thụ lý giải quyết đơn thư\n\nKính gửi: Ông/Bà ${petitionContext.senderName || 'Công dân'}\n\nUBND phường/xã đã tiếp nhận đơn thư mã số ${petitionContext.caseCode || 'N/A'}, nội dung: ${petitionContext.summary || 'Kiến nghị phản ánh'}.\n\nQua kiểm tra và thẩm định, UBND phường/xã thông báo không thụ lý giải quyết đơn thư nêu trên.\n\n[Cán bộ bổ sung số thông báo, ngày tháng ban hành]\n[Cán bộ bổ sung lý do chi tiết từ chối thụ lý (ví dụ: hết thời hiệu, không đủ điều kiện...)]\n[Cán bộ bổ sung căn cứ pháp lý cụ thể]${customNote}\n\nTrân trọng thông báo đến Ông/Bà được biết.`;
+        legalReferences = ['Luật Khiếu nại 2011', 'Luật Tố cáo 2018'];
+      } else if (draftType === 'VAN_BAN_CHUYEN_DON') {
+        draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nCONG VĂN\nVề việc chuyển đơn thư của công dân\n\nKính gửi: [Cán bộ bổ sung tên cơ quan có thẩm quyền giải quyết]\nĐồng kính gửi: Ông/Bà ${petitionContext.senderName || 'Công dân'} (để biết)\n\nUBND phường/xã tiếp nhận đơn của Ông/Bà ${petitionContext.senderName || 'Công dân'}, mã hồ sơ ${petitionContext.caseCode || 'N/A'}, trình bày về việc: ${petitionContext.summary || 'Kiến nghị phản ánh'}.\n\nCăn cứ quy định pháp luật, nội dung đơn thư không thuộc thẩm quyền giải quyết của UBND phường/xã. UBND phường/xã chuyển đơn thư nêu trên đến Quý cơ quan để xem xét, giải quyết theo thẩm quyền.\n\n[Cán bộ bổ sung số công văn, ngày tháng ban hành]\n[Cán bộ bổ sung căn cứ pháp lý về thẩm quyền]\n[Cán bộ bổ sung đề nghị thông báo kết quả giải quyết]${customNote}`;
+        legalReferences = ['Luật Tiếp công dân 2013', 'Thông tư 05/2021/TT-TTCP'];
+      } else if (draftType === 'TRA_LOI_CONG_DAN_DU_THAO') {
+        draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nCONG VĂN\nVề việc trả lời đơn kiến nghị, phản ánh của công dân\n\nKính gửi: Ông/Bà ${petitionContext.senderName || 'Công dân'}\n\nUBND phường/xã đã tiếp nhận và nghiên cứu nội dung đơn thư mã số ${petitionContext.caseCode || 'N/A'}, nội dung: ${petitionContext.summary || 'Kiến nghị phản ánh'}.\n\nSau khi kiểm tra xác minh thực tế, UBND phường/xã xin trả lời và giải thích như sau:\n\n[Cán bộ bổ sung số công văn, ngày tháng ban hành]\n[Cán bộ bổ sung kết quả xác minh thực tế tại địa phương]\n[Cán bộ bổ sung căn cứ pháp lý và hướng dẫn giải quyết]${customNote}\n\nUBND phường/xã trả lời để Ông/Bà được biết và thực hiện.`;
+        legalReferences = ['Luật Tiếp công dân 2013', 'Luật Đất đai 2024'];
       }
 
       return {
@@ -261,21 +283,21 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
       };
     }
 
-    const systemPrompt = `Bạn là Trợ lý soạn thảo văn bản hành chính UBND cấp xã. Hãy soạn thảo dự thảo văn bản "${draftType}" dựa trên thông tin hồ sơ. Bắt buộc thêm dòng chữ nhãn cảnh báo ở đầu: "${warningLabel.trim()}". Trả về JSON format: { "draftTitle": "...", "draftContent": "...", "legalReferences": ["Luật..."] }`;
+    const systemPrompt = `Bạn là Trợ lý soạn thảo văn bản hành chính UBND cấp xã. Hãy soạn thảo dự thảo văn bản "${draftType}" (${getDraftTitle(draftType)}) dựa trên thông tin hồ sơ. Bắt buộc thêm dòng chữ nhãn cảnh báo ở đầu: "${warningLabel.trim()}". Nếu thông tin hồ sơ chưa đủ để kết luận thẩm quyền hoặc căn cứ pháp lý cụ thể, bắt buộc ghi các vùng giữ chỗ rõ ràng dưới dạng "[Cán bộ bổ sung...]". Trả về JSON format: { "draftTitle": "...", "draftContent": "...", "legalReferences": ["Luật..."] }`;
     const rawResponse = await this.generateText(systemPrompt, JSON.stringify(petitionContext));
     try {
       const jsonStr = rawResponse.content.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
       return {
         ...rawResponse,
-        draftTitle: parsed.draftTitle || (draftType === 'PHIEU_XU_LY' ? 'Phiếu xử lý đơn' : 'Giấy mời làm việc/đối thoại'),
+        draftTitle: parsed.draftTitle || getDraftTitle(draftType),
         draftContent: parsed.draftContent || `${warningLabel}${rawResponse.content}`,
         legalReferences: Array.isArray(parsed.legalReferences) ? parsed.legalReferences : [],
       };
     } catch {
       return {
         ...rawResponse,
-        draftTitle: draftType === 'PHIEU_XU_LY' ? 'Phiếu xử lý đơn' : 'Giấy mời làm việc/đối thoại',
+        draftTitle: getDraftTitle(draftType),
         draftContent: `${warningLabel}${rawResponse.content}`,
         legalReferences: ['Luật Tiếp công dân 2013'],
       };

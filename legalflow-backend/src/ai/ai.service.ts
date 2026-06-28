@@ -303,9 +303,21 @@ export class AiService {
       if (isAccepted && dto.draftContent) {
         let noteContent = dto.draftContent.trim();
         let prefix = '[AI Dự thảo - Văn bản nháp]';
-        if (dto.draftType === 'PHIEU_XU_LY' || (dto.draftTitle && dto.draftTitle.toLowerCase().includes('phiếu'))) {
+        if (dto.draftType === 'PHIEU_XU_LY') {
           prefix = '[AI Dự thảo - Phiếu xử lý đơn]';
-        } else if (dto.draftType === 'GIAY_MOI_LAM_VIEC' || (dto.draftTitle && dto.draftTitle.toLowerCase().includes('mời'))) {
+        } else if (dto.draftType === 'GIAY_MOI_LAM_VIEC') {
+          prefix = '[AI Dự thảo - Giấy mời làm việc]';
+        } else if (dto.draftType === 'THONG_BAO_THU_LY') {
+          prefix = '[AI Dự thảo - Thông báo thụ lý]';
+        } else if (dto.draftType === 'THONG_BAO_KHONG_THU_LY') {
+          prefix = '[AI Dự thảo - Thông báo không thụ lý]';
+        } else if (dto.draftType === 'VAN_BAN_CHUYEN_DON') {
+          prefix = '[AI Dự thảo - Văn bản chuyển đơn]';
+        } else if (dto.draftType === 'TRA_LOI_CONG_DAN_DU_THAO') {
+          prefix = '[AI Dự thảo - Trả lời công dân]';
+        } else if (dto.draftTitle && dto.draftTitle.toLowerCase().includes('phiếu')) {
+          prefix = '[AI Dự thảo - Phiếu xử lý đơn]';
+        } else if (dto.draftTitle && dto.draftTitle.toLowerCase().includes('mời')) {
           prefix = '[AI Dự thảo - Giấy mời làm việc]';
         } else if (dto.draftTitle) {
           prefix = `[AI Dự thảo - ${dto.draftTitle}]`;
