@@ -230,36 +230,53 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
 
   async draftResponse(petitionContext: Record<string, any>, draftType: string): Promise<AiDraftResponse> {
     const startTime = Date.now();
+    const warningLabel = "--- BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG. ---\n\n";
+    const customNote = petitionContext.customInstructions ? `\n\n[Ghi chú / Hướng dẫn thêm: ${petitionContext.customInstructions}]` : '';
+
     if (this.isMockMode()) {
       await new Promise((resolve) => setTimeout(resolve, 700));
+      let draftTitle = `Dự thảo: ${draftType}`;
+      let draftContent = `${warningLabel}Nội dung bản nháp cho ${draftType}...`;
+      let legalReferences = ['Luật Tiếp công dân 2013', 'Luật Đất đai 2024'];
+
+      if (draftType === 'PHIEU_XU_LY') {
+        draftTitle = 'Phiếu xử lý đơn';
+        draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nPHIẾU ĐỀ XUẤT XỬ LÝ ĐƠN\n\n1. Thông tin tiếp nhận:\n- Mã hồ sơ: ${petitionContext.caseCode || 'N/A'}\n- Người nộp đơn: ${petitionContext.senderName || 'Công dân'}\n- Tóm tắt nội dung: ${petitionContext.summary || 'Đơn khiếu nại / kiến nghị phản ánh'}\n\n2. Đề xuất thụ lý và phân công:\n- Đơn thuộc thẩm quyền giải quyết của UBND cấp xã.\n- Đề xuất thụ lý giải quyết và giao công chức Địa chính - Tư pháp tiến hành thẩm tra thực tế hiện trạng.${customNote}\n\n3. Ý kiến phê duyệt của Lãnh đạo:\n....................................................................................`;
+        legalReferences = ['Luật Khiếu nại 2011', 'Luật Đất đai 2024', 'Nghị định 124/2020/NĐ-CP'];
+      } else if (draftType === 'GIAY_MOI_LAM_VIEC') {
+        draftTitle = 'Giấy mời làm việc/đối thoại';
+        draftContent = `${warningLabel}CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGIẤY MỜI LÀM VIỆC\n\nKính gửi: Ông/Bà ${petitionContext.senderName || 'Người có quyền lợi, nghĩa vụ liên quan'}\n\nUBND phường/xã trân trọng kính mời Ông/Bà đến làm việc để đối thoại và làm rõ nội dung đơn thư kiến nghị/tranh chấp:\n\n1. Thời gian làm việc: 08 giờ 30 phút, ngày ... tháng ... năm 2026\n2. Địa điểm: Phòng Tiếp công dân / Hội trường UBND phường/xã\n3. Thành phần tham dự: Lãnh đạo UBND xã, Công chức Địa chính, Trưởng thôn và các bên liên quan.\n4. Nội dung: Làm rõ ranh giới đất đai và hòa giải tranh chấp.${customNote}\n\nĐề nghị Ông/Bà mang theo CMND/CCCD và các giấy tờ, hồ sơ đất đai bản gốc để đối chiếu.`;
+        legalReferences = ['Luật Đất đai 2024', 'Luật Hòa giải ở cơ sở 2013'];
+      }
+
       return {
-        content: 'Mock draft generated',
-        draftTitle: `DỰ THẢO: ${draftType.toUpperCase()}`,
-        draftContent: `Kính gửi: Ông/Bà ${petitionContext.senderName || 'Công dân'}\n\nUBND phường/xã đã tiếp nhận đơn của Ông/Bà về việc: ${petitionContext.summary || 'thủ tục hành chính'}.\nCăn cứ quy định hiện hành, UBND xin thông báo đã tiếp nhận và đang tiến hành xử lý hồ sơ theo đúng trình tự pháp luật.\n\nTrân trọng.`,
-        legalReferences: ['Luật Tiếp công dân 2013', 'Nghị định 64/2014/NĐ-CP'],
+        content: draftContent,
+        draftTitle,
+        draftContent,
+        legalReferences,
         promptTokens: 250,
-        completionTokens: 110,
+        completionTokens: 150,
         latencyMs: Date.now() - startTime,
         modelName: `${this.model}-mock`,
       };
     }
 
-    const systemPrompt = `Bạn là Trợ lý soạn thảo văn bản hành chính UBND cấp xã. Hãy soạn thảo dự thảo văn bản "${draftType}" dựa trên thông tin hồ sơ. Trả về JSON format: { "draftTitle": "...", "draftContent": "...", "legalReferences": ["Luật..."] }`;
+    const systemPrompt = `Bạn là Trợ lý soạn thảo văn bản hành chính UBND cấp xã. Hãy soạn thảo dự thảo văn bản "${draftType}" dựa trên thông tin hồ sơ. Bắt buộc thêm dòng chữ nhãn cảnh báo ở đầu: "${warningLabel.trim()}". Trả về JSON format: { "draftTitle": "...", "draftContent": "...", "legalReferences": ["Luật..."] }`;
     const rawResponse = await this.generateText(systemPrompt, JSON.stringify(petitionContext));
     try {
       const jsonStr = rawResponse.content.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
       return {
         ...rawResponse,
-        draftTitle: parsed.draftTitle || `Văn bản phản hồi hồ sơ`,
-        draftContent: parsed.draftContent || rawResponse.content,
+        draftTitle: parsed.draftTitle || (draftType === 'PHIEU_XU_LY' ? 'Phiếu xử lý đơn' : 'Giấy mời làm việc/đối thoại'),
+        draftContent: parsed.draftContent || `${warningLabel}${rawResponse.content}`,
         legalReferences: Array.isArray(parsed.legalReferences) ? parsed.legalReferences : [],
       };
     } catch {
       return {
         ...rawResponse,
-        draftTitle: `Dự thảo văn bản phản hồi`,
-        draftContent: rawResponse.content,
+        draftTitle: draftType === 'PHIEU_XU_LY' ? 'Phiếu xử lý đơn' : 'Giấy mời làm việc/đối thoại',
+        draftContent: `${warningLabel}${rawResponse.content}`,
         legalReferences: ['Luật Tiếp công dân 2013'],
       };
     }

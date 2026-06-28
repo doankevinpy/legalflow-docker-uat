@@ -226,7 +226,25 @@ export class AiService {
   }
 
   async draftResponse(dto: DraftResponseDto, userId: string): Promise<AiDraftResponse> {
-    const preparedContext = JSON.parse(this.promptBuilder.prepareInput(dto.petitionContext));
+    let contextObj: Record<string, any> = dto.petitionContext || {};
+    if (dto.caseId && (!dto.petitionContext || Object.keys(dto.petitionContext).length === 0)) {
+      const c = await this.prisma.legalCase.findUnique({ where: { id: dto.caseId } });
+      if (c) {
+        contextObj = {
+          ...contextObj,
+          caseCode: c.caseCode,
+          summary: c.summary,
+          request: c.request,
+          type: c.type,
+          field: c.field,
+          senderName: c.senderName,
+        };
+      }
+    }
+    if (dto.customInstructions) {
+      contextObj.customInstructions = dto.customInstructions;
+    }
+    const preparedContext = JSON.parse(this.promptBuilder.prepareInput(contextObj));
     const startTime = Date.now();
 
     try {
@@ -267,6 +285,53 @@ export class AiService {
 
   async submitFeedback(dto: AiFeedbackDto, userId: string) {
     const isAccepted = dto.feedback === AiFeedbackStatus.ACCEPTED;
+
+    if (dto.feedbackType === 'DRAFT') {
+      await this.prisma.aiAuditLog.updateMany({
+        where: {
+          caseId: dto.caseId,
+          actionType: AiActionType.DRAFT,
+          userFeedback: AiFeedbackStatus.PENDING,
+        },
+        data: {
+          userFeedback: dto.feedback,
+          appliedAt: isAccepted ? new Date() : null,
+        },
+      });
+
+      let caseUpdated = false;
+      if (isAccepted && dto.draftContent) {
+        let noteContent = dto.draftContent.trim();
+        let prefix = '[AI Dự thảo - Văn bản nháp]';
+        if (dto.draftType === 'PHIEU_XU_LY' || (dto.draftTitle && dto.draftTitle.toLowerCase().includes('phiếu'))) {
+          prefix = '[AI Dự thảo - Phiếu xử lý đơn]';
+        } else if (dto.draftType === 'GIAY_MOI_LAM_VIEC' || (dto.draftTitle && dto.draftTitle.toLowerCase().includes('mời'))) {
+          prefix = '[AI Dự thảo - Giấy mời làm việc]';
+        } else if (dto.draftTitle) {
+          prefix = `[AI Dự thảo - ${dto.draftTitle}]`;
+        }
+
+        if (!noteContent.startsWith('[AI Dự thảo - ')) {
+          noteContent = `${prefix}\n\n${noteContent}`;
+        }
+
+        await this.prisma.caseNote.create({
+          data: {
+            caseId: dto.caseId,
+            userId,
+            content: noteContent,
+          },
+        });
+        caseUpdated = true;
+      }
+
+      return {
+        success: true,
+        caseId: dto.caseId,
+        feedback: dto.feedback,
+        caseUpdated,
+      };
+    }
 
     if (dto.feedbackType === 'CHECKLIST') {
       await this.prisma.aiAuditLog.updateMany({

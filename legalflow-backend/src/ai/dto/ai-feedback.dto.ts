@@ -21,4 +21,17 @@ export class AiFeedbackDto {
   @IsArray()
   @IsString({ each: true })
   checklistItems?: string[];
+
+  @IsOptional()
+  @IsString()
+  draftType?: string;
+
+  @IsOptional()
+  @IsString()
+  draftTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  draftContent?: string;
 }
+

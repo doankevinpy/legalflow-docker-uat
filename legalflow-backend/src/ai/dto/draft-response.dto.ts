@@ -6,10 +6,15 @@ export class DraftResponseDto {
   draftType!: string;
 
   @IsObject()
-  @IsNotEmpty()
-  petitionContext!: Record<string, any>;
+  @IsOptional()
+  petitionContext?: Record<string, any>;
 
   @IsString()
   @IsOptional()
   caseId?: string;
+
+  @IsString()
+  @IsOptional()
+  customInstructions?: string;
 }
+

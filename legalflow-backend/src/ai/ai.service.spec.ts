@@ -28,7 +28,11 @@ describe('AiService', () => {
       findMany: jest.fn().mockResolvedValue([]),
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
+    caseNote: {
+      create: jest.fn().mockResolvedValue({ id: 'note-1' }),
+    },
   };
+
 
   const mockAiProvider = {
     summarize: jest.fn(),
@@ -193,4 +197,45 @@ describe('AiService', () => {
     });
     expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
   });
+
+  it('should generate draft response and log audit', async () => {
+    const mockDraftRes = {
+      content: 'draft content',
+      draftTitle: 'Phiếu xử lý đơn',
+      draftContent: 'draft content',
+      legalReferences: ['Luật 1'],
+      modelName: 'gemini-test',
+    };
+    (mockAiProvider.draftResponse as jest.Mock).mockResolvedValue(mockDraftRes);
+
+    const res = await service.draftResponse({ caseId: 'case-1', draftType: 'PHIEU_XU_LY' }, 'user-1');
+    expect(res).toEqual(mockDraftRes);
+    expect(mockPrismaService.aiAuditLog.create).toHaveBeenCalled();
+  });
+
+  it('should submit feedback DRAFT ACCEPTED and create CaseNote', async () => {
+    const res = await service.submitFeedback(
+      {
+        caseId: 'case-1',
+        feedback: 'ACCEPTED' as any,
+        feedbackType: 'DRAFT',
+        draftType: 'PHIEU_XU_LY',
+        draftTitle: 'Phiếu xử lý đơn',
+        draftContent: 'Nội dung bản nháp...',
+      },
+      'user-1',
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.caseUpdated).toBe(true);
+    expect(mockPrismaService.caseNote.create).toHaveBeenCalledWith({
+      data: {
+        caseId: 'case-1',
+        userId: 'user-1',
+        content: '[AI Dự thảo - Phiếu xử lý đơn]\n\nNội dung bản nháp...',
+      },
+    });
+    expect(mockPrismaService.legalCase.update).not.toHaveBeenCalled();
+  });
 });
+

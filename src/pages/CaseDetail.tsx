@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   ArrowLeft, CheckSquare, Clock, FileText, Info, Trash2, CalendarClock,
-  Loader2, Send, AlertCircle, Sparkles,
+  Loader2, Send, AlertCircle, Sparkles, FileEdit,
 } from 'lucide-react';
 import { getDeadlineStatus } from '../utils/deadline';
 import { casesApi } from '../lib/casesApi';
@@ -168,6 +168,80 @@ export default function CaseDetail() {
       alert('Ghi nhận phản hồi thất bại.');
     } finally {
       setIsSubmittingChecklistFeedback(false);
+    }
+  };
+
+  // AI Drafting Phase 4A State & Handlers
+  const [selectedDraftType, setSelectedDraftType] = useState<string>('PHIEU_XU_LY');
+  const [customDraftInstructions, setCustomDraftInstructions] = useState<string>('');
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState<boolean>(false);
+  const [generatedDraftTitle, setGeneratedDraftTitle] = useState<string>('');
+  const [generatedDraftContent, setGeneratedDraftContent] = useState<string>('');
+  const [isSubmittingDraftFeedback, setIsSubmittingDraftFeedback] = useState<boolean>(false);
+
+  const handleSuggestDraft = async () => {
+    if (!id) return;
+    setIsGeneratingDraft(true);
+    try {
+      const res = await casesApi.aiSuggestDraft({
+        caseId: id,
+        draftType: selectedDraftType,
+        customInstructions: customDraftInstructions,
+      });
+      setGeneratedDraftTitle(res.draftTitle || (selectedDraftType === 'PHIEU_XU_LY' ? 'Phiếu xử lý đơn' : 'Giấy mời làm việc/đối thoại'));
+      setGeneratedDraftContent(res.draftContent || res.content);
+    } catch (err) {
+      alert('Không thể tạo bản nháp văn bản cho hồ sơ này.');
+    } finally {
+      setIsGeneratingDraft(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!id || !generatedDraftContent.trim()) return;
+    setIsSubmittingDraftFeedback(true);
+    try {
+      await casesApi.aiSubmitFeedback(
+        id,
+        'ACCEPTED',
+        true,
+        'DRAFT',
+        [],
+        selectedDraftType,
+        generatedDraftTitle,
+        generatedDraftContent
+      );
+      await load();
+      alert('Đã lưu bản nháp vào ghi chú hồ sơ thành công.');
+      setGeneratedDraftContent('');
+      setGeneratedDraftTitle('');
+      setActiveTab('history');
+    } catch (err) {
+      alert('Lưu bản nháp thất bại.');
+    } finally {
+      setIsSubmittingDraftFeedback(false);
+    }
+  };
+
+  const handleRejectDraft = async () => {
+    if (!id) return;
+    setIsSubmittingDraftFeedback(true);
+    try {
+      await casesApi.aiSubmitFeedback(
+        id,
+        'REJECTED',
+        false,
+        'DRAFT',
+        [],
+        selectedDraftType
+      );
+      setGeneratedDraftContent('');
+      setGeneratedDraftTitle('');
+      alert('Đã hủy / không sử dụng bản nháp AI.');
+    } catch (err) {
+      alert('Thao tác thất bại.');
+    } finally {
+      setIsSubmittingDraftFeedback(false);
     }
   };
 
@@ -704,6 +778,104 @@ export default function CaseDetail() {
                       >
                         {isSuggestingChecklist ? 'Đang phân tích...' : '✨ Gợi ý ngay'}
                       </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Phase 4A AI Drafting Widget */}
+                <div className="bg-card border rounded-xl p-6 shadow-sm mt-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b">
+                    <div>
+                      <h3 className="text-lg font-semibold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                        <FileEdit className="h-5 w-5" />
+                        📝 Soạn thảo văn bản nháp thông minh
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        AI hỗ trợ tạo bản nháp nội bộ cho các bước giải quyết đơn thư (Phase 4A).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg p-3.5 mt-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-900 dark:text-amber-200">
+                      <span className="font-semibold">⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG.</span>
+                      <br />Hệ thống tuyệt đối không tự đổi trạng thái hồ sơ hay gửi văn bản cho công dân. Bản nháp được duyệt sẽ lưu vào Ghi chú hồ sơ.
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Loại văn bản nháp</label>
+                      <select
+                        value={selectedDraftType}
+                        onChange={(e) => setSelectedDraftType(e.target.value)}
+                        className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="PHIEU_XU_LY">Phiếu xử lý đơn</option>
+                        <option value="GIAY_MOI_LAM_VIEC">Giấy mời làm việc / đối thoại</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Hướng dẫn bổ sung cho AI (không bắt buộc)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Ví dụ: Mời làm việc 8h sáng thứ Sáu, mang theo sổ đỏ..."
+                          value={customDraftInstructions}
+                          onChange={(e) => setCustomDraftInstructions(e.target.value)}
+                          className="flex-1 h-10 px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <Button
+                          onClick={handleSuggestDraft}
+                          disabled={isGeneratingDraft}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 h-10 px-4"
+                        >
+                          {isGeneratingDraft ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang soạn...</>
+                          ) : (
+                            '✨ Tạo bản nháp AI'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {generatedDraftContent && (
+                    <div className="mt-6 border rounded-lg p-4 bg-secondary/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-foreground">{generatedDraftTitle || 'Dự thảo văn bản'}</span>
+                        <span className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 px-2.5 py-0.5 rounded font-medium">
+                          Chưa phát hành
+                        </span>
+                      </div>
+                      <textarea
+                        value={generatedDraftContent}
+                        onChange={(e) => setGeneratedDraftContent(e.target.value)}
+                        rows={12}
+                        className="w-full font-mono text-sm p-3 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-y leading-relaxed"
+                      />
+                      <div className="flex items-center justify-end gap-3 mt-4 pt-3 border-t">
+                        <Button
+                          variant="outline"
+                          onClick={handleRejectDraft}
+                          disabled={isSubmittingDraftFeedback}
+                          className="border-destructive text-destructive hover:bg-destructive/10"
+                        >
+                          ❌ Không sử dụng bản nháp
+                        </Button>
+                        <Button
+                          onClick={handleSaveDraft}
+                          disabled={isSubmittingDraftFeedback || !generatedDraftContent.trim()}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {isSubmittingDraftFeedback ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu...</>
+                          ) : (
+                            '💾 Lưu vào ghi chú hồ sơ'
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

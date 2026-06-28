@@ -218,3 +218,12 @@ export interface AiChecklistResponse {
   checklistGroups?: AiChecklistGroups;
   modelName: string;
 }
+
+export interface AiDraftResponse {
+  content: string;
+  draftTitle: string;
+  draftContent: string;
+  legalReferences: string[];
+  modelName: string;
+}
+

@@ -15,6 +15,7 @@ import type {
   AiSummarizeResponse,
   AiClassifyResponse,
   AiChecklistResponse,
+  AiDraftResponse,
 } from './api-types';
 
 function buildQuery(params: QueryCasesParams): string {
@@ -93,7 +94,30 @@ export const casesApi = {
   aiSuggestChecklist: (params: { text?: string; caseId?: string; type?: string; field?: string; summary?: string; request?: string }) =>
     apiClient.post<AiChecklistResponse>('/ai/checklist', params),
 
+  /** POST /ai/draft */
+  aiSuggestDraft: (params: { caseId: string; draftType: string; customInstructions?: string }) =>
+    apiClient.post<AiDraftResponse>('/ai/draft', params),
+
   /** POST /ai/feedback */
-  aiSubmitFeedback: (caseId: string, feedback: 'ACCEPTED' | 'REJECTED', applyToCase?: boolean, feedbackType?: string, checklistItems?: string[]) =>
-    apiClient.post<{ success: boolean; caseUpdated: boolean }>('/ai/feedback', { caseId, feedback, applyToCase, feedbackType, checklistItems }),
+  aiSubmitFeedback: (
+    caseId: string,
+    feedback: 'ACCEPTED' | 'REJECTED',
+    applyToCase?: boolean,
+    feedbackType?: string,
+    checklistItems?: string[],
+    draftType?: string,
+    draftTitle?: string,
+    draftContent?: string
+  ) =>
+    apiClient.post<{ success: boolean; caseUpdated: boolean }>('/ai/feedback', {
+      caseId,
+      feedback,
+      applyToCase,
+      feedbackType,
+      checklistItems,
+      draftType,
+      draftTitle,
+      draftContent,
+    }),
 };
+
