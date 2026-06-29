@@ -17,18 +17,8 @@ import { ChangeCaseStatusDto } from './dto/change-case-status.dto';
 import { CaseHistoryAction, CaseField, CaseStatus } from './enums/case.enum';
 import { Role } from '../common/role.enum';
 import { Prisma, AiActionType, AiLogStatus, AiFeedbackStatus } from '@prisma/client';
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  AlignmentType,
-  BorderStyle,
-} from 'docx';
+import { Packer } from 'docx';
+import { identifyTemplateGroup, buildDocxDocument } from './docx-templates.helper';
 
 @Injectable()
 export class CasesService {
@@ -584,210 +574,8 @@ export class CasesService {
       throw new BadRequestException('Case note is not a valid AI draft');
     }
 
-    const prefixMatch = note.content.match(/^\[AI Dự thảo - (.*?)\]\s*(.*)$/s);
-    const draftTitle = prefixMatch ? prefixMatch[1].toUpperCase() : 'VĂN BẢN DỰ THẢO';
-    const draftBody = prefixMatch ? prefixMatch[2].trim() : note.content.trim();
-
-    const lines = draftBody.split('\n');
-    const bodyParagraphs = lines.map((line) => {
-      if (line.includes('[Cán bộ bổ sung')) {
-        return new Paragraph({
-          children: [
-            new TextRun({ text: line, bold: true, italics: true, color: 'D97706' }),
-          ],
-          spacing: { after: 120 },
-        });
-      }
-      return new Paragraph({
-        children: [new TextRun({ text: line })],
-        spacing: { after: 120 },
-      });
-    });
-
-    const doc = new Document({
-      sections: [
-        {
-          properties: {},
-          children: [
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: {
-                top: { style: BorderStyle.NONE },
-                bottom: { style: BorderStyle.NONE },
-                left: { style: BorderStyle.NONE },
-                right: { style: BorderStyle.NONE },
-                insideHorizontal: { style: BorderStyle.NONE },
-                insideVertical: { style: BorderStyle.NONE },
-              },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      width: { size: 40, type: WidthType.PERCENTAGE },
-                      children: [
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [
-                            new TextRun({
-                              text: '[Cán bộ bổ sung tên cơ quan ban hành]',
-                              bold: true,
-                              italics: true,
-                              color: 'D97706',
-                            }),
-                          ],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: 'Số: ...../........', italics: true })],
-                        }),
-                      ],
-                    }),
-                    new TableCell({
-                      width: { size: 60, type: WidthType.PERCENTAGE },
-                      children: [
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [
-                            new TextRun({
-                              text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM',
-                              bold: true,
-                            }),
-                          ],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [
-                            new TextRun({
-                              text: 'Độc lập - Tự do - Hạnh phúc',
-                              bold: true,
-                            }),
-                          ],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: '-------------------' })],
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              ],
-            }),
-            new Paragraph({ spacing: { after: 240 } }),
-
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: {
-                top: { style: BorderStyle.SINGLE, size: 6, color: 'D97706' },
-                bottom: { style: BorderStyle.SINGLE, size: 6, color: 'D97706' },
-                left: { style: BorderStyle.SINGLE, size: 6, color: 'D97706' },
-                right: { style: BorderStyle.SINGLE, size: 6, color: 'D97706' },
-              },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      margins: { top: 140, bottom: 140, left: 140, right: 140 },
-                      children: [
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [
-                            new TextRun({
-                              text: '⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH',
-                              bold: true,
-                              color: 'D97706',
-                            }),
-                          ],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [
-                            new TextRun({
-                              text: 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng.',
-                              italics: true,
-                              color: 'D97706',
-                            }),
-                          ],
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              ],
-            }),
-            new Paragraph({ spacing: { after: 360 } }),
-
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [
-                new TextRun({
-                  text: draftTitle,
-                  bold: true,
-                  size: 28,
-                }),
-              ],
-              spacing: { after: 240 },
-            }),
-
-            ...bodyParagraphs,
-            new Paragraph({ spacing: { after: 360 } }),
-
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: {
-                top: { style: BorderStyle.NONE },
-                bottom: { style: BorderStyle.NONE },
-                left: { style: BorderStyle.NONE },
-                right: { style: BorderStyle.NONE },
-                insideHorizontal: { style: BorderStyle.NONE },
-                insideVertical: { style: BorderStyle.NONE },
-              },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      width: { size: 50, type: WidthType.PERCENTAGE },
-                      children: [
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: 'Nơi nhận:', bold: true, italics: true })],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: '- Như trên;', italics: true })],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: '- Lưu: VT, Hồ sơ.', italics: true })],
-                        }),
-                      ],
-                    }),
-                    new TableCell({
-                      width: { size: 50, type: WidthType.PERCENTAGE },
-                      children: [
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: 'CÁN BỘ THỤ LÝ', bold: true })],
-                        }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: '(Ký, ghi rõ họ tên)', italics: true })],
-                        }),
-                        new Paragraph({ spacing: { after: 720 } }),
-                        new Paragraph({
-                          alignment: AlignmentType.CENTER,
-                          children: [new TextRun({ text: user.fullName || '...........................', bold: true })],
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        },
-      ],
-    });
+    const { templateGroup, draftTitle, draftBody } = identifyTemplateGroup(note.content);
+    const doc = buildDocxDocument(templateGroup, draftTitle, draftBody);
 
     const buffer = await Packer.toBuffer(doc);
 
@@ -800,8 +588,8 @@ export class CasesService {
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: 0,
-        inputPayload: { action: 'EXPORT_DOCX', caseId: id, noteId, fileType: 'docx' },
-        outputPayload: { action: 'EXPORT_DOCX', caseId: id, noteId, fileType: 'docx' },
+        inputPayload: { action: 'EXPORT_DOCX', caseId: id, noteId, fileType: 'docx', templateGroup },
+        outputPayload: { action: 'EXPORT_DOCX', caseId: id, noteId, fileType: 'docx', templateGroup },
         status: AiLogStatus.SUCCESS,
         userFeedback: AiFeedbackStatus.ACCEPTED,
       },
