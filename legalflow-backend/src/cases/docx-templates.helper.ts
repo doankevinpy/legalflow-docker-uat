@@ -9,6 +9,7 @@ import {
   AlignmentType,
   BorderStyle,
 } from 'docx';
+import { AgencyConfig, getAgencyConfig } from '../config/agency.config';
 
 export type TemplateGroup = 'INTERNAL_NOTE' | 'NAMED_DOC' | 'OFFICIAL_LETTER' | 'DEFAULT';
 
@@ -40,7 +41,6 @@ export function identifyTemplateGroup(noteContent: string): {
 }
 
 function formatLineToParagraph(line: string): Paragraph {
-  // If line has brackets like [Cán bộ bổ sung...] or [...], format placeholders in orange bold italic
   const parts = line.split(/(\[[^\]]+\])/g);
   const textRuns = parts.map((part) => {
     if (part.startsWith('[') && part.endsWith(']')) {
@@ -64,7 +64,10 @@ export function buildDocxDocument(
   templateGroup: TemplateGroup,
   draftTitle: string,
   draftBody: string,
+  config?: AgencyConfig,
 ): Document {
+  const cfg = config || getAgencyConfig();
+
   // 1. Warning Banner Table
   const warningTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -107,29 +110,76 @@ export function buildDocxDocument(
     ],
   });
 
-  // 2. Header Table
-  const agencyRuns = [
-    new TextRun({
-      text: '[Cán bộ bổ sung tên cơ quan ban hành]',
-      bold: true,
-      italics: true,
-      color: 'D97706',
-    }),
-  ];
+  // 2. Header Table Left Cell
+  const leftCellParagraphs: Paragraph[] = [];
 
-  const leftCellParagraphs: Paragraph[] = [
-    new Paragraph({ alignment: AlignmentType.CENTER, children: agencyRuns }),
-  ];
-
-  if (templateGroup === 'NAMED_DOC' || templateGroup === 'OFFICIAL_LETTER') {
+  if (cfg.parentName) {
     leftCellParagraphs.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
           new TextRun({
-            text: '[Cán bộ bổ sung số, ký hiệu văn bản]',
+            text: cfg.parentName.toUpperCase(),
+            size: 22,
+          }),
+        ],
+      }),
+    );
+  } else {
+    leftCellParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: '[Cán bộ bổ sung tên cơ quan chủ quản]',
+            bold: true,
             italics: true,
             color: 'D97706',
+            size: 22,
+          }),
+        ],
+      }),
+    );
+  }
+
+  if (cfg.name) {
+    leftCellParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: cfg.name.toUpperCase(),
+            bold: true,
+            size: 24,
+          }),
+        ],
+      }),
+    );
+  } else {
+    leftCellParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: '[Cán bộ bổ sung tên cơ quan ban hành]',
+            bold: true,
+            italics: true,
+            color: 'D97706',
+            size: 24,
+          }),
+        ],
+      }),
+    );
+  }
+
+  if (cfg.docSymbolPrefix) {
+    leftCellParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: `Số: .....${cfg.docSymbolPrefix}`,
+            italics: true,
           }),
         ],
       }),
@@ -164,6 +214,7 @@ export function buildDocxDocument(
     );
   }
 
+  // Header Table Right Cell
   const rightCellParagraphs: Paragraph[] = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -190,18 +241,32 @@ export function buildDocxDocument(
   ];
 
   if (templateGroup === 'NAMED_DOC' || templateGroup === 'OFFICIAL_LETTER' || templateGroup === 'DEFAULT') {
-    rightCellParagraphs.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [
-          new TextRun({
-            text: '[Cán bộ bổ sung địa danh, ngày tháng]',
-            italics: true,
-            color: 'D97706',
-          }),
-        ],
-      }),
-    );
+    if (cfg.location) {
+      rightCellParagraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: `${cfg.location}, ngày ... tháng ... năm 202...`,
+              italics: true,
+            }),
+          ],
+        }),
+      );
+    } else {
+      rightCellParagraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: '[Cán bộ bổ sung địa danh, ngày tháng]',
+              italics: true,
+              color: 'D97706',
+            }),
+          ],
+        }),
+      );
+    }
   }
 
   const headerTable = new Table({
@@ -291,59 +356,112 @@ export function buildDocxDocument(
     bodyParagraphs.push(formatLineToParagraph(line));
   }
 
-  // 5. Footer Signature Table
+  // 5. Footer Signature Table Left Cell
   const leftFooterParagraphs = [
     new Paragraph({
       alignment: AlignmentType.LEFT,
       children: [new TextRun({ text: 'Nơi nhận:', bold: true, italics: true })],
     }),
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
-      children: [new TextRun({ text: '- Như trên;', italics: true })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
-      children: [new TextRun({ text: '- Lưu: VT, Hồ sơ.', italics: true })],
-    }),
   ];
 
-  const rightFooterParagraphs = [
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [
-        new TextRun({
-          text: templateGroup === 'INTERNAL_NOTE'
-            ? 'CÁN BỘ THỤ LÝ'
-            : '[Cán bộ bổ sung chức danh Lãnh đạo ký]',
-          bold: true,
-          color: templateGroup === 'INTERNAL_NOTE' ? undefined : 'D97706',
+  if (cfg.defaultRecipients && cfg.defaultRecipients.length > 0) {
+    for (const r of cfg.defaultRecipients) {
+      leftFooterParagraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          children: [new TextRun({ text: r, italics: true })],
         }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [
-        new TextRun({
-          text: templateGroup === 'INTERNAL_NOTE'
-            ? '(Ký, ghi rõ họ tên)'
-            : '(Ký, ghi rõ họ tên, đóng dấu)',
-          italics: true,
+      );
+    }
+  } else {
+    leftFooterParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text: '[Cán bộ bổ sung nơi nhận]',
+            bold: true,
+            italics: true,
+            color: 'D97706',
+          }),
+        ],
+      }),
+    );
+  }
+
+  // Footer Signature Table Right Cell
+  const rightFooterParagraphs: Paragraph[] = [];
+
+  if (templateGroup === 'INTERNAL_NOTE') {
+    rightFooterParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: 'CÁN BỘ THỤ LÝ', bold: true })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: '(Ký, ghi rõ họ tên)', italics: true })],
+      }),
+    );
+  } else {
+    if (cfg.signerTitle) {
+      const lines = cfg.signerTitle.split('\n').map((l) => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        rightFooterParagraphs.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: line, bold: true })],
+          }),
+        );
+      }
+    } else {
+      rightFooterParagraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: '[Cán bộ bổ sung chức danh người ký]',
+              bold: true,
+              italics: true,
+              color: 'D97706',
+            }),
+          ],
         }),
-      ],
-    }),
-    new Paragraph({ spacing: { after: 720 } }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      children: [
-        new TextRun({
-          text: '[Cán bộ bổ sung họ tên người ký]',
-          bold: true,
-          italics: true,
-          color: 'D97706',
-        }),
-      ],
-    }),
-  ];
+      );
+    }
+
+    rightFooterParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: '(Ký, ghi rõ họ tên, đóng dấu)', italics: true })],
+      }),
+    );
+  }
+
+  rightFooterParagraphs.push(new Paragraph({ spacing: { after: 720 } }));
+
+  if (cfg.signerName) {
+    rightFooterParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: cfg.signerName, bold: true })],
+      }),
+    );
+  } else {
+    rightFooterParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: '[Cán bộ bổ sung họ tên người ký]',
+            bold: true,
+            italics: true,
+            color: 'D97706',
+          }),
+        ],
+      }),
+    );
+  }
 
   const footerTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -388,3 +506,4 @@ export function buildDocxDocument(
     ],
   });
 }
+

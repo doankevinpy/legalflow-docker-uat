@@ -1,7 +1,8 @@
 import { identifyTemplateGroup, buildDocxDocument } from './docx-templates.helper';
+import { getAgencyConfig, AgencyConfig } from '../config/agency.config';
 import { Packer } from 'docx';
 
-describe('DocxTemplatesHelper', () => {
+describe('DocxTemplatesHelper & AgencyConfig', () => {
   it('should identify INTERNAL_NOTE for Phiếu xử lý đơn', () => {
     const content = '[AI Dự thảo - Phiếu xử lý đơn]\n\nNội dung phiếu xử lý...';
     const res = identifyTemplateGroup(content);
@@ -32,7 +33,7 @@ describe('DocxTemplatesHelper', () => {
     }
   });
 
-  it('should successfully build Word document buffers for all 6 draft types', async () => {
+  it('should successfully build Word document buffers for all 6 draft types with default fallback', async () => {
     const testCases = [
       '[AI Dự thảo - Phiếu xử lý đơn]\n\n1. Thông tin tiếp nhận\n[Cán bộ bổ sung ý kiến]',
       '[AI Dự thảo - Giấy mời làm việc]\n\nKính gửi Ông A\n[Cán bộ bổ sung địa điểm]',
@@ -49,5 +50,55 @@ describe('DocxTemplatesHelper', () => {
       expect(buffer).toBeDefined();
       expect(buffer.length).toBeGreaterThan(0);
     }
+  });
+
+  it('should apply agency configuration when provided', async () => {
+    const mockConfig: AgencyConfig = {
+      parentName: 'UBND HUYỆN TEST',
+      name: 'UBND XÃ TEST',
+      location: 'Xã Test',
+      signerTitle: 'TM. ỦY BAN NHÂN DÂN\nCHỦ TỊCH',
+      signerName: 'Nguyễn Văn Test',
+      defaultRecipients: ['- Như trên;', '- Lưu: VT.'],
+      docSymbolPrefix: '/UBND-T',
+      isConfigured: true,
+      missingFields: [],
+    };
+
+    const content = '[AI Dự thảo - Giấy mời làm việc]\n\nNội dung mời...';
+    const { templateGroup, draftTitle, draftBody } = identifyTemplateGroup(content);
+    const doc = buildDocxDocument(templateGroup, draftTitle, draftBody, mockConfig);
+    const buffer = await Packer.toBuffer(doc);
+    expect(buffer).toBeDefined();
+    expect(buffer.length).toBeGreaterThan(0);
+  });
+
+  it('should fallback to placeholders when configuration is missing or empty', async () => {
+    const emptyConfig: AgencyConfig = {
+      parentName: undefined,
+      name: '',
+      location: undefined,
+      signerTitle: '',
+      signerName: '',
+      defaultRecipients: undefined,
+      docSymbolPrefix: '',
+      isConfigured: false,
+      missingFields: [
+        'AGENCY_PARENT_NAME',
+        'AGENCY_NAME',
+        'AGENCY_LOCATION',
+        'AGENCY_SIGNER_TITLE',
+        'AGENCY_SIGNER_NAME',
+        'AGENCY_DEFAULT_RECIPIENTS',
+        'AGENCY_DOCUMENT_SYMBOL_PREFIX',
+      ],
+    };
+
+    const content = '[AI Dự thảo - Văn bản chuyển đơn]\n\nNội dung chuyển...';
+    const { templateGroup, draftTitle, draftBody } = identifyTemplateGroup(content);
+    const doc = buildDocxDocument(templateGroup, draftTitle, draftBody, emptyConfig);
+    const buffer = await Packer.toBuffer(doc);
+    expect(buffer).toBeDefined();
+    expect(buffer.length).toBeGreaterThan(0);
   });
 });

@@ -19,6 +19,7 @@ import { Role } from '../common/role.enum';
 import { Prisma, AiActionType, AiLogStatus, AiFeedbackStatus } from '@prisma/client';
 import { Packer } from 'docx';
 import { identifyTemplateGroup, buildDocxDocument } from './docx-templates.helper';
+import { getAgencyConfig } from '../config/agency.config';
 
 @Injectable()
 export class CasesService {
@@ -574,10 +575,21 @@ export class CasesService {
       throw new BadRequestException('Case note is not a valid AI draft');
     }
 
+    const config = getAgencyConfig();
     const { templateGroup, draftTitle, draftBody } = identifyTemplateGroup(note.content);
-    const doc = buildDocxDocument(templateGroup, draftTitle, draftBody);
+    const doc = buildDocxDocument(templateGroup, draftTitle, draftBody, config);
 
     const buffer = await Packer.toBuffer(doc);
+
+    const auditPayload = {
+      action: 'EXPORT_DOCX',
+      caseId: id,
+      noteId,
+      fileType: 'docx',
+      templateGroup,
+      agencyConfigApplied: config.isConfigured,
+      missingConfigs: config.missingFields,
+    };
 
     await this.prisma.aiAuditLog.create({
       data: {
@@ -588,8 +600,8 @@ export class CasesService {
         promptTokens: 0,
         completionTokens: 0,
         latencyMs: 0,
-        inputPayload: { action: 'EXPORT_DOCX', caseId: id, noteId, fileType: 'docx', templateGroup },
-        outputPayload: { action: 'EXPORT_DOCX', caseId: id, noteId, fileType: 'docx', templateGroup },
+        inputPayload: auditPayload,
+        outputPayload: auditPayload,
         status: AiLogStatus.SUCCESS,
         userFeedback: AiFeedbackStatus.ACCEPTED,
       },
