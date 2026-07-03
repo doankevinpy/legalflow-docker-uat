@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: legalflow_postgres_uat
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_STRONG_PASS}
+      POSTGRES_DB: ${POSTGRES_DB:-legalflow_uat}
+    # KHÔNG expose ra host public (0.0.0.0:5432). Chỉ giao tiếp trong mạng nội bộ docker.
+    expose:
+      - "5432"
+    volumes:
+      - postgres_uat_data:/var/lib/postgresql/data
+    networks:
+      - legalflow_uat_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-legalflow_uat}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: legalflow_minio_uat
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-CHANGE_ME_STRONG_MINIO_PASS}
+    command: server /data --console-address ":9001"
+    # KHÔNG expose MinIO console/API ra host public. Chỉ giao tiếp trong mạng nội bộ docker.
+    expose:
+      - "9000"
+      - "9001"
+    volumes:
+      - minio_uat_data:/data
+    networks:
+      - legalflow_uat_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  backend:
+    build:
+      context: ./legalflow-backend
+      dockerfile: Dockerfile
+    container_name: legalflow_backend_uat
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_VERY_STRONG_JWT_SECRET_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://uat-legalflow.example.com}
+      HOST: 0.0.0.0
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-CHANGE_ME_STRONG_MINIO_PASS}
+      MINIO_BUCKET: ${MINIO_BUCKET:-legalflow-documents}
+      MINIO_USE_SSL: "false"
+      # Phase 5C Agency Config variables
+      AGENCY_PARENT_NAME: ${AGENCY_PARENT_NAME}
+      AGENCY_NAME: ${AGENCY_NAME}
+      AGENCY_LOCATION: ${AGENCY_LOCATION}
+      AGENCY_SIGNER_TITLE: ${AGENCY_SIGNER_TITLE}
+      AGENCY_SIGNER_NAME: ${AGENCY_SIGNER_NAME}
+      AGENCY_DOC_PREFIX: ${AGENCY_DOC_PREFIX}
+      AGENCY_DEFAULT_RECIPIENTS: ${AGENCY_DEFAULT_RECIPIENTS}
+    expose:
+      - "3000"
+    networks:
+      - legalflow_uat_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_URL:-/api}
+        VITE_APP_ENV_LABEL: UAT
+        VITE_APP_VERSION: v2.3.9-uat
+    container_name: legalflow_frontend_uat
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - legalflow_uat_network
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: legalflow_caddy_proxy_uat
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.uat:/etc/caddy/Caddyfile:ro
+      - caddy_uat_data:/data
+      - caddy_uat_config:/config
+    networks:
+      - legalflow_uat_network
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_uat_data:
+  minio_uat_data:
+  caddy_uat_data:
+  caddy_uat_config:
+
+networks:
+  legalflow_uat_network:
+    name: legalflow_uat_network
+    driver: bridge

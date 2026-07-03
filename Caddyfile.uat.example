@@ -1,0 +1,30 @@
+# Caddyfile.uat.example
+# Thay thế uat-legalflow.example.com bằng domain thật của bạn khi sao chép sang tệp Caddyfile.uat
+
+uat-legalflow.example.com {
+    # Cấu hình nén zstd / gzip
+    encode gzip zstd
+
+    # Chặn truy cập trực tiếp vào endpoints nhạy cảm nếu có
+    handle /api/metrics* {
+        respond 403
+    }
+
+    # Reverse proxy cho Backend NestJS API (định tuyến path /api/*)
+    handle_path /api/* {
+        reverse_proxy backend:3000
+    }
+
+    # Reverse proxy cho Frontend Single Page Application (chạy trong container frontend ở cổng 8080)
+    handle /* {
+        reverse_proxy frontend:8080
+    }
+
+    # Cấu hình bảo mật HTTP Headers cơ bản cho môi trường UAT
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+}
