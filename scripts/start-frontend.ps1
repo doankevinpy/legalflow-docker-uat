@@ -13,5 +13,5 @@ if (-not (Test-Path ".env.local")) {
     }
 }
 
-Write-Host "`nStarting Frontend Development Server on http://localhost:5173 ..." -ForegroundColor Green
-npm run dev
+Write-Host "`nStarting Frontend Development Server on http://localhost:5173 & http://kevindoan-legalflow.local:5173 ..." -ForegroundColor Green
+npm run dev -- --host 0.0.0.0 --port 5173

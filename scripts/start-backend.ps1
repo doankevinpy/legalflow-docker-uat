@@ -26,5 +26,6 @@ try {
     Write-Warning "Prisma migrate deploy threw an warning/error. Ensure Docker Postgres is running."
 }
 
-Write-Host "`nStarting Backend Development Server on http://localhost:3000 ..." -ForegroundColor Green
+Write-Host "`nStarting Backend Development Server on http://0.0.0.0:3000 ..." -ForegroundColor Green
+$env:HOST = "0.0.0.0"
 npm run start:dev

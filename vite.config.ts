@@ -11,4 +11,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    allowedHosts: [
+      'kevindoan-legalflow.local',
+      'localhost',
+      '127.0.0.1',
+    ],
+  },
+  preview: {
+    allowedHosts: [
+      'kevindoan-legalflow.local',
+      'localhost',
+      '127.0.0.1',
+    ],
+  },
 })

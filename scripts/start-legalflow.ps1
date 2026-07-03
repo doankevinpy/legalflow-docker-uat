@@ -34,7 +34,8 @@ Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", 
 Write-Host "`n=================================================" -ForegroundColor Green
 Write-Host "          LEGALFLOW IS LAUNCHING!" -ForegroundColor Green
 Write-Host "=================================================" -ForegroundColor Green
-Write-Host "-> Frontend Dashboard : http://localhost:5173" -ForegroundColor White
-Write-Host "-> Backend API Server : http://localhost:3000" -ForegroundColor White
-Write-Host "-> MinIO Console      : http://localhost:9001" -ForegroundColor White
+Write-Host "-> Main Portal (Caddy): http://kevindoan-legalflow.local:8080" -ForegroundColor Cyan
+Write-Host "-> Frontend Dev Server: http://kevindoan-legalflow.local:5173" -ForegroundColor White
+Write-Host "-> Backend API Server : http://kevindoan-legalflow.local:3000" -ForegroundColor White
+Write-Host "-> MinIO Storage Console: http://localhost:9001" -ForegroundColor White
 Write-Host "=================================================" -ForegroundColor Green

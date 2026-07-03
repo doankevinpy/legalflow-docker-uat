@@ -25,7 +25,7 @@ async function bootstrap() {
 
   const frontendOriginStr = configService.get<string>(
     'FRONTEND_ORIGIN',
-    'http://localhost:5173',
+    'http://localhost:5173,http://127.0.0.1:5173,http://kevindoan-legalflow.local:5173',
   );
 
   // Xử lý origin thành mảng
@@ -33,6 +33,21 @@ async function bootstrap() {
     .split(',')
     .map((o) => o.trim())
     .filter((o) => o && o !== '*');
+
+  // Luôn cho phép các origin local dev chuẩn (localhost, 127.0.0.1, kevindoan-legalflow.local cho cả port 5173 và 8080)
+  const defaultLocalOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://kevindoan-legalflow.local:5173',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://kevindoan-legalflow.local:8080',
+  ];
+  for (const origin of defaultLocalOrigins) {
+    if (!allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin);
+    }
+  }
 
   if (frontendOriginStr.includes('*')) {
     console.warn(
