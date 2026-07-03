@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import {
   ArrowLeft, CheckSquare, Clock, FileText, Info, Trash2, CalendarClock,
-  Loader2, Send, AlertCircle, Sparkles, FileEdit, Download,
+  Loader2, Send, AlertCircle, Sparkles, FileEdit, Download, Printer,
 } from 'lucide-react';
 import { getDeadlineStatus } from '../utils/deadline';
 import { casesApi } from '../lib/casesApi';
@@ -21,6 +21,7 @@ import type { ApiCase } from '../lib/api-types';
 import { DocumentUpload } from '../components/documents/DocumentUpload';
 import { LandProfileTab } from '../components/cases/LandProfileTab';
 import { AiAssistantWidget } from '../components/cases/AiAssistantWidget';
+import { AiDraftPrintModal } from '../components/AiDraftPrintModal';
 
 export default function CaseDetail() {
   const { id }      = useParams<{ id: string }>();
@@ -37,6 +38,10 @@ export default function CaseDetail() {
   const [noteInput, setNoteInput] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [exportingNoteId, setExportingNoteId] = useState<string | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewingNoteId, setPreviewingNoteId] = useState<string | null>(null);
+  const [activeNoteIdForModal, setActiveNoteIdForModal] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -319,6 +324,21 @@ export default function CaseDetail() {
       alert(err instanceof ApiError ? err.message : 'Không thể xuất file Word');
     } finally {
       setExportingNoteId(null);
+    }
+  };
+
+  const handlePreviewPdf = async (noteId: string) => {
+    if (!currentCase) return;
+    try {
+      setPreviewingNoteId(noteId);
+      setActiveNoteIdForModal(noteId);
+      const data = await casesApi.getDraftPreviewData(currentCase.id, noteId);
+      setPreviewData(data);
+      setPreviewModalOpen(true);
+    } catch (err: any) {
+      alert(err instanceof ApiError ? err.message : 'Không thể xem trước bản nháp PDF');
+    } finally {
+      setPreviewingNoteId(null);
     }
   };
 
@@ -608,16 +628,28 @@ export default function CaseDetail() {
                             {note.user?.fullName ?? 'Người dùng'} – {format(new Date(note.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })}
                           </p>
                           {isAiDraft && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs flex items-center gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                              onClick={() => handleExportDocx(note.id)}
-                              disabled={isExporting}
-                            >
-                              {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                              <span>📄 Tải Word (.docx)</span>
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs flex items-center gap-1 text-slate-700 border-slate-300 hover:bg-slate-100 shadow-sm"
+                                onClick={() => handlePreviewPdf(note.id)}
+                                disabled={previewingNoteId === note.id || isExporting}
+                              >
+                                {previewingNoteId === note.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Printer className="h-3 w-3 text-amber-600" />}
+                                <span>🖨️ Xem & In PDF</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs flex items-center gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50 shadow-sm"
+                                onClick={() => handleExportDocx(note.id)}
+                                disabled={isExporting || previewingNoteId === note.id}
+                              >
+                                {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                                <span>📄 Tải Word (.docx)</span>
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -960,6 +992,17 @@ export default function CaseDetail() {
           </div>
         </div>
       </div>
+
+      <AiDraftPrintModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        previewData={previewData}
+        onDownloadWord={() => {
+          if (activeNoteIdForModal) {
+            handleExportDocx(activeNoteIdForModal);
+          }
+        }}
+      />
     </div>
   );
 }

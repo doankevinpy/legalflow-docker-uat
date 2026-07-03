@@ -60,6 +60,47 @@ function formatLineToParagraph(line: string): Paragraph {
   });
 }
 
+export function cleanDraftBodyLines(draftTitle: string, draftBody: string): string[] {
+  const rawLines = draftBody.split('\n');
+  const ignorePatterns = [
+    /BẢN NHÁP AI/i,
+    /Cán bộ phải kiểm tra/i,
+    /^CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM$/i,
+    /^Độc lập - Tự do - Hạnh phúc$/i,
+    /^-------------------$/,
+    /^PHIẾU ĐỀ XUẤT XỬ LÝ ĐƠN$/i,
+    /^GIẤY MỜI LÀM VIỆC$/i,
+    /^THÔNG BÁO$/i,
+    /^CONG VĂN$/i,
+    /^CÔNG VĂN$/i,
+    /^Nơi nhận:?$/i,
+    /^- Như trên;?$/i,
+    /^- Lưu: VT, Hồ sơ\.?$/i,
+    /^CÁN BỘ THỤ LÝ$/i,
+    /^\(Ký, ghi rõ họ tên\)$/i,
+  ];
+
+  const cleaned: string[] = [];
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      cleaned.push('');
+      continue;
+    }
+    if (trimmed.toUpperCase() === draftTitle.toUpperCase()) continue;
+    let shouldIgnore = false;
+    for (const pat of ignorePatterns) {
+      if (pat.test(trimmed)) {
+        shouldIgnore = true;
+        break;
+      }
+    }
+    if (shouldIgnore) continue;
+    cleaned.push(line);
+  }
+  return cleaned;
+}
+
 export function buildDocxDocument(
   templateGroup: TemplateGroup,
   draftTitle: string,
@@ -316,44 +357,14 @@ export function buildDocxDocument(
   }
 
   // 4. Body Paragraphs cleaning and parsing
-  const rawLines = draftBody.split('\n');
-  const ignorePatterns = [
-    /BẢN NHÁP AI/i,
-    /Cán bộ phải kiểm tra/i,
-    /^CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM$/i,
-    /^Độc lập - Tự do - Hạnh phúc$/i,
-    /^-------------------$/,
-    /^PHIẾU ĐỀ XUẤT XỬ LÝ ĐƠN$/i,
-    /^GIẤY MỜI LÀM VIỆC$/i,
-    /^THÔNG BÁO$/i,
-    /^CONG VĂN$/i,
-    /^CÔNG VĂN$/i,
-    /^Nơi nhận:?$/i,
-    /^- Như trên;?$/i,
-    /^- Lưu: VT, Hồ sơ\.?$/i,
-    /^CÁN BỘ THỤ LÝ$/i,
-    /^\(Ký, ghi rõ họ tên\)$/i,
-  ];
-
+  const cleanedLines = cleanDraftBodyLines(draftTitle, draftBody);
   const bodyParagraphs: Paragraph[] = [];
-  for (const line of rawLines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
+  for (const line of cleanedLines) {
+    if (!line.trim()) {
       bodyParagraphs.push(new Paragraph({ spacing: { after: 120 } }));
-      continue;
+    } else {
+      bodyParagraphs.push(formatLineToParagraph(line));
     }
-
-    if (trimmed.toUpperCase() === draftTitle.toUpperCase()) continue;
-    let shouldIgnore = false;
-    for (const pat of ignorePatterns) {
-      if (pat.test(trimmed)) {
-        shouldIgnore = true;
-        break;
-      }
-    }
-    if (shouldIgnore) continue;
-
-    bodyParagraphs.push(formatLineToParagraph(line));
   }
 
   // 5. Footer Signature Table Left Cell

@@ -86,6 +86,11 @@ export const casesApi = {
   exportDocx: (id: string, noteId: string) =>
     apiClient.downloadBlob(`/cases/${id}/notes/${noteId}/export-docx`),
 
+  /** GET /cases/:id/notes/:noteId/preview-data */
+  getDraftPreviewData: (id: string, noteId: string) =>
+    apiClient.get<any>(`/cases/${id}/notes/${noteId}/preview-data`),
+
+
   /** POST /ai/summarize */
   aiSummarize: (text: string, caseId?: string) =>
     apiClient.post<AiSummarizeResponse>('/ai/summarize', { text, caseId }),

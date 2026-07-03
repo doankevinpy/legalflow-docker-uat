@@ -144,4 +144,15 @@ export class CasesController {
     });
     return new StreamableFile(buffer);
   }
+
+  @Get(':id/notes/:noteId/preview-data')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  async getDraftPreviewData(
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @Request() req: any,
+  ) {
+    return this.casesService.getDraftPreviewData(id, noteId, req.user);
+  }
 }
+

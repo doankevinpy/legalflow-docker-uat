@@ -18,7 +18,7 @@ import { CaseHistoryAction, CaseField, CaseStatus } from './enums/case.enum';
 import { Role } from '../common/role.enum';
 import { Prisma, AiActionType, AiLogStatus, AiFeedbackStatus } from '@prisma/client';
 import { Packer } from 'docx';
-import { identifyTemplateGroup, buildDocxDocument } from './docx-templates.helper';
+import { identifyTemplateGroup, buildDocxDocument, cleanDraftBodyLines } from './docx-templates.helper';
 import { getAgencyConfig } from '../config/agency.config';
 
 @Injectable()
@@ -610,4 +610,55 @@ export class CasesService {
     const filename = `Ban_Nhap_AI_${caseObj.caseCode || id}.docx`;
     return { buffer, filename };
   }
+
+  async getDraftPreviewData(id: string, noteId: string, user: any) {
+    const caseObj = await this.findOneInternal(id);
+    this.checkStaffAccess(caseObj, user);
+
+    const note = (caseObj.notes || []).find((n: any) => n.id === noteId);
+    if (!note || !note.content || !note.content.startsWith('[AI Dự thảo -')) {
+      throw new BadRequestException('Case note is not a valid AI draft');
+    }
+
+    const config = getAgencyConfig();
+    const { templateGroup, draftTitle, draftBody } = identifyTemplateGroup(note.content);
+    const cleanedLines = cleanDraftBodyLines(draftTitle, draftBody);
+
+    const auditPayload = {
+      action: 'EXPORT_PDF_PREVIEW',
+      caseId: id,
+      noteId,
+      fileType: 'pdf_preview',
+      templateGroup,
+      agencyConfigApplied: config.isConfigured,
+      missingConfigs: config.missingFields,
+    };
+
+    await this.prisma.aiAuditLog.create({
+      data: {
+        userId: user.id,
+        caseId: id,
+        actionType: AiActionType.DRAFT,
+        modelName: 'System-Pdf-Preview-Exporter',
+        promptTokens: 0,
+        completionTokens: 0,
+        latencyMs: 0,
+        inputPayload: auditPayload,
+        outputPayload: auditPayload,
+        status: AiLogStatus.SUCCESS,
+        userFeedback: AiFeedbackStatus.ACCEPTED,
+      },
+    });
+
+    return {
+      caseCode: caseObj.caseCode || id,
+      templateGroup,
+      draftTitle,
+      cleanedLines,
+      agencyConfig: config,
+      warningBanner: '⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH',
+      warningDisclaimer: 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng.',
+    };
+  }
 }
+
