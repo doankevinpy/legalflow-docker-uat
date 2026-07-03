@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const routeNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/cases': 'Danh sách hồ sơ',
+  '/procedure-cases': 'Hồ sơ Thủ tục Hành chính',
   '/cases/new': 'Tạo hồ sơ mới',
   '/drafts': 'Dự thảo văn bản',
   '/anonymizer': 'Công cụ Ẩn danh',
@@ -37,6 +38,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   if (!title) {
     if (location.pathname.startsWith('/cases/')) {
       title = 'Chi tiết hồ sơ';
+    } else if (location.pathname.startsWith('/procedure-cases/')) {
+      title = 'Chi tiết hồ sơ TTHC';
     } else {
       title = 'LegalFlow';
     }

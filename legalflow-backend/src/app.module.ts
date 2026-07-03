@@ -14,6 +14,7 @@ import { CustomThrottlerGuard } from './common/custom-throttler.guard';
 import { MetricsModule } from './metrics/metrics.module';
 import { LandProfileModule } from './land-profile/land-profile.module';
 import { AiModule } from './ai/ai.module';
+import { AdministrativeProceduresModule } from './administrative-procedures/administrative-procedures.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AiModule } from './ai/ai.module';
     MetricsModule,
     LandProfileModule,
     AiModule,
+    AdministrativeProceduresModule,
   ],
   controllers: [],
   providers: [

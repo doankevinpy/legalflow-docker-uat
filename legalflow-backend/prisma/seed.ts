@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { PrismaClient, Role, Prisma } from '@prisma/client';
+import { PrismaClient, Role, ProcedureField, ProcedureGroup } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +11,59 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+
+async function seedProcedureTypes() {
+  console.log('--- Seeding ProcedureTypes ---');
+  const types = [
+    {
+      code: 'LAND_FIRST_CERTIFICATE',
+      name: 'Cấp Giấy chứng nhận quyền sử dụng đất lần đầu',
+      field: ProcedureField.DAT_DAI,
+      group: ProcedureGroup.CAP_GCN_LAN_DAU,
+      description: 'Thủ tục cấp GCN QSDĐ lần đầu đối với đất hộ gia đình, cá nhân',
+      processingTimeDays: 30,
+    },
+    {
+      code: 'LAND_USE_PURPOSE_CHANGE',
+      name: 'Chuyển mục đích sử dụng đất',
+      field: ProcedureField.DAT_DAI,
+      group: ProcedureGroup.CHUYEN_MUC_DICH_SDD,
+      description: 'Thủ tục chuyển mục đích sử dụng đất sang đất ở hoặc đất phi nông nghiệp',
+      processingTimeDays: 15,
+    },
+    {
+      code: 'LAND_FINANCIAL_OBLIGATION_REVIEW',
+      name: 'Kiểm tra nghĩa vụ tài chính / tiền sử dụng đất',
+      field: ProcedureField.DAT_DAI,
+      group: ProcedureGroup.NGHIA_VU_TAI_CHINH,
+      description: 'Thẩm tra hồ sơ xác định tiền sử dụng đất, lệ phí trước bạ',
+      processingTimeDays: 10,
+    },
+    {
+      code: 'CONSTRUCTION_PERMIT',
+      name: 'Cấp giấy phép xây dựng công trình',
+      field: ProcedureField.XAY_DUNG,
+      group: ProcedureGroup.CAP_PHEP_XAY_DUNG,
+      description: 'Cấp mới giấy phép xây dựng nhà ở riêng lẻ hoặc công trình xây dựng',
+      processingTimeDays: 20,
+    },
+  ];
+
+  for (const t of types) {
+    await prisma.procedureType.upsert({
+      where: { code: t.code },
+      update: {
+        name: t.name,
+        field: t.field,
+        group: t.group,
+        description: t.description,
+        processingTimeDays: t.processingTimeDays,
+      },
+      create: t,
+    });
+    console.log(`Upserted ProcedureType: ${t.code}`);
+  }
+}
 
 async function seedCore() {
   console.log('--- Starting Core Seed ---');
@@ -44,6 +97,7 @@ async function seedCore() {
   });
 
   console.log(`Core seed completed. Admin email: ${admin.email}`);
+  await seedProcedureTypes();
 }
 
 async function seedMock() {

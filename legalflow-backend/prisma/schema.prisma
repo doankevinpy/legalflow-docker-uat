@@ -69,6 +69,12 @@ model User {
   caseHistories           CaseHistory[]
   completedChecklistItems CaseChecklistItem[]
   aiAuditLogs             AiAuditLog[]
+
+  assignedProcedureCases           AdministrativeProcedureCase[] @relation("AssignedProcedureCases")
+  createdProcedureCases            AdministrativeProcedureCase[] @relation("CreatedProcedureCases")
+  completedProcedureChecklistItems ProcedureChecklistItem[]      @relation("CompletedProcedureChecklistItems")
+  procedureNotes                   ProcedureNote[]               @relation("ProcedureNotes")
+  procedureAuditLogs               ProcedureAuditLog[]           @relation("ProcedureAuditLogs")
 }
 
 model LegalCase {
@@ -352,3 +358,170 @@ model AiCaseSuggestion {
 
   @@index([isApplied])
 }
+
+enum ProcedureField {
+  DAT_DAI
+  XAY_DUNG
+  KHAC
+}
+
+enum ProcedureGroup {
+  CAP_GCN_LAN_DAU
+  CHUYEN_MUC_DICH_SDD
+  NGHIA_VU_TAI_CHINH
+  CAP_PHEP_XAY_DUNG
+  KHAC
+}
+
+enum ProcedureStatus {
+  SUBMITTED
+  IN_REVIEW
+  SUPPLEMENT_REQUIRED
+  PENDING_APPROVAL
+  COMPLETED
+  REJECTED
+}
+
+enum ProcedureDocReviewStatus {
+  VALID
+  MISSING
+  NEEDS_VERIFICATION
+}
+
+enum ProcedurePriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ProcedureNoteType {
+  GENERAL
+  OFFICER_REVIEW
+  FIELD_INSPECTION
+}
+
+model ProcedureType {
+  id                 String         @id @default(uuid())
+  code               String         @unique
+  name               String
+  field              ProcedureField
+  group              ProcedureGroup
+  description        String?
+  legalBasis         String?
+  requiredDocuments  Json           @default("[]")
+  processingTimeDays Int            @default(15)
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  procedureCases     AdministrativeProcedureCase[]
+
+  @@index([field])
+  @@index([group])
+  @@index([isActive])
+}
+
+model AdministrativeProcedureCase {
+  id                  String           @id @default(uuid())
+  caseCode            String           @unique
+  procedureTypeId     String
+  procedureType       ProcedureType    @relation(fields: [procedureTypeId], references: [id], onDelete: Restrict)
+  field               ProcedureField
+  applicantName       String
+  applicantAddress    String?
+  applicantPhone      String?
+  landParcelSummary   Json?
+  constructionSummary Json?
+  status              ProcedureStatus  @default(SUBMITTED)
+  receivedAt          DateTime         @default(now())
+  dueDate             DateTime?
+  assignedToId        String?
+  assignedTo          User?            @relation("AssignedProcedureCases", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdById         String?
+  createdBy           User?            @relation("CreatedProcedureCases", fields: [createdById], references: [id], onDelete: SetNull)
+  notes               String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  documents           ProcedureDocument[]
+  checklistItems      ProcedureChecklistItem[]
+  procedureNotes      ProcedureNote[]
+  auditLogs           ProcedureAuditLog[]
+
+  @@index([procedureTypeId])
+  @@index([field])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([createdAt])
+}
+
+model ProcedureDocument {
+  id              String                      @id @default(uuid())
+  procedureCaseId String
+  procedureCase   AdministrativeProcedureCase @relation(fields: [procedureCaseId], references: [id], onDelete: Cascade)
+  documentType    String
+  title           String
+  fileUrl         String?
+  objectKey       String?
+  extractedText   String?
+  reviewStatus    ProcedureDocReviewStatus    @default(NEEDS_VERIFICATION)
+  officerNote     String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([procedureCaseId])
+}
+
+model ProcedureChecklistItem {
+  id              String                      @id @default(uuid())
+  procedureCaseId String
+  procedureCase   AdministrativeProcedureCase @relation(fields: [procedureCaseId], references: [id], onDelete: Cascade)
+  checklistGroup  String
+  title           String
+  description     String?
+  priority        ProcedurePriority           @default(MEDIUM)
+  isCompleted     Boolean                     @default(false)
+  completedById   String?
+  completedBy     User?                       @relation("CompletedProcedureChecklistItems", fields: [completedById], references: [id], onDelete: SetNull)
+  completedAt     DateTime?
+  isAiSuggested   Boolean                     @default(false)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([procedureCaseId])
+  @@index([isCompleted])
+}
+
+model ProcedureNote {
+  id              String                      @id @default(uuid())
+  procedureCaseId String
+  procedureCase   AdministrativeProcedureCase @relation(fields: [procedureCaseId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User                        @relation("ProcedureNotes", fields: [userId], references: [id], onDelete: Cascade)
+  content         String
+  noteType        ProcedureNoteType           @default(GENERAL)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([procedureCaseId])
+  @@index([userId])
+}
+
+model ProcedureAuditLog {
+  id              String                       @id @default(uuid())
+  procedureCaseId String?
+  procedureCase   AdministrativeProcedureCase? @relation(fields: [procedureCaseId], references: [id], onDelete: SetNull)
+  userId          String
+  user            User                         @relation("ProcedureAuditLogs", fields: [userId], references: [id], onDelete: Cascade)
+  actionType      String
+  entityType      String
+  entityId        String?
+  inputPayload    Json                         @default("{}")
+  outputPayload   Json                         @default("{}")
+  createdAt       DateTime                     @default(now())
+
+  @@index([procedureCaseId])
+  @@index([userId])
+  @@index([actionType])
+}
+

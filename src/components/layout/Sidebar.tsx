@@ -26,6 +26,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const navigation = [
     { name: 'Dashboard',         href: '/dashboard',  icon: LayoutDashboard, show: true },
     { name: 'Danh sách hồ sơ',  href: '/cases',      icon: FolderOpen,      show: true },
+    { name: 'Thẩm tra TTHC',     href: '/procedure-cases', icon: FileText,   show: true },
     { name: 'Tạo mới',          href: '/cases/new',  icon: PlusCircle,      show: canCreate(role) },
     { name: 'Dự thảo văn bản',  href: '/drafts',     icon: FileText,        show: true },
     { name: 'Công cụ Ẩn danh',  href: '/anonymizer', icon: Shield,          show: true },

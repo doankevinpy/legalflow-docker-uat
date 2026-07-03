@@ -16,6 +16,8 @@ import UserManagement from './pages/UserManagement';
 import AuditLogs from './pages/AuditLogs';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import NotFound from './pages/NotFound';
+import ProcedureCaseList from './pages/ProcedureCaseList';
+import ProcedureCaseDetail from './pages/ProcedureCaseDetail';
 
 function App() {
   return (
@@ -37,6 +39,8 @@ function App() {
                     <Route path="/cases" element={<CaseList />} />
                     <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'STAFF']}><NewCase /></ProtectedRoute>} />
                     <Route path="/cases/:id" element={<CaseDetail />} />
+                    <Route path="/procedure-cases" element={<ProcedureCaseList />} />
+                    <Route path="/procedure-cases/:id" element={<ProcedureCaseDetail />} />
                     <Route path="/drafts" element={<Drafts />} />
                     <Route path="/anonymizer" element={<Anonymizer />} />
                     <Route path="/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><UserManagement /></ProtectedRoute>} />
