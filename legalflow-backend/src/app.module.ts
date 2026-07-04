@@ -15,6 +15,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { LandProfileModule } from './land-profile/land-profile.module';
 import { AiModule } from './ai/ai.module';
 import { AdministrativeProceduresModule } from './administrative-procedures/administrative-procedures.module';
+import { LegalKnowledgeModule } from './legal-knowledge/legal-knowledge.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AdministrativeProceduresModule } from './administrative-procedures/admi
     LandProfileModule,
     AiModule,
     AdministrativeProceduresModule,
+    LegalKnowledgeModule,
   ],
   controllers: [],
   providers: [

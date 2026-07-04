@@ -77,6 +77,12 @@ model User {
   procedureAuditLogs               ProcedureAuditLog[]           @relation("ProcedureAuditLogs")
   createdProcedureAiAnalyses       ProcedureAiAnalysis[]         @relation("CreatedProcedureAiAnalyses")
   reviewedProcedureAiAnalyses      ProcedureAiAnalysis[]         @relation("ReviewedProcedureAiAnalyses")
+  createdLegalDocuments            LegalDocument[]               @relation("LegalDocumentCreatedBy")
+  approvedLegalDocuments           LegalDocument[]               @relation("LegalDocumentApprovedBy")
+  approvedProcedureTypeVersions    ProcedureTypeVersion[]        @relation("ProcedureTypeVersionApprovedBy")
+  approvedAiPromptVersions         AiPromptVersion[]             @relation("AiPromptVersionApprovedBy")
+  approvedChecklistVersions        ChecklistVersion[]            @relation("ChecklistVersionApprovedBy")
+  reviewedLegalUpdateLogs          LegalUpdateLog[]              @relation("LegalUpdateLogReviewedBy")
 }
 
 model LegalCase {
@@ -417,6 +423,7 @@ model ProcedureType {
   updatedAt          DateTime       @updatedAt
 
   procedureCases     AdministrativeProcedureCase[]
+  versions           ProcedureTypeVersion[]
 
   @@index([field])
   @@index([group])
@@ -556,12 +563,243 @@ model ProcedureAiAnalysis {
   reviewedById    String?
   reviewedBy      User?                       @relation("ReviewedProcedureAiAnalyses", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt      DateTime?
-  createdAt       DateTime                    @default(now())
-  updatedAt       DateTime                    @updatedAt
+  createdAt       DateTime                          @default(now())
+  updatedAt       DateTime                          @updatedAt
+  legalSnapshot   ProcedureAiAnalysisLegalSnapshot?
 
   @@index([procedureCaseId])
   @@index([analysisType])
   @@index([status])
   @@index([createdById])
 }
+
+enum LegalDocumentType {
+  LAW
+  DECREE
+  CIRCULAR
+  DECISION
+  INTERNAL_PROCESS
+  LAND_PRICE_TABLE
+  OTHER
+}
+
+enum LegalDocumentStatus {
+  DRAFT
+  ACTIVE
+  AMENDED
+  EXPIRED
+  REPLACED
+  ARCHIVED
+}
+
+enum LegalDocumentRelationType {
+  AMENDS
+  REPLACES
+  GUIDES
+  ANNULS
+  REFERENCES
+  IMPLEMENTS
+}
+
+enum VersionStatus {
+  DRAFT
+  REVIEWING
+  APPROVED
+  ACTIVE
+  ARCHIVED
+  EXPIRED
+  REPLACED
+}
+
+enum LegalUpdateReviewStatus {
+  PENDING
+  REVIEWING
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+model LegalDocument {
+  id               String              @id @default(cuid())
+  documentCode     String
+  documentTitle    String
+  documentType     LegalDocumentType
+  issuingAuthority String?
+  issuedDate       DateTime?
+  effectiveFrom    DateTime?
+  effectiveTo      DateTime?
+  status           LegalDocumentStatus @default(DRAFT)
+  sourceUrl        String?
+  fileObjectKey    String?
+  summary          String?
+  notes            String?
+  createdById      String?
+  approvedById     String?
+  approvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  createdBy         User?                   @relation("LegalDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy        User?                   @relation("LegalDocumentApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  outgoingRelations LegalDocumentRelation[] @relation("SourceDocument")
+  incomingRelations LegalDocumentRelation[] @relation("TargetDocument")
+  updateLogs        LegalUpdateLog[]        @relation("SourceDocumentForUpdateLog")
+
+  @@index([documentCode])
+  @@index([documentType])
+  @@index([status])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+}
+
+model LegalDocumentRelation {
+  id                String                    @id @default(cuid())
+  documentId        String
+  relatedDocumentId String
+  relationType      LegalDocumentRelationType
+  description       String?
+  effectiveFrom     DateTime?
+  createdAt         DateTime                  @default(now())
+
+  document        LegalDocument @relation("SourceDocument", fields: [documentId], references: [id], onDelete: Cascade)
+  relatedDocument LegalDocument @relation("TargetDocument", fields: [relatedDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([relatedDocumentId])
+  @@index([relationType])
+}
+
+model ProcedureTypeVersion {
+  id                    String        @id @default(cuid())
+  procedureTypeId       String
+  version               String
+  effectiveFrom         DateTime?
+  effectiveTo           DateTime?
+  status                VersionStatus @default(DRAFT)
+  procedureName         String
+  procedureCode         String?
+  field                 String?
+  group                 String?
+  requiredDocuments     Json?
+  processingTimeDays    Int?
+  receivingAgency       String?
+  resolvingAgency       String?
+  workflowSteps         Json?
+  legalBasisDocumentIds Json?
+  approvedById          String?
+  approvedAt            DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  procedureType  ProcedureType                      @relation(fields: [procedureTypeId], references: [id], onDelete: Cascade)
+  approvedBy     User?                              @relation("ProcedureTypeVersionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  legalSnapshots ProcedureAiAnalysisLegalSnapshot[]
+
+  @@unique([procedureTypeId, version])
+  @@index([procedureTypeId])
+  @@index([status])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+}
+
+model AiPromptVersion {
+  id                String        @id @default(cuid())
+  promptKey         String
+  version           String
+  procedureTypeCode String?
+  procedureGroup    String?
+  analysisType      String?
+  systemPrompt      String
+  outputSchema      Json?
+  legalDocumentIds  Json?
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+  status            VersionStatus @default(DRAFT)
+  approvedById      String?
+  approvedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  approvedBy     User?                              @relation("AiPromptVersionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  legalSnapshots ProcedureAiAnalysisLegalSnapshot[]
+
+  @@unique([promptKey, version])
+  @@index([promptKey])
+  @@index([analysisType])
+  @@index([status])
+}
+
+model ChecklistVersion {
+  id                String        @id @default(cuid())
+  checklistKey      String
+  version           String
+  procedureTypeCode String?
+  procedureGroup    String?
+  checklistItems    Json
+  legalDocumentIds  Json?
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+  status            VersionStatus @default(DRAFT)
+  approvedById      String?
+  approvedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  approvedBy     User?                              @relation("ChecklistVersionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  legalSnapshots ProcedureAiAnalysisLegalSnapshot[]
+
+  @@unique([checklistKey, version])
+  @@index([checklistKey])
+  @@index([procedureTypeCode])
+  @@index([procedureGroup])
+  @@index([status])
+}
+
+model LegalUpdateLog {
+  id                     String                  @id @default(cuid())
+  updateTitle            String
+  sourceDocumentId       String?
+  affectedDocumentIds    Json?
+  affectedProcedureTypes Json?
+  affectedPromptKeys     Json?
+  affectedChecklistKeys  Json?
+  impactSummary          String?
+  reviewStatus           LegalUpdateReviewStatus @default(PENDING)
+  reviewedById           String?
+  reviewedAt             DateTime?
+  appliedAt              DateTime?
+  notes                  String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  sourceDocument LegalDocument? @relation("SourceDocumentForUpdateLog", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  reviewedBy     User?          @relation("LegalUpdateLogReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([sourceDocumentId])
+  @@index([reviewStatus])
+  @@index([createdAt])
+}
+
+model ProcedureAiAnalysisLegalSnapshot {
+  id                     String   @id @default(cuid())
+  procedureAiAnalysisId  String   @unique
+  legalDocumentIds       Json?
+  promptVersionId        String?
+  checklistVersionId     String?
+  procedureTypeVersionId String?
+  knowledgeBaseVersion   String?
+  snapshotJson           Json?
+  createdAt              DateTime @default(now())
+
+  procedureAiAnalysis  ProcedureAiAnalysis   @relation(fields: [procedureAiAnalysisId], references: [id], onDelete: Cascade)
+  promptVersion        AiPromptVersion?      @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  checklistVersion     ChecklistVersion?     @relation(fields: [checklistVersionId], references: [id], onDelete: SetNull)
+  procedureTypeVersion ProcedureTypeVersion? @relation(fields: [procedureTypeVersionId], references: [id], onDelete: SetNull)
+
+  @@index([procedureAiAnalysisId])
+  @@index([promptVersionId])
+  @@index([checklistVersionId])
+  @@index([procedureTypeVersionId])
+}
+
 
