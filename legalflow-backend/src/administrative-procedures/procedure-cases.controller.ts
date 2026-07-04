@@ -149,4 +149,33 @@ export class ProcedureCasesController {
   ) {
     return this.aiService.getReviewPreviewData(caseId, analysisId, req?.user?.id || req?.user?.userId);
   }
+
+  @Get(':id/ai-analyses/:analysisId/export-purpose-change-review-docx')
+  async exportPurposeChangeReviewDocx(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+    @Request() req: any,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    const { buffer, filename } = await this.aiService.exportPurposeChangeReviewDocx(
+      caseId,
+      analysisId,
+      req?.user?.id || req?.user?.userId,
+    );
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  @Get(':id/ai-analyses/:analysisId/purpose-change-review-preview-data')
+  async getPurposeChangeReviewPreviewData(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+    @Request() req: any,
+  ) {
+    return this.aiService.getPurposeChangeReviewPreviewData(caseId, analysisId, req?.user?.id || req?.user?.userId);
+  }
 }
+

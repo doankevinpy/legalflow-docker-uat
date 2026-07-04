@@ -77,4 +77,11 @@ export const procedureCasesApi = {
 
   getReviewPreviewData: (caseId: string, analysisId: string) =>
     apiClient.get<any>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/review-preview-data`),
+
+  exportPurposeChangeReviewDocx: (caseId: string, analysisId: string) =>
+    apiClient.downloadBlob(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/export-purpose-change-review-docx`),
+
+  getPurposeChangeReviewPreviewData: (caseId: string, analysisId: string) =>
+    apiClient.get<any>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/purpose-change-review-preview-data`),
 };
+

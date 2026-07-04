@@ -5,7 +5,7 @@ import { AI_PROVIDER_TOKEN } from '../../ai/interfaces/ai-provider.interface';
 import type { IAiProvider } from '../../ai/interfaces/ai-provider.interface';
 import { Packer } from 'docx';
 import { getAgencyConfig } from '../../config/agency.config';
-import { buildLandFirstCertReviewDocx } from './procedure-docx.helper';
+import { buildLandFirstCertReviewDocx, buildLandUsePurposeChangeReviewDocx } from './procedure-docx.helper';
 
 @Injectable()
 export class ProcedureAiService {
@@ -695,6 +695,7 @@ export class ProcedureAiService {
     });
 
     return {
+      analysisType: analysis.analysisType,
       caseCode: analysis.procedureCase.caseCode || caseId,
       procedureName: analysis.procedureCase.procedureType?.name || 'Cấp GCN quyền sử dụng đất lần đầu',
       applicantName: analysis.procedureCase.applicantName || '[Cán bộ bổ sung/kiểm tra]',
@@ -718,4 +719,127 @@ export class ProcedureAiService {
         'Cán bộ chuyên môn có trách nhiệm kiểm tra, đối chiếu hồ sơ gốc, căn cứ pháp luật, dữ liệu địa chính, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ trước khi tham mưu xử lý.',
     };
   }
+
+  async exportPurposeChangeReviewDocx(caseId: string, analysisId: string, userId?: string) {
+    const effectiveUserId = await this.resolveUserId(userId);
+
+    const analysis = await this.prisma.procedureAiAnalysis.findUnique({
+      where: { id: analysisId },
+      include: {
+        procedureCase: {
+          include: {
+            procedureType: true,
+            assignedTo: true,
+            documents: true,
+            checklistItems: true,
+            procedureNotes: true,
+          },
+        },
+      },
+    });
+
+    if (!analysis || analysis.procedureCaseId !== caseId) {
+      throw new NotFoundException('Không tìm thấy kết quả rà soát AI.');
+    }
+
+    if (analysis.analysisType !== 'LAND_USE_PURPOSE_CHANGE_REVIEW') {
+      throw new BadRequestException('Chức năng xuất phiếu rà soát chỉ áp dụng cho kết quả rà soát chuyển mục đích sử dụng đất.');
+    }
+
+    const procType = analysis.procedureCase?.procedureType;
+    if (!procType || (procType.code !== 'LAND_USE_PURPOSE_CHANGE' && procType.group !== 'CHUYEN_MUC_DICH_SDD')) {
+      throw new BadRequestException('Hồ sơ không thuộc thủ tục Chuyển mục đích sử dụng đất.');
+    }
+
+    const doc = buildLandUsePurposeChangeReviewDocx(analysis.procedureCase, analysis, getAgencyConfig());
+    const buffer = await Packer.toBuffer(doc);
+
+    const filename = `phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${analysis.procedureCase.caseCode || caseId}.docx`;
+
+    await this.prisma.procedureAuditLog.create({
+      data: {
+        procedureCaseId: caseId,
+        userId: effectiveUserId,
+        actionType: 'EXPORT_PURPOSE_CHANGE_REVIEW_DOCX',
+        entityType: 'ProcedureAiAnalysis',
+        entityId: analysisId,
+        inputPayload: { analysisType: analysis.analysisType },
+        outputPayload: { filename },
+      },
+    });
+
+    return { buffer, filename };
+  }
+
+  async getPurposeChangeReviewPreviewData(caseId: string, analysisId: string, userId?: string) {
+    const effectiveUserId = await this.resolveUserId(userId);
+
+    const analysis = await this.prisma.procedureAiAnalysis.findUnique({
+      where: { id: analysisId },
+      include: {
+        procedureCase: {
+          include: {
+            procedureType: true,
+            assignedTo: true,
+            documents: true,
+            checklistItems: true,
+            procedureNotes: true,
+          },
+        },
+      },
+    });
+
+    if (!analysis || analysis.procedureCaseId !== caseId) {
+      throw new NotFoundException('Không tìm thấy kết quả rà soát AI.');
+    }
+
+    if (analysis.analysisType !== 'LAND_USE_PURPOSE_CHANGE_REVIEW') {
+      throw new BadRequestException('Chức năng xuất phiếu rà soát chỉ áp dụng cho kết quả rà soát chuyển mục đích sử dụng đất.');
+    }
+
+    const procType = analysis.procedureCase?.procedureType;
+    if (!procType || (procType.code !== 'LAND_USE_PURPOSE_CHANGE' && procType.group !== 'CHUYEN_MUC_DICH_SDD')) {
+      throw new BadRequestException('Hồ sơ không thuộc thủ tục Chuyển mục đích sử dụng đất.');
+    }
+
+    const config = getAgencyConfig();
+
+    await this.prisma.procedureAuditLog.create({
+      data: {
+        procedureCaseId: caseId,
+        userId: effectiveUserId,
+        actionType: 'PURPOSE_CHANGE_REVIEW_PREVIEW_DATA',
+        entityType: 'ProcedureAiAnalysis',
+        entityId: analysisId,
+        inputPayload: { analysisType: analysis.analysisType },
+        outputPayload: { previewType: 'A4_BROWSER_PRINT' },
+      },
+    });
+
+    return {
+      analysisType: analysis.analysisType,
+      caseCode: analysis.procedureCase.caseCode || caseId,
+      procedureName: analysis.procedureCase.procedureType?.name || 'Chuyển mục đích sử dụng đất',
+      applicantName: analysis.procedureCase.applicantName || '[Cán bộ bổ sung/kiểm tra]',
+      applicantAddress: analysis.procedureCase.applicantAddress || '[Cán bộ bổ sung/kiểm tra]',
+      applicantPhone: analysis.procedureCase.applicantPhone || '[Cán bộ bổ sung/kiểm tra]',
+      receivedAt: analysis.procedureCase.receivedAt
+        ? new Date(analysis.procedureCase.receivedAt).toLocaleDateString('vi-VN')
+        : '[Cán bộ bổ sung/kiểm tra]',
+      dueDate: analysis.procedureCase.dueDate
+        ? new Date(analysis.procedureCase.dueDate).toLocaleDateString('vi-VN')
+        : '[Cán bộ bổ sung/kiểm tra]',
+      assignedToName: analysis.procedureCase.assignedTo?.fullName || '[Cán bộ bổ sung/kiểm tra]',
+      createdAt: new Date(analysis.createdAt).toLocaleString('vi-VN'),
+      confidenceLevel: analysis.confidenceLevel || 'MEDIUM',
+      outputPayload: analysis.outputPayload || {},
+      agencyConfig: config,
+      warningBanner: '⚠️ BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA',
+      warningDisclaimer:
+        'Phiếu này là tài liệu hỗ trợ rà soát nội bộ, không phải văn bản kết luận, không thay thế ý kiến thẩm tra của cán bộ chuyên môn và không phải văn bản phát hành cho công dân.',
+      officerResponsibility:
+        'Cán bộ chuyên môn có trách nhiệm kiểm tra, đối chiếu hồ sơ gốc, căn cứ pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có, dữ liệu địa chính, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ trước khi tham mưu xử lý.',
+    };
+  }
 }
+

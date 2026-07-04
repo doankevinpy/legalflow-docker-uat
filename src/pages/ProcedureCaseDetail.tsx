@@ -5,6 +5,7 @@ import type { ProcedureCase, ProcedureChecklistItem, ProcedureAiAnalysis } from 
 import { ApiError } from '../lib/apiClient';
 import { Printer, Download } from 'lucide-react';
 import { ProcedureReviewPrintModal } from '../components/ProcedureReviewPrintModal';
+import { PurposeChangeReviewPrintModal } from '../components/PurposeChangeReviewPrintModal';
 
 export default function ProcedureCaseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,7 @@ export default function ProcedureCaseDetail() {
 
   // Review Print/Export Modal State
   const [reviewPreviewModalOpen, setReviewPreviewModalOpen] = useState<boolean>(false);
+  const [purposeChangeReviewModalOpen, setPurposeChangeReviewModalOpen] = useState<boolean>(false);
   const [reviewPreviewData, setReviewPreviewData] = useState<any>(null);
   const [activeAnalysisIdForModal, setActiveAnalysisIdForModal] = useState<string | null>(null);
   const [exportingAnalysisId, setExportingAnalysisId] = useState<string | null>(null);
@@ -124,6 +126,42 @@ export default function ProcedureCaseDetail() {
       const resData = await procedureCasesApi.getReviewPreviewData(data.id, analysisId);
       setReviewPreviewData(resData);
       setReviewPreviewModalOpen(true);
+    } catch (err: any) {
+      alert(err instanceof ApiError ? err.message : 'Không thể xem trước phiếu rà soát PDF');
+    } finally {
+      setPreviewingAnalysisId(null);
+    }
+  };
+
+  const handleExportPurposeChangeReviewDocx = async (analysisId: string) => {
+    if (!data) return;
+    try {
+      setExportingAnalysisId(analysisId);
+      const { blob, filename } = await procedureCasesApi.exportPurposeChangeReviewDocx(data.id, analysisId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename || `phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${data.caseCode || data.id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      alert('Đã xuất Word (.docx) phiếu rà soát chuyển mục đích sử dụng đất thành công!');
+    } catch (err: any) {
+      alert(err instanceof ApiError ? err.message : 'Không thể xuất file Word phiếu rà soát');
+    } finally {
+      setExportingAnalysisId(null);
+    }
+  };
+
+  const handlePreviewPurposeChangeReviewPdf = async (analysisId: string) => {
+    if (!data) return;
+    try {
+      setPreviewingAnalysisId(analysisId);
+      setActiveAnalysisIdForModal(analysisId);
+      const resData = await procedureCasesApi.getPurposeChangeReviewPreviewData(data.id, analysisId);
+      setReviewPreviewData(resData);
+      setPurposeChangeReviewModalOpen(true);
     } catch (err: any) {
       alert(err instanceof ApiError ? err.message : 'Không thể xem trước phiếu rà soát PDF');
     } finally {
@@ -653,6 +691,25 @@ export default function ProcedureCaseDetail() {
                               {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
                             </button>
                           </div>
+                        ) : analysis.analysisType === 'LAND_USE_PURPOSE_CHANGE_REVIEW' ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => handleExportPurposeChangeReviewDocx(analysis.id)}
+                              disabled={exportingAnalysisId === analysis.id}
+                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                              {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
+                            </button>
+                            <button
+                              onClick={() => handlePreviewPurposeChangeReviewPdf(analysis.id)}
+                              disabled={previewingAnalysisId === analysis.id}
+                              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5" />
+                              {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
+                            </button>
+                          </div>
                         ) : (
                           <div className="text-xs text-slate-500 italic flex items-center gap-1.5">
                             <span>ℹ️</span>
@@ -860,6 +917,17 @@ export default function ProcedureCaseDetail() {
         onDownloadWord={() => {
           if (activeAnalysisIdForModal) {
             handleExportReviewDocx(activeAnalysisIdForModal);
+          }
+        }}
+      />
+
+      <PurposeChangeReviewPrintModal
+        isOpen={purposeChangeReviewModalOpen}
+        onClose={() => setPurposeChangeReviewModalOpen(false)}
+        previewData={reviewPreviewData}
+        onDownloadWord={() => {
+          if (activeAnalysisIdForModal) {
+            handleExportPurposeChangeReviewDocx(activeAnalysisIdForModal);
           }
         }}
       />
