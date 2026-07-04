@@ -20,6 +20,12 @@ describe('LegalKnowledgeService', () => {
     checklistVersion: {
       findMany: jest.fn(),
     },
+    legalUpdateLog: {
+      findMany: jest.fn(),
+    },
+    procedureAiAnalysisLegalSnapshot: {
+      findMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -42,7 +48,7 @@ describe('LegalKnowledgeService', () => {
   });
 
   describe('getDocuments', () => {
-    it('should return all legal documents ordered by issuedDate desc', async () => {
+    it('should return all legal documents ordered by issuedDate desc with relations', async () => {
       const mockDocs = [{ id: '1', documentCode: '31/2024/QH15' }];
       mockPrismaService.legalDocument.findMany.mockResolvedValue(mockDocs);
 
@@ -50,12 +56,20 @@ describe('LegalKnowledgeService', () => {
       expect(result).toEqual(mockDocs);
       expect(mockPrismaService.legalDocument.findMany).toHaveBeenCalledWith({
         orderBy: { issuedDate: 'desc' },
+        include: {
+          outgoingRelations: {
+            include: { relatedDocument: true },
+          },
+          incomingRelations: {
+            include: { document: true },
+          },
+        },
       });
     });
   });
 
   describe('getDocument', () => {
-    it('should return a document by id', async () => {
+    it('should return a document by id with relations', async () => {
       const mockDoc = { id: '1', documentCode: '31/2024/QH15' };
       mockPrismaService.legalDocument.findUnique.mockResolvedValue(mockDoc);
 
@@ -63,6 +77,14 @@ describe('LegalKnowledgeService', () => {
       expect(result).toEqual(mockDoc);
       expect(mockPrismaService.legalDocument.findUnique).toHaveBeenCalledWith({
         where: { id: '1' },
+        include: {
+          outgoingRelations: {
+            include: { relatedDocument: true },
+          },
+          incomingRelations: {
+            include: { document: true },
+          },
+        },
       });
     });
 
@@ -103,7 +125,9 @@ describe('LegalKnowledgeService', () => {
           version: 'v1.0',
         },
       ];
-      mockPrismaService.aiPromptVersion.findMany.mockResolvedValue(mockPrompts);
+      mockPrismaService.aiPromptVersion.findMany.mockResolvedValue(
+        mockPrompts,
+      );
 
       const result = await service.getPromptVersions();
       expect(result).toEqual(mockPrompts);
@@ -116,11 +140,7 @@ describe('LegalKnowledgeService', () => {
   describe('getChecklistVersions', () => {
     it('should return all checklist versions', async () => {
       const mockChecklists = [
-        {
-          id: '1',
-          checklistKey: 'CHK_LAND_FIRST_CERTIFICATE',
-          version: 'v1.0',
-        },
+        { id: '1', checklistKey: 'CHK_LAND_FIRST_CERTIFICATE', version: 'v1.0' },
       ];
       mockPrismaService.checklistVersion.findMany.mockResolvedValue(
         mockChecklists,
@@ -130,6 +150,45 @@ describe('LegalKnowledgeService', () => {
       expect(result).toEqual(mockChecklists);
       expect(mockPrismaService.checklistVersion.findMany).toHaveBeenCalledWith({
         orderBy: [{ checklistKey: 'asc' }, { version: 'desc' }],
+      });
+    });
+  });
+
+  describe('getUpdateLogs', () => {
+    it('should return all update logs ordered by createdAt desc', async () => {
+      const mockLogs = [{ id: '1', updateTitle: 'Test log' }];
+      mockPrismaService.legalUpdateLog.findMany.mockResolvedValue(mockLogs);
+
+      const result = await service.getUpdateLogs();
+      expect(result).toEqual(mockLogs);
+      expect(mockPrismaService.legalUpdateLog.findMany).toHaveBeenCalledWith({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          sourceDocument: true,
+        },
+      });
+    });
+  });
+
+  describe('getSnapshots', () => {
+    it('should return all legal snapshots ordered by createdAt desc', async () => {
+      const mockSnapshots = [{ id: '1', procedureAiAnalysisId: 'ana-1' }];
+      mockPrismaService.procedureAiAnalysisLegalSnapshot.findMany.mockResolvedValue(
+        mockSnapshots,
+      );
+
+      const result = await service.getSnapshots();
+      expect(result).toEqual(mockSnapshots);
+      expect(
+        mockPrismaService.procedureAiAnalysisLegalSnapshot.findMany,
+      ).toHaveBeenCalledWith({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          procedureAiAnalysis: true,
+          procedureTypeVersion: true,
+          promptVersion: true,
+          checklistVersion: true,
+        },
       });
     });
   });

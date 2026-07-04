@@ -11,12 +11,16 @@ describe('LegalKnowledgeController', () => {
     getProcedureTypeVersions: jest.fn(),
     getPromptVersions: jest.fn(),
     getChecklistVersions: jest.fn(),
+    getUpdateLogs: jest.fn(),
+    getSnapshots: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [LegalKnowledgeController],
-      providers: [{ provide: LegalKnowledgeService, useValue: mockService }],
+      providers: [
+        { provide: LegalKnowledgeService, useValue: mockService },
+      ],
     }).compile();
 
     controller = module.get<LegalKnowledgeController>(LegalKnowledgeController);
@@ -73,5 +77,23 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.getChecklistVersions();
     expect(result).toEqual(mockResult);
     expect(mockService.getChecklistVersions).toHaveBeenCalled();
+  });
+
+  it('getUpdateLogs should call service.getUpdateLogs', async () => {
+    const mockResult = [{ id: '1' }];
+    mockService.getUpdateLogs.mockResolvedValue(mockResult);
+
+    const result = await controller.getUpdateLogs();
+    expect(result).toEqual(mockResult);
+    expect(mockService.getUpdateLogs).toHaveBeenCalled();
+  });
+
+  it('getSnapshots should call service.getSnapshots', async () => {
+    const mockResult = [{ id: '1' }];
+    mockService.getSnapshots.mockResolvedValue(mockResult);
+
+    const result = await controller.getSnapshots();
+    expect(result).toEqual(mockResult);
+    expect(mockService.getSnapshots).toHaveBeenCalled();
   });
 });

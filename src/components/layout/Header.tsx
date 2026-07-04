@@ -6,6 +6,7 @@ const routeNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/cases': 'Danh sách hồ sơ',
   '/procedure-cases': 'Hồ sơ Thủ tục Hành chính',
+  '/legal-knowledge': 'Kho căn cứ pháp lý',
   '/cases/new': 'Tạo hồ sơ mới',
   '/drafts': 'Dự thảo văn bản',
   '/anonymizer': 'Công cụ Ẩn danh',

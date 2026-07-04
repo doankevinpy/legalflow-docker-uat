@@ -9,6 +9,7 @@ import {
   Users,
   ClipboardList,
   BarChart2,
+  BookOpen,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     { name: 'Dashboard',         href: '/dashboard',  icon: LayoutDashboard, show: true },
     { name: 'Danh sách hồ sơ',  href: '/cases',      icon: FolderOpen,      show: true },
     { name: 'Thẩm tra TTHC',     href: '/procedure-cases', icon: FileText,   show: true },
+    { name: 'Kho căn cứ pháp lý', href: '/legal-knowledge', icon: BookOpen,   show: true },
     { name: 'Tạo mới',          href: '/cases/new',  icon: PlusCircle,      show: canCreate(role) },
     { name: 'Dự thảo văn bản',  href: '/drafts',     icon: FileText,        show: true },
     { name: 'Công cụ Ẩn danh',  href: '/anonymizer', icon: Shield,          show: true },

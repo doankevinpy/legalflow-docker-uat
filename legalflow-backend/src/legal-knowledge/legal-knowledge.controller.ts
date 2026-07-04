@@ -39,4 +39,16 @@ export class LegalKnowledgeController {
   getChecklistVersions() {
     return this.service.getChecklistVersions();
   }
+
+  @Get('update-logs')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  getUpdateLogs() {
+    return this.service.getUpdateLogs();
+  }
+
+  @Get('snapshots')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  getSnapshots() {
+    return this.service.getSnapshots();
+  }
 }
