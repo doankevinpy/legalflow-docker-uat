@@ -68,4 +68,10 @@ export const procedureCasesApi = {
 
   rejectAiAnalysis: (caseId: string, analysisId: string) =>
     apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/reject`),
+
+  exportReviewDocx: (caseId: string, analysisId: string) =>
+    apiClient.downloadBlob(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/export-review-docx`),
+
+  getReviewPreviewData: (caseId: string, analysisId: string) =>
+    apiClient.get<any>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/review-preview-data`),
 };

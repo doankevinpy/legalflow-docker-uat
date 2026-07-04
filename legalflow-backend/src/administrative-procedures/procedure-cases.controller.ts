@@ -8,6 +8,8 @@ import {
   Query,
   UseGuards,
   Request,
+  StreamableFile,
+  Res,
 } from '@nestjs/common';
 import { AdministrativeProceduresService } from './administrative-procedures.service';
 import { ProcedureAiService } from './ai/procedure-ai.service';
@@ -113,5 +115,33 @@ export class ProcedureCasesController {
     @Request() req: any,
   ) {
     return this.aiService.rejectAnalysis(caseId, analysisId, req?.user?.id || req?.user?.userId);
+  }
+
+  @Get(':id/ai-analyses/:analysisId/export-review-docx')
+  async exportReviewDocx(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+    @Request() req: any,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    const { buffer, filename } = await this.aiService.exportReviewDocx(
+      caseId,
+      analysisId,
+      req?.user?.id || req?.user?.userId,
+    );
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
+  @Get(':id/ai-analyses/:analysisId/review-preview-data')
+  async getReviewPreviewData(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+    @Request() req: any,
+  ) {
+    return this.aiService.getReviewPreviewData(caseId, analysisId, req?.user?.id || req?.user?.userId);
   }
 }

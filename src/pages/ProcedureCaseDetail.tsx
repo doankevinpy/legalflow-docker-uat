@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { procedureCasesApi } from '../lib/procedureCasesApi';
 import type { ProcedureCase, ProcedureChecklistItem, ProcedureAiAnalysis } from '../types/procedure';
+import { ApiError } from '../lib/apiClient';
+import { Printer, Download } from 'lucide-react';
+import { ProcedureReviewPrintModal } from '../components/ProcedureReviewPrintModal';
 
 export default function ProcedureCaseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +20,13 @@ export default function ProcedureCaseDetail() {
   // AI Review State
   const [aiAnalyses, setAiAnalyses] = useState<ProcedureAiAnalysis[]>([]);
   const [runningAi, setRunningAi] = useState<boolean>(false);
+
+  // Review Print/Export Modal State
+  const [reviewPreviewModalOpen, setReviewPreviewModalOpen] = useState<boolean>(false);
+  const [reviewPreviewData, setReviewPreviewData] = useState<any>(null);
+  const [activeAnalysisIdForModal, setActiveAnalysisIdForModal] = useState<string | null>(null);
+  const [exportingAnalysisId, setExportingAnalysisId] = useState<string | null>(null);
+  const [previewingAnalysisId, setPreviewingAnalysisId] = useState<string | null>(null);
 
   // New Note
   const [noteContent, setNoteContent] = useState<string>('');
@@ -79,6 +89,42 @@ export default function ProcedureCaseDetail() {
       fetchDetail();
     } catch (err: any) {
       alert(err?.response?.data?.message || err?.message || 'Lỗi khi từ chối kết quả.');
+    }
+  };
+
+  const handleExportReviewDocx = async (analysisId: string) => {
+    if (!data) return;
+    try {
+      setExportingAnalysisId(analysisId);
+      const { blob, filename } = await procedureCasesApi.exportReviewDocx(data.id, analysisId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename || `phieu-ra-soat-cap-gcn-lan-dau-${data.caseCode || data.id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      alert('Đã xuất Word (.docx) phiếu rà soát thành công!');
+    } catch (err: any) {
+      alert(err instanceof ApiError ? err.message : 'Không thể xuất file Word phiếu rà soát');
+    } finally {
+      setExportingAnalysisId(null);
+    }
+  };
+
+  const handlePreviewReviewPdf = async (analysisId: string) => {
+    if (!data) return;
+    try {
+      setPreviewingAnalysisId(analysisId);
+      setActiveAnalysisIdForModal(analysisId);
+      const resData = await procedureCasesApi.getReviewPreviewData(data.id, analysisId);
+      setReviewPreviewData(resData);
+      setReviewPreviewModalOpen(true);
+    } catch (err: any) {
+      alert(err instanceof ApiError ? err.message : 'Không thể xem trước phiếu rà soát PDF');
+    } finally {
+      setPreviewingAnalysisId(null);
     }
   };
 
@@ -508,35 +554,56 @@ export default function ProcedureCaseDetail() {
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      {isPending && (
-                        <div className="pt-4 border-t flex flex-wrap items-center justify-end gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
+                      {/* Export & Review Actions */}
+                      <div className="pt-4 border-t flex flex-wrap items-center justify-between gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
-                            onClick={() => handleAcceptAiAnalysis(analysis.id, true, false)}
-                            className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-sm transition"
+                            onClick={() => handleExportReviewDocx(analysis.id)}
+                            disabled={exportingAnalysisId === analysis.id}
+                            className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                           >
-                            ✅ Chấp nhận &amp; Lưu ý kiến vào Ghi chú
+                            <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                            {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
                           </button>
                           <button
-                            onClick={() => handleAcceptAiAnalysis(analysis.id, false, true)}
-                            className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm transition"
+                            onClick={() => handlePreviewReviewPdf(analysis.id)}
+                            disabled={previewingAnalysisId === analysis.id}
+                            className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
                           >
-                            📋 Chấp nhận &amp; Tạo checklist gợi ý
-                          </button>
-                          <button
-                            onClick={() => handleAcceptAiAnalysis(analysis.id, true, true)}
-                            className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition"
-                          >
-                            ⚡ Chấp nhận cả hai (Ghi chú + Checklist)
-                          </button>
-                          <button
-                            onClick={() => handleRejectAiAnalysis(analysis.id)}
-                            className="px-3.5 py-2 bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold hover:bg-rose-200 transition ml-2"
-                          >
-                            ❌ Từ chối
+                            <Printer className="w-3.5 h-3.5 mr-1.5" />
+                            {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
                           </button>
                         </div>
-                      )}
+
+                        {isPending && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => handleAcceptAiAnalysis(analysis.id, true, false)}
+                              className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-sm transition"
+                            >
+                              ✅ Chấp nhận &amp; Lưu ý kiến vào Ghi chú
+                            </button>
+                            <button
+                              onClick={() => handleAcceptAiAnalysis(analysis.id, false, true)}
+                              className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm transition"
+                            >
+                              📋 Chấp nhận &amp; Tạo checklist gợi ý
+                            </button>
+                            <button
+                              onClick={() => handleAcceptAiAnalysis(analysis.id, true, true)}
+                              className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition"
+                            >
+                              ⚡ Chấp nhận cả hai (Ghi chú + Checklist)
+                            </button>
+                            <button
+                              onClick={() => handleRejectAiAnalysis(analysis.id)}
+                              className="px-3.5 py-2 bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold hover:bg-rose-200 transition ml-2"
+                            >
+                              ❌ Từ chối
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -700,6 +767,17 @@ export default function ProcedureCaseDetail() {
           </div>
         )}
       </div>
+
+      <ProcedureReviewPrintModal
+        isOpen={reviewPreviewModalOpen}
+        onClose={() => setReviewPreviewModalOpen(false)}
+        previewData={reviewPreviewData}
+        onDownloadWord={() => {
+          if (activeAnalysisIdForModal) {
+            handleExportReviewDocx(activeAnalysisIdForModal);
+          }
+        }}
+      />
     </div>
   );
 }
