@@ -60,6 +60,9 @@ export const procedureCasesApi = {
   runLandFirstCertificateReview: (caseId: string) =>
     apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai/land-first-certificate-review`),
 
+  runLandUsePurposeChangeReview: (caseId: string) =>
+    apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai/land-use-purpose-change-review`),
+
   getAiAnalyses: (caseId: string) =>
     apiClient.get<ProcedureAiAnalysis[]>(`/procedure-cases/${caseId}/ai-analyses`),
 

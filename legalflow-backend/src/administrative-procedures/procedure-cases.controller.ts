@@ -93,6 +93,11 @@ export class ProcedureCasesController {
     return this.aiService.reviewLandFirstCertificate(id, req?.user?.id || req?.user?.userId);
   }
 
+  @Post(':id/ai/land-use-purpose-change-review')
+  async runLandUsePurposeChangeReview(@Param('id') id: string, @Request() req: any) {
+    return this.aiService.reviewLandUsePurposeChange(id, req?.user?.id || req?.user?.userId);
+  }
+
   @Get(':id/ai-analyses')
   async getAiAnalyses(@Param('id') id: string) {
     return this.aiService.getAnalysesByCaseId(id);

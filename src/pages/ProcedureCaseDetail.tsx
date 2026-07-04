@@ -59,10 +59,13 @@ export default function ProcedureCaseDetail() {
   }, [caseId]);
 
   const handleRunAiReview = async () => {
-    if (!caseId) return;
+    if (!caseId || !data) return;
     setRunningAi(true);
     try {
-      const newAnalysis = await procedureCasesApi.runLandFirstCertificateReview(caseId);
+      const isPurposeChange = data.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data.procedureType?.group === 'CHUYEN_MUC_DICH_SDD';
+      const newAnalysis = isPurposeChange
+        ? await procedureCasesApi.runLandUsePurposeChangeReview(caseId)
+        : await procedureCasesApi.runLandFirstCertificateReview(caseId);
       setAiAnalyses((prev) => [newAnalysis, ...prev]);
       alert('Đã hoàn thành rà soát AI cho hồ sơ!');
     } catch (err: any) {
@@ -317,20 +320,26 @@ export default function ProcedureCaseDetail() {
               </p>
             </div>
 
-            {data?.procedureType?.code !== 'LAND_FIRST_CERTIFICATE' && data?.procedureType?.group !== 'CAP_GCN_LAN_DAU' ? (
+            {!(data?.procedureType?.code === 'LAND_FIRST_CERTIFICATE' || data?.procedureType?.group === 'CAP_GCN_LAN_DAU' || data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD') ? (
               <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed space-y-2">
                 <div className="text-2xl">ℹ️</div>
                 <p className="font-semibold text-gray-700 text-sm">
-                  Chức năng này chỉ áp dụng cho hồ sơ cấp Giấy chứng nhận quyền sử dụng đất lần đầu.
+                  Chức năng rà soát AI hiện chỉ hỗ trợ thủ tục Cấp GCN lần đầu và Chuyển mục đích sử dụng đất.
                 </p>
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="flex justify-between items-center bg-blue-50 p-4 rounded-xl border border-blue-100">
                   <div>
-                    <h4 className="font-bold text-blue-900 text-base">Trợ lý AI rà soát cấp GCN lần đầu</h4>
+                    <h4 className="font-bold text-blue-900 text-base">
+                      {data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                        ? 'Trợ lý AI rà soát chuyển mục đích sử dụng đất'
+                        : 'Trợ lý AI rà soát cấp GCN lần đầu'}
+                    </h4>
                     <p className="text-xs text-blue-700 mt-0.5">
-                      Phân tích chuyên sâu thông tin chủ sở hữu, thửa đất, lịch sử sử dụng đất và đối chiếu căn cứ pháp lý.
+                      {data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                        ? 'Phân tích chuyên sâu thông tin người sử dụng đất, thửa đất, loại đất hiện tại và mục đích xin chuyển, đối chiếu quy hoạch/kế hoạch sử dụng đất.'
+                        : 'Phân tích chuyên sâu thông tin chủ sở hữu, thửa đất, lịch sử sử dụng đất và đối chiếu căn cứ pháp lý.'}
                     </p>
                   </div>
                   <button
@@ -338,7 +347,11 @@ export default function ProcedureCaseDetail() {
                     disabled={runningAi}
                     className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold text-sm shadow flex items-center gap-2 transition"
                   >
-                    {runningAi ? '⏳ Đang phân tích...' : '🤖 AI rà soát cấp GCN lần đầu'}
+                    {runningAi
+                      ? '⏳ Đang phân tích...'
+                      : data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                      ? '🤖 AI rà soát chuyển mục đích'
+                      : '🤖 AI rà soát cấp GCN lần đầu'}
                   </button>
                 </div>
 
@@ -412,7 +425,16 @@ export default function ProcedureCaseDetail() {
                           <div className="text-xs space-y-1 text-gray-700">
                             <p><span className="font-semibold">Số thửa / Tờ bản đồ:</span> Thửa {payload.landParcelReview?.parcelNumber} / Tờ số {payload.landParcelReview?.mapSheetNumber}</p>
                             <p><span className="font-semibold">Vị trí:</span> {payload.landParcelReview?.location}</p>
-                            <p><span className="font-semibold">Diện tích / Loại đất:</span> {payload.landParcelReview?.area} &bull; {payload.landParcelReview?.landUseType}</p>
+                            {analysis.analysisType === 'LAND_USE_PURPOSE_CHANGE_REVIEW' ? (
+                              <>
+                                <p><span className="font-semibold">Diện tích toàn thửa:</span> {payload.landParcelReview?.totalArea || payload.landParcelReview?.area}</p>
+                                <p><span className="font-semibold">Diện tích xin chuyển:</span> <span className="text-indigo-600 font-bold">{payload.landParcelReview?.requestedChangeArea || payload.purposeChangeReview?.requestedArea}</span></p>
+                                <p><span className="font-semibold">Loại đất hiện tại:</span> {payload.landParcelReview?.currentLandUseType || payload.purposeChangeReview?.currentPurpose}</p>
+                                <p><span className="font-semibold">Mục đích xin chuyển sang:</span> <span className="text-emerald-700 font-bold">{payload.landParcelReview?.requestedLandUseType || payload.purposeChangeReview?.requestedPurpose}</span></p>
+                              </>
+                            ) : (
+                              <p><span className="font-semibold">Diện tích / Loại đất:</span> {payload.landParcelReview?.area} &bull; {payload.landParcelReview?.landUseType}</p>
+                            )}
                             <p><span className="font-semibold">Ranh giới:</span> {payload.landParcelReview?.boundaryStatus}</p>
                           </div>
                           {payload.landParcelReview?.issuesToVerify?.length > 0 && (
@@ -428,36 +450,79 @@ export default function ProcedureCaseDetail() {
                         </div>
                       </div>
 
-                      {/* D. Nguồn gốc & Thời điểm sử dụng đất */}
-                      <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-4 space-y-2">
-                        <h5 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
-                          <span>📜</span> D. Phân tích Nguồn gốc & Thời điểm sử dụng đất
-                        </h5>
-                        <div className="text-xs space-y-1 text-gray-800">
-                          <p><span className="font-semibold">Nguồn gốc kê khai:</span> {payload.originAndUseHistoryReview?.declaredOrigin}</p>
-                          <p><span className="font-semibold">Thời điểm sử dụng:</span> {payload.originAndUseHistoryReview?.declaredUseStartTime}</p>
+                      {/* D. Nguồn gốc & Thời điểm OR Mục đích xin chuyển */}
+                      {analysis.analysisType === 'LAND_USE_PURPOSE_CHANGE_REVIEW' ? (
+                        <div className="border border-indigo-200 bg-indigo-50/40 rounded-xl p-4 space-y-2">
+                          <h5 className="font-bold text-indigo-900 text-sm flex items-center gap-1.5">
+                            <span>🔄</span> D. Phân tích Mục đích xin chuyển &amp; Điều kiện chuyển mục đích
+                          </h5>
+                          <div className="text-xs space-y-1 text-gray-800">
+                            <p><span className="font-semibold">Loại đất hiện tại:</span> {payload.purposeChangeReview?.currentPurpose}</p>
+                            <p><span className="font-semibold">Mục đích xin chuyển sang:</span> <span className="text-emerald-700 font-bold">{payload.purposeChangeReview?.requestedPurpose}</span></p>
+                            <p><span className="font-semibold">Diện tích xin chuyển:</span> {payload.purposeChangeReview?.requestedArea}</p>
+                          </div>
+                          {payload.purposeChangeReview?.riskFlags?.length > 0 && (
+                            <div className="text-xs bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-rose-800 space-y-1">
+                              <span className="font-semibold block">⚠️ Cảnh báo rủi ro chuyển mục đích:</span>
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                {payload.purposeChangeReview.riskFlags.map((risk: string, idx: number) => (
+                                  <li key={idx}>{risk}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {payload.purposeChangeReview?.eligibilityIssuesToVerify?.length > 0 && (
+                            <div className="text-xs pt-1">
+                              <span className="font-semibold text-gray-800 block mb-1">Kiểm tra điều kiện chuyển mục đích (Điều 116, 121 Luật Đất đai 2024):</span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                                {payload.purposeChangeReview.eligibilityIssuesToVerify.map((item: string, idx: number) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {payload.purposeChangeReview?.planningNeedCheck?.length > 0 && (
+                            <div className="text-xs pt-1 border-t border-indigo-100">
+                              <span className="font-semibold text-indigo-900 block mb-1">Kiểm tra quy hoạch / Kế hoạch sử dụng đất:</span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-indigo-800">
+                                {payload.purposeChangeReview.planningNeedCheck.map((item: string, idx: number) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
-                        {payload.originAndUseHistoryReview?.riskFlags?.length > 0 && (
-                          <div className="text-xs bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-rose-800 space-y-1">
-                            <span className="font-semibold block">⚠️ Cảnh báo rủi ro lịch sử sử dụng:</span>
-                            <ul className="list-disc pl-4 space-y-0.5">
-                              {payload.originAndUseHistoryReview.riskFlags.map((risk: string, idx: number) => (
-                                <li key={idx}>{risk}</li>
-                              ))}
-                            </ul>
+                      ) : (
+                        <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-4 space-y-2">
+                          <h5 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                            <span>📜</span> D. Phân tích Nguồn gốc & Thời điểm sử dụng đất
+                          </h5>
+                          <div className="text-xs space-y-1 text-gray-800">
+                            <p><span className="font-semibold">Nguồn gốc kê khai:</span> {payload.originAndUseHistoryReview?.declaredOrigin}</p>
+                            <p><span className="font-semibold">Thời điểm sử dụng:</span> {payload.originAndUseHistoryReview?.declaredUseStartTime}</p>
                           </div>
-                        )}
-                        {payload.originAndUseHistoryReview?.issuesToVerify?.length > 0 && (
-                          <div className="text-xs pt-1">
-                            <span className="font-semibold text-gray-800 block mb-1">Nội dung cán bộ cần thẩm tra/bổ sung căn cứ:</span>
-                            <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
-                              {payload.originAndUseHistoryReview.issuesToVerify.map((item: string, idx: number) => (
-                                <li key={idx}>{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
+                          {payload.originAndUseHistoryReview?.riskFlags?.length > 0 && (
+                            <div className="text-xs bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-rose-800 space-y-1">
+                              <span className="font-semibold block">⚠️ Cảnh báo rủi ro lịch sử sử dụng:</span>
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                {payload.originAndUseHistoryReview.riskFlags.map((risk: string, idx: number) => (
+                                  <li key={idx}>{risk}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {payload.originAndUseHistoryReview?.issuesToVerify?.length > 0 && (
+                            <div className="text-xs pt-1">
+                              <span className="font-semibold text-gray-800 block mb-1">Nội dung cán bộ cần thẩm tra/bổ sung căn cứ:</span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                                {payload.originAndUseHistoryReview.issuesToVerify.map((item: string, idx: number) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* E. Thành phần hồ sơ */}
                       <div className="border rounded-xl p-4 bg-white space-y-3">
@@ -501,21 +566,34 @@ export default function ProcedureCaseDetail() {
                           <div>
                             <span className="font-semibold text-gray-800 block">Quy hoạch & Tranh chấp cần rà soát:</span>
                             <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-600">
-                              {(payload.planningDisputeAndCurrentStatusReview?.planningNeedCheck || []).map((item: string, idx: number) => (
+                              {(payload.planningDisputeAndCurrentStatusReview?.planningNeedCheck || payload.planningAndCurrentStatusReview?.planningNeedCheck || []).map((item: string, idx: number) => (
                                 <li key={`p-${idx}`}>{item}</li>
                               ))}
-                              {(payload.planningDisputeAndCurrentStatusReview?.disputeNeedCheck || []).map((item: string, idx: number) => (
+                              {(payload.planningDisputeAndCurrentStatusReview?.disputeNeedCheck || payload.planningAndCurrentStatusReview?.disputeNeedCheck || []).map((item: string, idx: number) => (
                                 <li key={`d-${idx}`}>{item}</li>
+                              ))}
+                              {(payload.planningAndCurrentStatusReview?.boundaryAreaNeedCheck || []).map((item: string, idx: number) => (
+                                <li key={`b-${idx}`}>{item}</li>
                               ))}
                             </ul>
                           </div>
                           <div>
                             <span className="font-semibold text-gray-800 block">Hiện trạng sử dụng & Nghĩa vụ tài chính:</span>
                             <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-600">
-                              {(payload.planningDisputeAndCurrentStatusReview?.currentUseNeedCheck || []).map((item: string, idx: number) => (
+                              {(payload.planningDisputeAndCurrentStatusReview?.currentUseNeedCheck || payload.planningAndCurrentStatusReview?.currentUseNeedCheck || []).map((item: string, idx: number) => (
                                 <li key={`c-${idx}`}>{item}</li>
                               ))}
                               <li><span className="font-semibold text-indigo-700">Ghi chú tài chính:</span> {payload.financialObligationNotice?.message}</li>
+                              {payload.financialObligationNotice?.dataNeededForLaterPhase?.length > 0 && (
+                                <li className="pt-1">
+                                  <span className="font-semibold text-slate-700 block">Các khoản/dữ liệu cần chuẩn bị cho bước tính tiền sau này:</span>
+                                  <ul className="list-disc pl-4 mt-0.5 space-y-0.5 text-slate-600">
+                                    {payload.financialObligationNotice.dataNeededForLaterPhase.map((item: string, idx: number) => (
+                                      <li key={idx}>{item}</li>
+                                    ))}
+                                  </ul>
+                                </li>
+                              )}
                             </ul>
                           </div>
                         </div>
@@ -556,24 +634,31 @@ export default function ProcedureCaseDetail() {
 
                       {/* Export & Review Actions */}
                       <div className="pt-4 border-t flex flex-wrap items-center justify-between gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            onClick={() => handleExportReviewDocx(analysis.id)}
-                            disabled={exportingAnalysisId === analysis.id}
-                            className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
-                          >
-                            <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                            {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
-                          </button>
-                          <button
-                            onClick={() => handlePreviewReviewPdf(analysis.id)}
-                            disabled={previewingAnalysisId === analysis.id}
-                            className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
-                          >
-                            <Printer className="w-3.5 h-3.5 mr-1.5" />
-                            {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
-                          </button>
-                        </div>
+                        {analysis.analysisType === 'LAND_FIRST_CERTIFICATE_REVIEW' ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => handleExportReviewDocx(analysis.id)}
+                              disabled={exportingAnalysisId === analysis.id}
+                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                              {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
+                            </button>
+                            <button
+                              onClick={() => handlePreviewReviewPdf(analysis.id)}
+                              disabled={previewingAnalysisId === analysis.id}
+                              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5" />
+                              {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-500 italic flex items-center gap-1.5">
+                            <span>ℹ️</span>
+                            <span>Tính năng xuất Word/PDF sẽ được hỗ trợ trong phase sau.</span>
+                          </div>
+                        )}
 
                         {isPending && (
                           <div className="flex flex-wrap items-center gap-2">
