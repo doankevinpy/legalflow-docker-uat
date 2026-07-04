@@ -12,7 +12,9 @@ describe('LegalKnowledgeController', () => {
     getPromptVersions: jest.fn(),
     getChecklistVersions: jest.fn(),
     getUpdateLogs: jest.fn(),
+    getUpdateLogById: jest.fn(),
     getSnapshots: jest.fn(),
+    analyzeImpact: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -88,6 +90,15 @@ describe('LegalKnowledgeController', () => {
     expect(mockService.getUpdateLogs).toHaveBeenCalled();
   });
 
+  it('getUpdateLog should call service.getUpdateLogById', async () => {
+    const mockResult = { id: '1' };
+    mockService.getUpdateLogById.mockResolvedValue(mockResult);
+
+    const result = await controller.getUpdateLog('1');
+    expect(result).toEqual(mockResult);
+    expect(mockService.getUpdateLogById).toHaveBeenCalledWith('1');
+  });
+
   it('getSnapshots should call service.getSnapshots', async () => {
     const mockResult = [{ id: '1' }];
     mockService.getSnapshots.mockResolvedValue(mockResult);
@@ -96,4 +107,23 @@ describe('LegalKnowledgeController', () => {
     expect(result).toEqual(mockResult);
     expect(mockService.getSnapshots).toHaveBeenCalled();
   });
+
+  it('analyzeImpactFromLog should call service.analyzeImpact', async () => {
+    const mockResult = { success: true };
+    mockService.analyzeImpact.mockResolvedValue(mockResult);
+
+    const result = await controller.analyzeImpactFromLog({ sourceDocumentId: 'doc-1', title: 'Test' });
+    expect(result).toEqual(mockResult);
+    expect(mockService.analyzeImpact).toHaveBeenCalledWith('doc-1', 'Test', undefined);
+  });
+
+  it('analyzeImpactFromDocument should call service.analyzeImpact', async () => {
+    const mockResult = { success: true };
+    mockService.analyzeImpact.mockResolvedValue(mockResult);
+
+    const result = await controller.analyzeImpactFromDocument('doc-1', { title: 'Test' });
+    expect(result).toEqual(mockResult);
+    expect(mockService.analyzeImpact).toHaveBeenCalledWith('doc-1', 'Test', undefined);
+  });
 });
+

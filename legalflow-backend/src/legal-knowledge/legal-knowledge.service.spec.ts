@@ -22,8 +22,13 @@ describe('LegalKnowledgeService', () => {
     },
     legalUpdateLog: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     procedureAiAnalysisLegalSnapshot: {
+      findMany: jest.fn(),
+    },
+    administrativeProcedureCase: {
       findMany: jest.fn(),
     },
   };
@@ -170,6 +175,25 @@ describe('LegalKnowledgeService', () => {
     });
   });
 
+  describe('getUpdateLogById', () => {
+    it('should return an update log by id', async () => {
+      const mockLog = { id: '1', updateTitle: 'Test log' };
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+
+      const result = await service.getUpdateLogById('1');
+      expect(result).toEqual(mockLog);
+      expect(mockPrismaService.legalUpdateLog.findUnique).toHaveBeenCalledWith({
+        where: { id: '1' },
+        include: { sourceDocument: true },
+      });
+    });
+
+    it('should throw NotFoundException if log not found', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(null);
+      await expect(service.getUpdateLogById('999')).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('getSnapshots', () => {
     it('should return all legal snapshots ordered by createdAt desc', async () => {
       const mockSnapshots = [{ id: '1', procedureAiAnalysisId: 'ana-1' }];
@@ -198,4 +222,24 @@ describe('LegalKnowledgeService', () => {
       });
     });
   });
+
+  describe('analyzeImpact', () => {
+    it('should analyze impact and create a LegalUpdateLog', async () => {
+      mockPrismaService.legalDocument.findMany.mockResolvedValue([{ id: 'doc-1', documentCode: 'LAW-1', documentTitle: 'Law 1', status: 'ACTIVE' }]);
+      mockPrismaService.procedureTypeVersion.findMany.mockResolvedValue([{ id: 'proc-1', procedureCode: 'LAND_FIRST_CERTIFICATE', version: 'v1.0', status: 'ACTIVE' }]);
+      mockPrismaService.aiPromptVersion.findMany.mockResolvedValue([{ id: 'prompt-1', promptKey: 'KEY_1', version: 'v1.0', analysisType: 'TEST', status: 'ACTIVE' }]);
+      mockPrismaService.checklistVersion.findMany.mockResolvedValue([{ id: 'chk-1', checklistKey: 'CHK_1', version: 'v1.0', procedureTypeCode: 'LAND_FIRST_CERTIFICATE', status: 'ACTIVE' }]);
+      mockPrismaService.procedureAiAnalysisLegalSnapshot.findMany.mockResolvedValue([]);
+      mockPrismaService.administrativeProcedureCase.findMany.mockResolvedValue([]);
+      const mockLog = { id: 'log-1', updateTitle: 'Phân tích tác động: Test Title' };
+      mockPrismaService.legalUpdateLog.create.mockResolvedValue(mockLog);
+
+      const result = await service.analyzeImpact(undefined, 'Test Title', 'Test notes');
+      expect(result.success).toBe(true);
+      expect(result.logId).toBe('log-1');
+      expect(result.impactAnalysis.requiresOfficerVerification).toBe(true);
+      expect(mockPrismaService.legalUpdateLog.create).toHaveBeenCalled();
+    });
+  });
 });
+

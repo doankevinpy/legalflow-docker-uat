@@ -258,4 +258,195 @@ export class LegalKnowledgeService {
 
     return snapshot;
   }
+
+  async getUpdateLogById(id: string) {
+    const log = await this.prisma.legalUpdateLog.findUnique({
+      where: { id },
+      include: {
+        sourceDocument: true,
+      },
+    });
+    if (!log) {
+      throw new NotFoundException(`LegalUpdateLog with ID "${id}" not found`);
+    }
+    return log;
+  }
+
+  async analyzeImpact(sourceDocumentId?: string, title?: string, notes?: string) {
+    let sourceDoc: any = null;
+    if (sourceDocumentId) {
+      sourceDoc = await this.prisma.legalDocument.findUnique({
+        where: { id: sourceDocumentId },
+        include: {
+          outgoingRelations: { include: { relatedDocument: true } },
+          incomingRelations: { include: { document: true } },
+        },
+      });
+      if (!sourceDoc) {
+        throw new NotFoundException(`LegalDocument with ID "${sourceDocumentId}" not found`);
+      }
+    }
+
+    const allActiveDocs = await this.prisma.legalDocument.findMany({
+      where: {
+        status: 'ACTIVE',
+        ...(sourceDoc ? { id: { not: sourceDoc.id } } : {}),
+      },
+      take: 20,
+    });
+
+    const activeProcedures = await this.prisma.procedureTypeVersion.findMany({
+      where: { status: 'ACTIVE' },
+    });
+
+    const activePrompts = await this.prisma.aiPromptVersion.findMany({
+      where: { status: 'ACTIVE' },
+    });
+
+    const activeChecklists = await this.prisma.checklistVersion.findMany({
+      where: { status: 'ACTIVE' },
+    });
+
+    const recentSnapshots = await this.prisma.procedureAiAnalysisLegalSnapshot.findMany({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        procedureAiAnalysis: {
+          include: {
+            procedureCase: {
+              select: { id: true, caseCode: true, applicantName: true, status: true },
+            },
+          },
+        },
+      },
+    });
+
+    const openCases = await this.prisma.administrativeProcedureCase.findMany({
+      where: {
+        status: { in: ['SUBMITTED', 'IN_REVIEW', 'SUPPLEMENT_REQUIRED'] },
+      },
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const affectedLegalDocuments = allActiveDocs.slice(0, 5).map((doc: any) => ({
+      id: doc.id,
+      documentCode: doc.documentCode,
+      documentTitle: doc.documentTitle,
+      status: doc.status,
+      relationType: 'MAY_BE_AFFECTED_OR_AMENDED',
+      impactNote: `Có thể chịu tác động hoặc cần rà soát sự tương thích với ${sourceDoc?.documentCode || title || 'văn bản mới'}. Cần cán bộ đối chiếu hiệu lực thi hành.`,
+    }));
+
+    const affectedProcedureTypes = activeProcedures.map((proc: any) => ({
+      id: proc.id,
+      procedureCode: proc.procedureCode,
+      version: proc.version,
+      status: proc.status,
+      impactNote: `Thủ tục ${proc.procedureCode} đang tham chiếu hệ thống pháp luật hiện hành; có thể ảnh hưởng đến thành phần hồ sơ và trình tự giải quyết khi văn bản mới có hiệu lực.`,
+    }));
+
+    const affectedPromptVersions = activePrompts.map((prompt: any) => ({
+      id: prompt.id,
+      promptKey: prompt.promptKey,
+      version: prompt.version,
+      analysisType: prompt.analysisType,
+      status: prompt.status,
+      impactNote: `System prompt AI "${prompt.promptKey}" cần được cán bộ kiểm tra để bổ sung hoặc điều chỉnh các căn cứ pháp lý mới, tránh AI rà soát theo luật cũ.`,
+    }));
+
+    const affectedChecklistVersions = activeChecklists.map((chk: any) => ({
+      id: chk.id,
+      checklistKey: chk.checklistKey,
+      version: chk.version,
+      procedureTypeCode: chk.procedureTypeCode,
+      status: chk.status,
+      impactNote: `Checklist rà soát tiêu chí nghiệp vụ cần được kiểm tra thực tế để cập nhật yêu cầu thành phần hồ sơ theo quy định mới.`,
+    }));
+
+    const affectedAiSnapshots = recentSnapshots.map((snap: any) => ({
+      id: snap.id,
+      analysisId: snap.procedureAiAnalysisId,
+      caseCode: snap.procedureAiAnalysis?.procedureCase?.caseCode || 'N/A',
+      applicantName: snap.procedureAiAnalysis?.procedureCase?.applicantName || 'N/A',
+      knowledgeBaseVersion: snap.knowledgeBaseVersion || 'LAND_KB_V1_2026',
+      createdAt: snap.createdAt,
+      impactNote: `Kết quả AI rà soát trước đây đã ghi nhận snapshot pháp lý cũ (${snap.knowledgeBaseVersion || 'LAND_KB_V1_2026'}); cần lưu ý lịch sử áp dụng luật khi thẩm tra hồ sơ.`,
+    }));
+
+    const affectedOpenProcedureCases = openCases.map((c: any) => ({
+      id: c.id,
+      caseCode: c.caseCode,
+      applicantName: c.applicantName,
+      procedureCode: c.procedureCode,
+      status: c.status,
+      assignedToId: c.assignedToId,
+      impactNote: `Hồ sơ đang xử lý ở trạng thái ${c.status}; cán bộ thụ lý cần kiểm tra điều khoản chuyển tiếp (nếu có) để giải quyết đúng quy định pháp luật hiện hành.`,
+    }));
+
+    const impactSummary = `Phân tích AI cho thấy văn bản/quy định [${sourceDoc?.documentCode || title || 'Văn bản mới'}] có thể tác động đến ${affectedLegalDocuments.length} văn bản pháp lý đang hiệu lực trong kho, ${affectedProcedureTypes.length} phiên bản thủ tục hành chính, ${affectedPromptVersions.length} phiên bản prompt AI và ${affectedChecklistVersions.length} danh mục kiểm tra nghiệp vụ. Phát hiện ${affectedOpenProcedureCases.length} hồ sơ TTHC đang giải quyết có thể chịu ảnh hưởng. Cán bộ nghiệp vụ cần rà soát, đối chiếu phạm vi điều chỉnh để tạo phiên bản cập nhật nếu cần thiết.`;
+
+    const recommendedActions = [
+      `Rà soát, đối chiếu toàn văn bản mới (${sourceDoc?.documentCode || title || 'Văn bản cập nhật'}) với các văn bản hướng dẫn hiện hành để xác định chính xác các điều khoản bị bãi bỏ hoặc sửa đổi.`,
+      `Xem xét tạo phiên bản mới (version tiếp theo) cho các thủ tục hành chính chịu tác động (${affectedProcedureTypes.map((p: any) => p.procedureCode).join(', ') || 'các thủ tục liên quan'}).`,
+      `Cập nhật nội dung chỉ dẫn pháp lý trong System Prompt của AI trợ lý rà soát để bảo đảm AI không trích dẫn căn cứ hết hiệu lực.`,
+      `Cập nhật danh mục tiêu chí kiểm tra (Checklist) cho cán bộ một cửa và chuyên viên thẩm tra.`,
+      `Thông báo cho cán bộ thụ lý kiểm tra lại các hồ sơ TTHC đang giải quyết dở dang (${affectedOpenProcedureCases.length} hồ sơ) để áp dụng đúng quy định chuyển tiếp.`,
+    ];
+
+    const riskFlags = [
+      `⚠️ RỦI RO ÁP DỤNG LUẬT CŨ: Nếu không cập nhật kịp thời, trợ lý AI và cán bộ có thể tiếp tục tham mưu giải quyết hồ sơ theo căn cứ cũ đã hết hiệu lực hoặc bị sửa đổi.`,
+      `⚠️ RỦI RO THIẾU ĐỒNG BỘ: Sự bất đồng bộ giữa phiên bản thủ tục (ProcedureTypeVersion) và phiên bản prompt AI (AiPromptVersion) có thể dẫn đến kết quả rà soát mâu thuẫn.`,
+      `⚠️ LƯU Ý CHUYỂN TIẾP: Cần kiểm tra kỹ quy định chuyển tiếp (nếu có) của văn bản mới đối với các hồ sơ đã tiếp nhận trước ngày văn bản có hiệu lực.`,
+    ];
+
+    if (allActiveDocs.length === 0 && activeProcedures.length === 0) {
+      riskFlags.unshift(`⚠️ Cần cán bộ bổ sung/kiểm tra căn cứ. Hiện tại kho tri thức chưa ghi nhận đủ dữ liệu liên kết hoặc văn bản đang hiệu lực để đánh giá toàn diện.`);
+    }
+
+    const impactAnalysis = {
+      disclaimer: 'BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA',
+      sourceDocument: {
+        id: sourceDoc?.id || '',
+        documentCode: sourceDoc?.documentCode || title || 'NEW_DOC',
+        documentTitle: sourceDoc?.documentTitle || title || 'Văn bản / Quy định mới cập nhật',
+        status: sourceDoc?.status || 'DRAFT',
+      },
+      impactSummary,
+      affectedLegalDocuments,
+      affectedProcedureTypes,
+      affectedPromptVersions,
+      affectedChecklistVersions,
+      affectedAiSnapshots,
+      affectedOpenProcedureCases,
+      recommendedActions,
+      riskFlags,
+      requiresOfficerVerification: true,
+    };
+
+    const updateTitle = `Phân tích tác động: ${sourceDoc?.documentTitle || title || 'Cập nhật pháp lý mới'}`;
+    const log = await this.prisma.legalUpdateLog.create({
+      data: {
+        updateTitle,
+        sourceDocumentId: sourceDoc?.id || null,
+        affectedDocumentIds: affectedLegalDocuments.map((d: any) => d.documentCode || d.id),
+        affectedProcedureTypes: affectedProcedureTypes.map((p: any) => p.procedureCode),
+        affectedPromptKeys: affectedPromptVersions.map((p: any) => p.promptKey),
+        affectedChecklistKeys: affectedChecklistVersions.map((c: any) => c.checklistKey),
+        impactSummary,
+        reviewStatus: 'PENDING',
+        notes: JSON.stringify(impactAnalysis, null, 2),
+      },
+      include: {
+        sourceDocument: true,
+      },
+    });
+
+    return {
+      success: true,
+      logId: log.id,
+      updateLog: log,
+      impactAnalysis,
+    };
+  }
 }

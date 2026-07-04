@@ -2,7 +2,7 @@ export type LegalDocumentType = 'LAW' | 'DECREE' | 'CIRCULAR' | 'DECISION' | 'DI
 export type LegalDocumentStatus = 'DRAFT' | 'ACTIVE' | 'AMENDED' | 'REPLACED' | 'EXPIRED' | 'ARCHIVED';
 export type LegalDocumentRelationType = 'REPLACES' | 'AMENDS' | 'GUIDES' | 'IMPLEMENTS' | 'REFERENCES' | 'SUPERSEDES';
 export type VersionStatus = 'DRAFT' | 'REVIEWING' | 'APPROVED' | 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED';
-export type LegalUpdateReviewStatus = 'PENDING_REVIEW' | 'IN_REVIEW' | 'APPROVED_FOR_UPDATE' | 'REJECTED' | 'APPLIED';
+export type LegalUpdateReviewStatus = 'PENDING' | 'REVIEWING' | 'APPROVED' | 'REJECTED' | 'APPLIED' | 'PENDING_REVIEW' | 'IN_REVIEW' | 'APPROVED_FOR_UPDATE';
 
 export interface LegalDocumentRelation {
   id: string;

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { LegalKnowledgeService } from './legal-knowledge.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
@@ -46,9 +46,28 @@ export class LegalKnowledgeController {
     return this.service.getUpdateLogs();
   }
 
+  @Get('update-logs/:id')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  getUpdateLog(@Param('id') id: string) {
+    return this.service.getUpdateLogById(id);
+  }
+
   @Get('snapshots')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   getSnapshots() {
     return this.service.getSnapshots();
   }
+
+  @Post('update-logs/analyze-impact')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  analyzeImpactFromLog(@Body() body: { sourceDocumentId?: string; title?: string; notes?: string }) {
+    return this.service.analyzeImpact(body.sourceDocumentId, body.title, body.notes);
+  }
+
+  @Post('documents/:id/analyze-impact')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  analyzeImpactFromDocument(@Param('id') id: string, @Body() body?: { title?: string; notes?: string }) {
+    return this.service.analyzeImpact(id, body?.title, body?.notes);
+  }
 }
+

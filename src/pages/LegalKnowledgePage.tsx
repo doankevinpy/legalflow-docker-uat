@@ -18,6 +18,7 @@ import {
   Database,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
+import { useAuth } from '../contexts/AuthContext';
 import type {
   LegalDocument,
   ProcedureTypeVersion,
@@ -30,6 +31,10 @@ import type {
 type TabType = 'overview' | 'documents' | 'procedures' | 'prompts' | 'checklists' | 'logs' | 'snapshots';
 
 export default function LegalKnowledgePage() {
+  const { user } = useAuth();
+  const role = user?.role ?? 'VIEWER';
+  const canAnalyzeImpact = ['ADMIN', 'MANAGER'].includes(role);
+
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -52,6 +57,13 @@ export default function LegalKnowledgePage() {
   const [selectedPromptVer, setSelectedPromptVer] = useState<AiPromptVersion | null>(null);
   const [selectedChecklistVer, setSelectedChecklistVer] = useState<ChecklistVersion | null>(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState<ProcedureAiAnalysisLegalSnapshot | null>(null);
+  const [showImpactModal, setShowImpactModal] = useState<boolean>(false);
+  const [impactSourceDocId, setImpactSourceDocId] = useState<string>('');
+  const [impactTitle, setImpactTitle] = useState<string>('');
+  const [impactNotes, setImpactNotes] = useState<string>('');
+  const [analyzingImpact, setAnalyzingImpact] = useState<boolean>(false);
+  const [impactResult, setImpactResult] = useState<any | null>(null);
+  const [selectedLogForDetail, setSelectedLogForDetail] = useState<LegalUpdateLog | null>(null);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -80,6 +92,26 @@ export default function LegalKnowledgePage() {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  const handleAnalyzeImpact = async () => {
+    setAnalyzingImpact(true);
+    try {
+      const res = await legalKnowledgeApi.analyzeImpactFromLog({
+        sourceDocumentId: impactSourceDocId || undefined,
+        title: impactTitle || undefined,
+        notes: impactNotes || undefined,
+      });
+      if (res.data && res.data.impactAnalysis) {
+        setImpactResult(res.data.impactAnalysis);
+        fetchAllData();
+      }
+    } catch (err) {
+      console.error('Failed to analyze impact:', err);
+      alert('Có lỗi xảy ra khi phân tích tác động pháp lý.');
+    } finally {
+      setAnalyzingImpact(false);
+    }
+  };
 
   // Helpers for formatting
   const formatDocType = (type: string) => {
@@ -659,7 +691,24 @@ export default function LegalKnowledgePage() {
                   <h3 className="font-bold text-sm text-gray-800 dark:text-white">Nhật ký Cập nhật Pháp lý (Legal Update Logs)</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">Lịch sử theo dõi thay đổi luật, nghị định, thông tư tác động đến TTHC và AI</p>
                 </div>
-                <span className="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded font-medium">Chỉ xem (Phase 8C)</span>
+                <div className="flex items-center gap-2">
+                  {canAnalyzeImpact && (
+                    <button
+                      onClick={() => {
+                        setImpactSourceDocId('');
+                        setImpactTitle('');
+                        setImpactNotes('');
+                        setImpactResult(null);
+                        setShowImpactModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition shadow-sm"
+                    >
+                      <ShieldAlert className="h-4 w-4" />
+                      Phân tích tác động
+                    </button>
+                  )}
+                  <span className="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded font-medium">Chỉ xem / Phân tích (Phase 8E)</span>
+                </div>
               </div>
               {updateLogs.length === 0 ? (
                 <div className="p-12 text-center text-gray-500 space-y-2">
@@ -682,7 +731,15 @@ export default function LegalKnowledgePage() {
                     <tbody className="divide-y text-sm">
                       {updateLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition">
-                          <td className="p-4 font-bold text-gray-900 dark:text-white max-w-sm">{log.updateTitle}</td>
+                          <td className="p-4 font-bold text-gray-900 dark:text-white max-w-sm">
+                            <button
+                              onClick={() => setSelectedLogForDetail(log)}
+                              className="text-left hover:text-blue-600 hover:underline flex items-center gap-1.5"
+                            >
+                              <span>{log.updateTitle}</span>
+                              <Eye className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                            </button>
+                          </td>
                           <td className="p-4 font-mono text-xs text-blue-600">{log.sourceDocument?.documentCode || log.sourceDocumentId || '---'}</td>
                           <td className="p-4 text-xs text-gray-600 max-w-md">{log.impactSummary || '---'}</td>
                           <td className="p-4">
@@ -1030,6 +1087,393 @@ export default function LegalKnowledgePage() {
             </div>
             <div className="p-4 border-t bg-gray-50 dark:bg-slate-800 flex justify-end">
               <button onClick={() => setSelectedSnapshot(null)} className="px-5 py-2 bg-gray-200 rounded-xl font-semibold text-xs">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: IMPACT ANALYSIS (PHASE 8E) */}
+      {showImpactModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border">
+            <div className="p-5 border-b bg-gray-50 dark:bg-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-6 w-6 text-blue-600" />
+                <div>
+                  <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                    AI Phân tích tác động cập nhật pháp lý (Phase 8E)
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Đánh giá ảnh hưởng khi văn bản pháp luật thay đổi đối với thủ tục, prompt và checklist
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowImpactModal(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 text-sm flex-1">
+              <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <strong className="font-bold text-sm uppercase">BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA</strong>
+                  <p className="text-xs leading-relaxed">
+                    AI chỉ tạo bản gợi ý phân tích tác động theo quy định. Cán bộ nghiệp vụ phải kiểm tra, đối chiếu toàn văn bản pháp luật hiện hành trước khi áp dụng vào thực tế giải quyết thủ tục hành chính. Hệ thống không tự động kích hoạt hay sửa đổi bất kỳ phiên bản nào.
+                  </p>
+                </div>
+              </div>
+
+              {!impactResult ? (
+                <div className="space-y-4 max-w-2xl mx-auto py-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Văn bản pháp lý nguồn (Chọn từ kho căn cứ nếu có):
+                    </label>
+                    <select
+                      value={impactSourceDocId}
+                      onChange={(e) => {
+                        setImpactSourceDocId(e.target.value);
+                        const doc = documents.find((d) => d.id === e.target.value);
+                        if (doc && !impactTitle) {
+                          setImpactTitle(`${doc.documentCode} - ${doc.documentTitle}`);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border rounded-xl text-sm bg-gray-50 dark:bg-slate-800 dark:border-slate-700"
+                    >
+                      <option value="">-- Chọn văn bản trong kho (Hoặc để trống nếu nhập tự do) --</option>
+                      {documents.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.documentCode} - {d.documentTitle}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Tiêu đề cập nhật / Tên văn bản mới <span className="text-red-500">*</span>:
+                    </label>
+                    <input
+                      type="text"
+                      value={impactTitle}
+                      onChange={(e) => setImpactTitle(e.target.value)}
+                      placeholder="Ví dụ: Nghị định 102/2024/NĐ-CP quy định chi tiết thi hành Luật Đất đai"
+                      className="w-full px-3 py-2 border rounded-xl text-sm bg-gray-50 dark:bg-slate-800 dark:border-slate-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Ghi chú / Nội dung thay đổi chính cần rà soát:
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={impactNotes}
+                      onChange={(e) => setImpactNotes(e.target.value)}
+                      placeholder="Ví dụ: Bổ sung quy định mới về thành phần hồ sơ và thời gian giải quyết chuyển mục đích sử dụng đất..."
+                      className="w-full px-3 py-2 border rounded-xl text-sm bg-gray-50 dark:bg-slate-800 dark:border-slate-700"
+                    />
+                  </div>
+
+                  <div className="pt-2 text-center">
+                    <button
+                      onClick={handleAnalyzeImpact}
+                      disabled={analyzingImpact || (!impactSourceDocId && !impactTitle)}
+                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition shadow"
+                    >
+                      {analyzingImpact ? 'AI đang phân tích...' : 'Bắt đầu phân tích tác động'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* SUMMARY */}
+                  <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-4 rounded-xl space-y-2">
+                    <h4 className="font-bold text-sm text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                      <Info className="h-4 w-4" /> Tóm tắt đánh giá tác động AI:
+                    </h4>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {impactResult.impactSummary}
+                    </p>
+                  </div>
+
+                  {/* AFFECTED LEGAL DOCUMENTS */}
+                  <div>
+                    <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider mb-2">
+                      1. Văn bản pháp lý chịu ảnh hưởng / liên quan ({impactResult.affectedLegalDocuments?.length || 0}):
+                    </h4>
+                    {(!impactResult.affectedLegalDocuments || impactResult.affectedLegalDocuments.length === 0) ? (
+                      <p className="text-xs text-gray-400 italic">Không có văn bản liên quan bị tác động trực tiếp.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {impactResult.affectedLegalDocuments.map((doc: any, idx: number) => (
+                          <div key={idx} className="p-3 border rounded-xl bg-gray-50/70 dark:bg-slate-800/60 space-y-1">
+                            <div className="flex items-center justify-between font-bold text-xs text-blue-600 dark:text-blue-400">
+                              <span>{doc.documentCode}</span>
+                              <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded">{doc.status}</span>
+                            </div>
+                            <p className="font-medium text-xs text-gray-800 dark:text-gray-200 line-clamp-1">{doc.documentTitle}</p>
+                            <p className="text-[11px] text-gray-500">{doc.impactNote}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AFFECTED PROCEDURE TYPES */}
+                  <div>
+                    <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider mb-2">
+                      2. Thủ tục hành chính chịu tác động ({impactResult.affectedProcedureTypes?.length || 0}):
+                    </h4>
+                    {(!impactResult.affectedProcedureTypes || impactResult.affectedProcedureTypes.length === 0) ? (
+                      <p className="text-xs text-gray-400 italic">Không phát hiện thủ tục hành chính chịu ảnh hưởng.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {impactResult.affectedProcedureTypes.map((proc: any, idx: number) => (
+                          <div key={idx} className="p-3 border rounded-xl bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900/50 space-y-1">
+                            <div className="flex items-center justify-between font-bold text-xs text-purple-700 dark:text-purple-300">
+                              <span>{proc.procedureCode}</span>
+                              <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-800 rounded">{proc.version}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-600 dark:text-gray-400">{proc.impactNote}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AFFECTED PROMPTS & CHECKLISTS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider mb-2">
+                        3. Prompt AI cần cập nhật ({impactResult.affectedPromptVersions?.length || 0}):
+                      </h4>
+                      <div className="space-y-2">
+                        {(!impactResult.affectedPromptVersions || impactResult.affectedPromptVersions.length === 0) ? (
+                          <p className="text-xs text-gray-400 italic">Không có prompt bị ảnh hưởng.</p>
+                        ) : (
+                          impactResult.affectedPromptVersions.map((p: any, idx: number) => (
+                            <div key={idx} className="p-2.5 border rounded-lg bg-emerald-50/40 dark:bg-emerald-950/20 text-xs">
+                              <div className="font-bold text-emerald-800 dark:text-emerald-300 flex justify-between">
+                                <span>{p.promptKey}</span>
+                                <span>{p.version}</span>
+                              </div>
+                              <p className="text-[11px] text-gray-500 mt-0.5">{p.impactNote}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider mb-2">
+                        4. Checklist nghiệp vụ ảnh hưởng ({impactResult.affectedChecklistVersions?.length || 0}):
+                      </h4>
+                      <div className="space-y-2">
+                        {(!impactResult.affectedChecklistVersions || impactResult.affectedChecklistVersions.length === 0) ? (
+                          <p className="text-xs text-gray-400 italic">Không có checklist bị ảnh hưởng.</p>
+                        ) : (
+                          impactResult.affectedChecklistVersions.map((c: any, idx: number) => (
+                            <div key={idx} className="p-2.5 border rounded-lg bg-teal-50/40 dark:bg-teal-950/20 text-xs">
+                              <div className="font-bold text-teal-800 dark:text-teal-300 flex justify-between">
+                                <span>{c.checklistKey}</span>
+                                <span>{c.version}</span>
+                              </div>
+                              <p className="text-[11px] text-gray-500 mt-0.5">{c.impactNote}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AFFECTED OPEN CASES */}
+                  <div>
+                    <h4 className="font-bold text-xs text-red-600 dark:text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4" /> 5. Hồ sơ TTHC đang xử lý cần lưu ý chuyển tiếp ({impactResult.affectedOpenProcedureCases?.length || 0}):
+                    </h4>
+                    {(!impactResult.affectedOpenProcedureCases || impactResult.affectedOpenProcedureCases.length === 0) ? (
+                      <p className="text-xs text-gray-400 italic">Hiện không có hồ sơ nào đang giải quyết ở các thủ tục liên quan.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {impactResult.affectedOpenProcedureCases.map((c: any, idx: number) => (
+                          <div key={idx} className="p-3 border border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/20 rounded-xl flex items-center justify-between text-xs">
+                            <div>
+                              <span className="font-bold text-red-800 dark:text-red-300 mr-2">{c.caseCode}</span>
+                              <span className="text-gray-700 dark:text-gray-300 font-medium">({c.applicantName})</span>
+                              <p className="text-[11px] text-gray-500 mt-0.5">{c.impactNote}</p>
+                            </div>
+                            <span className="px-2 py-1 bg-red-100 text-red-800 font-bold rounded">{c.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RECOMMENDED ACTIONS */}
+                  <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border space-y-3">
+                    <h4 className="font-bold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      6. Đề xuất hành động rà soát nghiệp vụ:
+                    </h4>
+                    <div className="space-y-2">
+                      {(impactResult.recommendedActions || []).map((act: string, idx: number) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs text-gray-700 dark:text-gray-300">
+                          <input type="checkbox" className="mt-0.5 rounded border-gray-300" defaultChecked={false} />
+                          <span>{act.replace(/^\[[ x]\]\s*/, '')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* RISK FLAGS */}
+                  <div className="space-y-2">
+                    {(impactResult.riskFlags || []).map((flag: string, idx: number) => (
+                      <div key={idx} className="p-3 bg-red-100/60 dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 rounded-xl text-xs font-medium">
+                        {flag}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-center text-xs text-gray-500 italic">
+                    * Tuân thủ an toàn nghiệp vụ Phase 8E: Hệ thống không tự động tạo hay kích hoạt phiên bản, không tự ý sửa đổi căn cứ hay kết luận hồ sơ.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t bg-gray-50 dark:bg-slate-800 flex items-center justify-between">
+              {impactResult ? (
+                <button
+                  onClick={() => setImpactResult(null)}
+                  className="text-xs text-blue-600 hover:underline font-semibold"
+                >
+                  ← Phân tích văn bản khác
+                </button>
+              ) : <div />}
+              <button
+                onClick={() => {
+                  setShowImpactModal(false);
+                  if (impactResult) fetchAllData();
+                }}
+                className="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl font-bold text-xs transition"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: UPDATE LOG DETAIL (PHASE 8E) */}
+      {selectedLogForDetail && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border">
+            <div className="p-5 border-b bg-gray-50 dark:bg-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                  Chi tiết Nhật ký Cập nhật: <span className="text-blue-600">{selectedLogForDetail.updateTitle}</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Ngày tạo: {new Date(selectedLogForDetail.createdAt).toLocaleString('vi-VN')} | Trạng thái: {selectedLogForDetail.reviewStatus}
+                </p>
+              </div>
+              <button onClick={() => setSelectedLogForDetail(null)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 text-sm flex-1">
+              {/* Parse notes if JSON */}
+              {(() => {
+                let parsed: any = null;
+                try {
+                  if (selectedLogForDetail.notes) {
+                    parsed = JSON.parse(selectedLogForDetail.notes);
+                  }
+                } catch (e) {}
+
+                if (!parsed || !parsed.impactSummary) {
+                  return (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                        <h4 className="font-bold text-xs text-gray-500 uppercase mb-1">Tóm tắt tác động:</h4>
+                        <p className="text-sm text-gray-800 dark:text-gray-200">{selectedLogForDetail.impactSummary || 'Không có tóm tắt.'}</p>
+                      </div>
+                      <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                        <h4 className="font-bold text-xs text-gray-500 uppercase mb-1">Ghi chú chi tiết:</h4>
+                        <pre className="text-xs font-mono whitespace-pre-wrap text-gray-700 dark:text-gray-300">{selectedLogForDetail.notes || '---'}</pre>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 border border-amber-300 p-3.5 rounded-xl text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200 text-xs font-bold">
+                      {parsed.disclaimer || 'BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA'}
+                    </div>
+
+                    <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-4 rounded-xl space-y-1">
+                      <h4 className="font-bold text-xs text-blue-900 dark:text-blue-300 uppercase">Tóm tắt đánh giá:</h4>
+                      <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{parsed.impactSummary}</p>
+                    </div>
+
+                    {parsed.affectedLegalDocuments?.length > 0 && (
+                      <div>
+                        <h4 className="font-bold text-xs text-gray-500 uppercase mb-2">1. Văn bản bị ảnh hưởng ({parsed.affectedLegalDocuments.length}):</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {parsed.affectedLegalDocuments.map((doc: any, i: number) => (
+                            <div key={i} className="p-2.5 border rounded-lg bg-gray-50 text-xs">
+                              <span className="font-bold text-blue-600">{doc.documentCode}</span>: <span className="text-gray-700">{doc.documentTitle}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {parsed.affectedProcedureTypes?.length > 0 && (
+                      <div>
+                        <h4 className="font-bold text-xs text-gray-500 uppercase mb-2">2. Thủ tục hành chính bị tác động ({parsed.affectedProcedureTypes.length}):</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {parsed.affectedProcedureTypes.map((proc: any, i: number) => (
+                            <div key={i} className="p-2.5 border rounded-lg bg-purple-50/50 text-xs font-bold text-purple-700">
+                              {proc.procedureCode} ({proc.version})
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {parsed.recommendedActions?.length > 0 && (
+                      <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border space-y-2">
+                        <h4 className="font-bold text-xs text-gray-700 dark:text-gray-300 uppercase">Đề xuất hành động:</h4>
+                        {parsed.recommendedActions.map((act: string, i: number) => (
+                          <div key={i} className="text-xs text-gray-700 dark:text-gray-300">
+                            • {act.replace(/^\[[ x]\]\s*/, '')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {parsed.riskFlags?.length > 0 && (
+                      <div className="space-y-1.5">
+                        {parsed.riskFlags.map((flag: string, i: number) => (
+                          <div key={i} className="p-2.5 bg-red-100/60 dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 rounded-lg text-xs font-medium">
+                            {flag}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="p-4 border-t bg-gray-50 dark:bg-slate-800 flex justify-end">
+              <button onClick={() => setSelectedLogForDetail(null)} className="px-5 py-2 bg-gray-200 dark:bg-slate-700 rounded-xl font-semibold text-xs">
                 Đóng
               </button>
             </div>
