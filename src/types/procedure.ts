@@ -110,4 +110,31 @@ export interface ProcedureCase {
   checklistItems?: ProcedureChecklistItem[];
   procedureNotes?: ProcedureNote[];
   auditLogs?: ProcedureAuditLog[];
+  aiAnalyses?: ProcedureAiAnalysis[];
+}
+
+export type ProcedureAiAnalysisType =
+  | 'LAND_FIRST_CERTIFICATE_REVIEW'
+  | 'LAND_USE_PURPOSE_CHANGE_REVIEW'
+  | 'FINANCIAL_OBLIGATION_REVIEW'
+  | 'CONSTRUCTION_PERMIT_REVIEW';
+
+export type ProcedureAiAnalysisStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
+
+export interface ProcedureAiAnalysis {
+  id: string;
+  procedureCaseId: string;
+  analysisType: ProcedureAiAnalysisType;
+  inputSnapshot?: any;
+  outputPayload?: any;
+  disclaimer: string;
+  confidenceLevel: string;
+  status: ProcedureAiAnalysisStatus;
+  createdById: string;
+  createdBy?: { id: string; fullName: string; email: string; role: string };
+  reviewedById?: string;
+  reviewedBy?: { id: string; fullName: string; email: string; role: string };
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }

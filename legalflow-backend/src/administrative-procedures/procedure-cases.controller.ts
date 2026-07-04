@@ -10,6 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { AdministrativeProceduresService } from './administrative-procedures.service';
+import { ProcedureAiService } from './ai/procedure-ai.service';
 import { CreateProcedureCaseDto } from './dto/create-procedure-case.dto';
 import { UpdateProcedureCaseDto } from './dto/update-procedure-case.dto';
 import { AddProcedureNoteDto } from './dto/add-procedure-note.dto';
@@ -22,11 +23,14 @@ import { ProcedureField, ProcedureStatus } from '@prisma/client';
 @Controller('procedure-cases')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProcedureCasesController {
-  constructor(private readonly service: AdministrativeProceduresService) {}
+  constructor(
+    private readonly service: AdministrativeProceduresService,
+    private readonly aiService: ProcedureAiService,
+  ) {}
 
   @Post()
   async createCase(@Body() createDto: CreateProcedureCaseDto, @Request() req: any) {
-    return this.service.createCase(createDto, req.user.userId);
+    return this.service.createCase(createDto, req?.user?.id || req?.user?.userId);
   }
 
   @Get()
@@ -52,7 +56,7 @@ export class ProcedureCasesController {
     @Body() updateDto: UpdateProcedureCaseDto,
     @Request() req: any,
   ) {
-    return this.service.updateCase(id, updateDto, req.user.userId);
+    return this.service.updateCase(id, updateDto, req?.user?.id || req?.user?.userId);
   }
 
   @Post(':id/notes')
@@ -61,7 +65,7 @@ export class ProcedureCasesController {
     @Body() noteDto: AddProcedureNoteDto,
     @Request() req: any,
   ) {
-    return this.service.addNote(id, noteDto, req.user.userId);
+    return this.service.addNote(id, noteDto, req?.user?.id || req?.user?.userId);
   }
 
   @Post(':id/checklists')
@@ -79,6 +83,35 @@ export class ProcedureCasesController {
     @Body() updateDto: UpdateProcedureChecklistDto,
     @Request() req: any,
   ) {
-    return this.service.updateChecklist(caseId, itemId, updateDto, req.user.userId);
+    return this.service.updateChecklist(caseId, itemId, updateDto, req?.user?.id || req?.user?.userId);
+  }
+
+  @Post(':id/ai/land-first-certificate-review')
+  async runLandFirstCertificateReview(@Param('id') id: string, @Request() req: any) {
+    return this.aiService.reviewLandFirstCertificate(id, req?.user?.id || req?.user?.userId);
+  }
+
+  @Get(':id/ai-analyses')
+  async getAiAnalyses(@Param('id') id: string) {
+    return this.aiService.getAnalysesByCaseId(id);
+  }
+
+  @Post(':id/ai-analyses/:analysisId/accept')
+  async acceptAiAnalysis(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+    @Body() body: { saveToNote?: boolean; applyChecklist?: boolean },
+    @Request() req: any,
+  ) {
+    return this.aiService.acceptAnalysis(caseId, analysisId, req?.user?.id || req?.user?.userId, body);
+  }
+
+  @Post(':id/ai-analyses/:analysisId/reject')
+  async rejectAiAnalysis(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+    @Request() req: any,
+  ) {
+    return this.aiService.rejectAnalysis(caseId, analysisId, req?.user?.id || req?.user?.userId);
   }
 }

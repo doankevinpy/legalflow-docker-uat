@@ -17,6 +17,6 @@ import { PrismaModule } from '../prisma/prisma.module';
       useClass: GeminiProvider,
     },
   ],
-  exports: [AiService, PromptBuilderService],
+  exports: [AiService, PromptBuilderService, AI_PROVIDER_TOKEN],
 })
 export class AiModule {}

@@ -6,6 +6,7 @@ import type {
   ProcedureStatus,
   ProcedureNote,
   ProcedureChecklistItem,
+  ProcedureAiAnalysis,
 } from '../types/procedure';
 
 export interface QueryProcedureCasesParams {
@@ -55,4 +56,16 @@ export const procedureCasesApi = {
 
   updateChecklist: (caseId: string, itemId: string, data: { isCompleted?: boolean; title?: string }) =>
     apiClient.patch<ProcedureChecklistItem>(`/procedure-cases/${caseId}/checklists/${itemId}`, data),
+
+  runLandFirstCertificateReview: (caseId: string) =>
+    apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai/land-first-certificate-review`),
+
+  getAiAnalyses: (caseId: string) =>
+    apiClient.get<ProcedureAiAnalysis[]>(`/procedure-cases/${caseId}/ai-analyses`),
+
+  acceptAiAnalysis: (caseId: string, analysisId: string, options?: { saveToNote?: boolean; applyChecklist?: boolean }) =>
+    apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/accept`, options || {}),
+
+  rejectAiAnalysis: (caseId: string, analysisId: string) =>
+    apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/reject`),
 };

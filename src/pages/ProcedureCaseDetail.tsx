@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { procedureCasesApi } from '../lib/procedureCasesApi';
-import type { ProcedureCase, ProcedureChecklistItem } from '../types/procedure';
+import type { ProcedureCase, ProcedureChecklistItem, ProcedureAiAnalysis } from '../types/procedure';
 
 export default function ProcedureCaseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +13,10 @@ export default function ProcedureCaseDetail() {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'documents' | 'ai_review' | 'checklist' | 'financial' | 'notes' | 'audit_log'
   >('overview');
+
+  // AI Review State
+  const [aiAnalyses, setAiAnalyses] = useState<ProcedureAiAnalysis[]>([]);
+  const [runningAi, setRunningAi] = useState<boolean>(false);
 
   // New Note
   const [noteContent, setNoteContent] = useState<string>('');
@@ -27,6 +31,12 @@ export default function ProcedureCaseDetail() {
     try {
       const res = await procedureCasesApi.getCase(caseId);
       setData(res);
+      try {
+        const aiRes = await procedureCasesApi.getAiAnalyses(caseId);
+        setAiAnalyses(aiRes || []);
+      } catch (aiErr) {
+        console.error('Error fetching AI analyses:', aiErr);
+      }
     } catch (err) {
       console.error('Error fetching procedure case detail:', err);
     } finally {
@@ -37,6 +47,40 @@ export default function ProcedureCaseDetail() {
   useEffect(() => {
     fetchDetail();
   }, [caseId]);
+
+  const handleRunAiReview = async () => {
+    if (!caseId) return;
+    setRunningAi(true);
+    try {
+      const newAnalysis = await procedureCasesApi.runLandFirstCertificateReview(caseId);
+      setAiAnalyses((prev) => [newAnalysis, ...prev]);
+      alert('Đã hoàn thành rà soát AI cho hồ sơ!');
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Lỗi khi gọi AI rà soát.');
+    } finally {
+      setRunningAi(false);
+    }
+  };
+
+  const handleAcceptAiAnalysis = async (analysisId: string, saveToNote: boolean, applyChecklist: boolean) => {
+    try {
+      await procedureCasesApi.acceptAiAnalysis(caseId, analysisId, { saveToNote, applyChecklist });
+      alert('Đã chấp nhận kết quả rà soát AI!');
+      fetchDetail();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Lỗi khi chấp nhận kết quả.');
+    }
+  };
+
+  const handleRejectAiAnalysis = async (analysisId: string) => {
+    try {
+      await procedureCasesApi.rejectAiAnalysis(caseId, analysisId);
+      alert('Đã từ chối kết quả rà soát AI.');
+      fetchDetail();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Lỗi khi từ chối kết quả.');
+    }
+  };
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,7 +258,7 @@ export default function ProcedureCaseDetail() {
           </div>
         )}
 
-        {/* TAB 3: AI REVIEW (Placeholder conforming strictly to user rules) */}
+        {/* TAB 3: AI REVIEW */}
         {activeTab === 'ai_review' && (
           <div className="space-y-6">
             <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm">
@@ -223,17 +267,281 @@ export default function ProcedureCaseDetail() {
                 <span>BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA</span>
               </div>
               <p className="text-xs text-amber-700 mt-1">
-                AI không kết luận thay cán bộ rằng hồ sơ đủ hay không đủ điều kiện. Cán bộ thẩm tra phải đối chiếu với tài liệu gốc theo nguyên tắc Human-in-the-Loop.
+                AI hỗ trợ với vai trò trợ lý chuyên môn rà soát hồ sơ, không thay thế cán bộ thẩm định và tuyệt đối không kết luận hồ sơ đủ hay không đủ điều kiện theo nguyên tắc Human-in-the-Loop.
               </p>
             </div>
 
-            <div className="p-12 text-center bg-gray-50 rounded-xl border border-dashed space-y-3">
-              <div className="text-3xl">🤖</div>
-              <h4 className="font-bold text-gray-700 text-base">Tính năng Trợ lý AI thẩm tra chuyên sâu chưa kích hoạt</h4>
-              <p className="text-sm text-gray-500 max-w-md mx-auto">
-                Trong giai đoạn Phase 7C-A (Nền tảng kỹ thuật), module AI chuyên sâu chưa được kết nối. Hệ thống sẽ hỗ trợ tự động rà soát thành phần hồ sơ, đối chiếu thông tin và gợi ý phiếu thẩm tra tại các phase tiếp theo (Phase 7C-B / 7D).
-              </p>
-            </div>
+            {data?.procedureType?.code !== 'LAND_FIRST_CERTIFICATE' && data?.procedureType?.group !== 'CAP_GCN_LAN_DAU' ? (
+              <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed space-y-2">
+                <div className="text-2xl">ℹ️</div>
+                <p className="font-semibold text-gray-700 text-sm">
+                  Chức năng này chỉ áp dụng cho hồ sơ cấp Giấy chứng nhận quyền sử dụng đất lần đầu.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center bg-blue-50 p-4 rounded-xl border border-blue-100">
+                  <div>
+                    <h4 className="font-bold text-blue-900 text-base">Trợ lý AI rà soát cấp GCN lần đầu</h4>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      Phân tích chuyên sâu thông tin chủ sở hữu, thửa đất, lịch sử sử dụng đất và đối chiếu căn cứ pháp lý.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRunAiReview}
+                    disabled={runningAi}
+                    className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold text-sm shadow flex items-center gap-2 transition"
+                  >
+                    {runningAi ? '⏳ Đang phân tích...' : '🤖 AI rà soát cấp GCN lần đầu'}
+                  </button>
+                </div>
+
+                {aiAnalyses.length === 0 && !runningAi && (
+                  <div className="p-12 text-center bg-gray-50 rounded-xl border border-dashed space-y-2">
+                    <div className="text-3xl text-gray-400">📄</div>
+                    <p className="text-sm text-gray-600">Chưa có bản rà soát AI nào cho hồ sơ này. Bấm nút phía trên để bắt đầu rà soát.</p>
+                  </div>
+                )}
+
+                {aiAnalyses.map((analysis) => {
+                  const payload = (analysis.outputPayload || {}) as any;
+                  const isPending = analysis.status === 'PENDING';
+                  return (
+                    <div key={analysis.id} className="border rounded-2xl bg-white shadow-sm overflow-hidden space-y-6 p-6">
+                      {/* Header */}
+                      <div className="flex justify-between items-start border-b pb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 text-base">Kết quả Phân tích Trợ lý AI</span>
+                            <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
+                              analysis.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
+                              analysis.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
+                              'bg-amber-100 text-amber-800'
+                            }`}>
+                              {analysis.status === 'ACCEPTED' ? 'Đã chấp nhận' :
+                               analysis.status === 'REJECTED' ? 'Đã từ chối' : 'Chờ kiểm tra'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Mức độ tin cậy: <span className="font-semibold">{analysis.confidenceLevel || 'MEDIUM'}</span> &bull; Thời gian: {new Date(analysis.createdAt).toLocaleString('vi-VN')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* A. Tóm tắt hồ sơ */}
+                      <div className="bg-slate-50 p-4 rounded-xl border space-y-1">
+                        <h5 className="font-bold text-gray-800 text-sm">A. Tóm tắt thông tin hồ sơ</h5>
+                        <p className="text-sm text-gray-700">{payload.summary || 'Không có tóm tắt'}</p>
+                        <p className="text-xs text-gray-500">Loại thủ tục: {payload.procedureType}</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* B. Thông tin người sử dụng đất */}
+                        <div className="border rounded-xl p-4 bg-white space-y-2">
+                          <h5 className="font-bold text-blue-900 text-sm flex items-center gap-1.5">
+                            <span>👤</span> B. Nhận diện Người sử dụng đất
+                          </h5>
+                          <div className="text-xs space-y-1 text-gray-700">
+                            <p><span className="font-semibold">Họ tên/Chủ thể:</span> {payload.applicantReview?.applicantName || 'Chưa rõ'}</p>
+                            <p><span className="font-semibold">Tình trạng nhân thân:</span> {payload.applicantReview?.identityInfoStatus}</p>
+                            <p><span className="font-semibold">Địa chỉ liên hệ:</span> {payload.applicantReview?.addressStatus}</p>
+                          </div>
+                          {payload.applicantReview?.issuesToVerify?.length > 0 && (
+                            <div className="mt-2 pt-2 border-t text-xs">
+                              <span className="font-semibold text-amber-700 block mb-1">Nội dung cần cán bộ kiểm tra:</span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-gray-600">
+                                {payload.applicantReview.issuesToVerify.map((item: string, idx: number) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* C. Thông tin thửa đất */}
+                        <div className="border rounded-xl p-4 bg-white space-y-2">
+                          <h5 className="font-bold text-blue-900 text-sm flex items-center gap-1.5">
+                            <span>🗺️</span> C. Nhận diện Thửa đất
+                          </h5>
+                          <div className="text-xs space-y-1 text-gray-700">
+                            <p><span className="font-semibold">Số thửa / Tờ bản đồ:</span> Thửa {payload.landParcelReview?.parcelNumber} / Tờ số {payload.landParcelReview?.mapSheetNumber}</p>
+                            <p><span className="font-semibold">Vị trí:</span> {payload.landParcelReview?.location}</p>
+                            <p><span className="font-semibold">Diện tích / Loại đất:</span> {payload.landParcelReview?.area} &bull; {payload.landParcelReview?.landUseType}</p>
+                            <p><span className="font-semibold">Ranh giới:</span> {payload.landParcelReview?.boundaryStatus}</p>
+                          </div>
+                          {payload.landParcelReview?.issuesToVerify?.length > 0 && (
+                            <div className="mt-2 pt-2 border-t text-xs">
+                              <span className="font-semibold text-amber-700 block mb-1">Điểm cần đối chiếu thực địa:</span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-gray-600">
+                                {payload.landParcelReview.issuesToVerify.map((item: string, idx: number) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* D. Nguồn gốc & Thời điểm sử dụng đất */}
+                      <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-4 space-y-2">
+                        <h5 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                          <span>📜</span> D. Phân tích Nguồn gốc & Thời điểm sử dụng đất
+                        </h5>
+                        <div className="text-xs space-y-1 text-gray-800">
+                          <p><span className="font-semibold">Nguồn gốc kê khai:</span> {payload.originAndUseHistoryReview?.declaredOrigin}</p>
+                          <p><span className="font-semibold">Thời điểm sử dụng:</span> {payload.originAndUseHistoryReview?.declaredUseStartTime}</p>
+                        </div>
+                        {payload.originAndUseHistoryReview?.riskFlags?.length > 0 && (
+                          <div className="text-xs bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-rose-800 space-y-1">
+                            <span className="font-semibold block">⚠️ Cảnh báo rủi ro lịch sử sử dụng:</span>
+                            <ul className="list-disc pl-4 space-y-0.5">
+                              {payload.originAndUseHistoryReview.riskFlags.map((risk: string, idx: number) => (
+                                <li key={idx}>{risk}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {payload.originAndUseHistoryReview?.issuesToVerify?.length > 0 && (
+                          <div className="text-xs pt-1">
+                            <span className="font-semibold text-gray-800 block mb-1">Nội dung cán bộ cần thẩm tra/bổ sung căn cứ:</span>
+                            <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                              {payload.originAndUseHistoryReview.issuesToVerify.map((item: string, idx: number) => (
+                                <li key={idx}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* E. Thành phần hồ sơ */}
+                      <div className="border rounded-xl p-4 bg-white space-y-3">
+                        <h5 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                          <span>📁</span> E. Kiểm tra Thành phần hồ sơ
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                          <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                            <span className="font-bold text-emerald-800 block mb-1">Tài liệu đã đính kèm</span>
+                            <ul className="list-disc pl-4 space-y-1 text-emerald-700">
+                              {(payload.documentCompletenessReview?.detectedDocuments || []).map((doc: string, idx: number) => (
+                                <li key={idx}>{doc}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                            <span className="font-bold text-amber-800 block mb-1">Tài liệu thiếu / Cần đối chiếu</span>
+                            <ul className="list-disc pl-4 space-y-1 text-amber-700">
+                              {(payload.documentCompletenessReview?.missingOrNeedCheckDocuments || []).map((doc: string, idx: number) => (
+                                <li key={idx}>{doc}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                            <span className="font-bold text-blue-800 block mb-1">Đề xuất yêu cầu bổ sung</span>
+                            <ul className="list-disc pl-4 space-y-1 text-blue-700">
+                              {(payload.documentCompletenessReview?.recommendSupplementDocuments || []).map((doc: string, idx: number) => (
+                                <li key={idx}>{doc}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* F. Quy hoạch, tranh chấp & hiện trạng */}
+                      <div className="border rounded-xl p-4 bg-white space-y-2">
+                        <h5 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                          <span>🔍</span> F. Kiểm tra Hiện trạng, Quy hoạch & Nghĩa vụ tài chính
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="font-semibold text-gray-800 block">Quy hoạch & Tranh chấp cần rà soát:</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-600">
+                              {(payload.planningDisputeAndCurrentStatusReview?.planningNeedCheck || []).map((item: string, idx: number) => (
+                                <li key={`p-${idx}`}>{item}</li>
+                              ))}
+                              {(payload.planningDisputeAndCurrentStatusReview?.disputeNeedCheck || []).map((item: string, idx: number) => (
+                                <li key={`d-${idx}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-gray-800 block">Hiện trạng sử dụng & Nghĩa vụ tài chính:</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-0.5 text-gray-600">
+                              {(payload.planningDisputeAndCurrentStatusReview?.currentUseNeedCheck || []).map((item: string, idx: number) => (
+                                <li key={`c-${idx}`}>{item}</li>
+                              ))}
+                              <li><span className="font-semibold text-indigo-700">Ghi chú tài chính:</span> {payload.financialObligationNotice?.message}</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* G. Khuyến nghị & Căn cứ */}
+                      <div className="border border-indigo-100 bg-indigo-50/30 rounded-xl p-4 space-y-3">
+                        <h5 className="font-bold text-indigo-900 text-sm flex items-center gap-1.5">
+                          <span>💡</span> G. Khuyến nghị Chuyên môn & Gợi ý bước xử lý
+                        </h5>
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="font-bold text-indigo-800 block mb-1">Khuyến nghị hướng giải quyết cho cán bộ:</span>
+                            <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                              {(payload.recommendations || []).map((rec: string, idx: number) => (
+                                <li key={idx}>{rec}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <span className="font-bold text-indigo-800 block mb-1">Gợi ý câu hỏi yêu cầu người dân giải trình/bổ sung:</span>
+                            <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                              {(payload.recommendedNextQuestions || []).map((q: string, idx: number) => (
+                                <li key={idx}>{q}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <span className="font-bold text-indigo-800 block mb-1">Căn cứ pháp lý áp dụng rà soát:</span>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {(payload.legalBasisToCheck || []).map((law: string, idx: number) => (
+                                <span key={idx} className="bg-white border px-2 py-0.5 rounded text-gray-700 font-medium">{law}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      {isPending && (
+                        <div className="pt-4 border-t flex flex-wrap items-center justify-end gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
+                          <button
+                            onClick={() => handleAcceptAiAnalysis(analysis.id, true, false)}
+                            className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-sm transition"
+                          >
+                            ✅ Chấp nhận &amp; Lưu ý kiến vào Ghi chú
+                          </button>
+                          <button
+                            onClick={() => handleAcceptAiAnalysis(analysis.id, false, true)}
+                            className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm transition"
+                          >
+                            📋 Chấp nhận &amp; Tạo checklist gợi ý
+                          </button>
+                          <button
+                            onClick={() => handleAcceptAiAnalysis(analysis.id, true, true)}
+                            className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition"
+                          >
+                            ⚡ Chấp nhận cả hai (Ghi chú + Checklist)
+                          </button>
+                          <button
+                            onClick={() => handleRejectAiAnalysis(analysis.id)}
+                            className="px-3.5 py-2 bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold hover:bg-rose-200 transition ml-2"
+                          >
+                            ❌ Từ chối
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

@@ -75,6 +75,8 @@ model User {
   completedProcedureChecklistItems ProcedureChecklistItem[]      @relation("CompletedProcedureChecklistItems")
   procedureNotes                   ProcedureNote[]               @relation("ProcedureNotes")
   procedureAuditLogs               ProcedureAuditLog[]           @relation("ProcedureAuditLogs")
+  createdProcedureAiAnalyses       ProcedureAiAnalysis[]         @relation("CreatedProcedureAiAnalyses")
+  reviewedProcedureAiAnalyses      ProcedureAiAnalysis[]         @relation("ReviewedProcedureAiAnalyses")
 }
 
 model LegalCase {
@@ -447,6 +449,7 @@ model AdministrativeProcedureCase {
   checklistItems      ProcedureChecklistItem[]
   procedureNotes      ProcedureNote[]
   auditLogs           ProcedureAuditLog[]
+  aiAnalyses          ProcedureAiAnalysis[]
 
   @@index([procedureTypeId])
   @@index([field])
@@ -523,5 +526,42 @@ model ProcedureAuditLog {
   @@index([procedureCaseId])
   @@index([userId])
   @@index([actionType])
+}
+
+enum ProcedureAiAnalysisType {
+  LAND_FIRST_CERTIFICATE_REVIEW
+  LAND_USE_PURPOSE_CHANGE_REVIEW
+  FINANCIAL_OBLIGATION_REVIEW
+  CONSTRUCTION_PERMIT_REVIEW
+}
+
+enum ProcedureAiAnalysisStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model ProcedureAiAnalysis {
+  id              String                      @id @default(uuid())
+  procedureCaseId String
+  procedureCase   AdministrativeProcedureCase @relation(fields: [procedureCaseId], references: [id], onDelete: Cascade)
+  analysisType    ProcedureAiAnalysisType
+  inputSnapshot   Json                        @default("{}")
+  outputPayload   Json                        @default("{}")
+  disclaimer      String                      @default("BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA")
+  confidenceLevel String                      @default("MEDIUM")
+  status          ProcedureAiAnalysisStatus   @default(PENDING)
+  createdById     String
+  createdBy       User                        @relation("CreatedProcedureAiAnalyses", fields: [createdById], references: [id], onDelete: Cascade)
+  reviewedById    String?
+  reviewedBy      User?                       @relation("ReviewedProcedureAiAnalyses", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([procedureCaseId])
+  @@index([analysisType])
+  @@index([status])
+  @@index([createdById])
 }
 
