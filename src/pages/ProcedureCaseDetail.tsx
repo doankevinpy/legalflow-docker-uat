@@ -670,6 +670,71 @@ export default function ProcedureCaseDetail() {
                         </div>
                       </div>
 
+                      {/* H. Căn cứ Pháp lý & Quản trị Phiên bản AI (Legal Snapshot) */}
+                      <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-4 space-y-3">
+                        <h5 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                          <span>🏛️</span> H. Căn cứ Pháp lý &amp; Quản trị Phiên bản AI (Legal Snapshot)
+                        </h5>
+                        
+                        {(() => {
+                          const snapshot = analysis.legalSnapshot;
+                          const meta = payload.legalKnowledgeMetadata;
+                          const kbVer = snapshot?.knowledgeBaseVersion || meta?.knowledgeBaseVersion || 'LAND_KB_V1_2026';
+                          const procVer = snapshot?.procedureTypeVersion?.version || meta?.procedureTypeVersion || 'Active Version';
+                          const promptVer = snapshot?.promptVersion?.version || meta?.promptVersion || 'Active Version';
+                          const chkVer = snapshot?.checklistVersion?.version || meta?.checklistVersion || 'Active Version';
+                          const docList = Array.isArray(snapshot?.legalDocumentIds) && snapshot.legalDocumentIds.length > 0
+                            ? snapshot.legalDocumentIds
+                            : Array.isArray(meta?.legalDocumentCodes) && meta.legalDocumentCodes.length > 0
+                            ? meta.legalDocumentCodes
+                            : ['Luật Đất đai 2024', 'NĐ 101/2024/NĐ-CP', 'NĐ 102/2024/NĐ-CP'];
+
+                          return (
+                            <div className="space-y-2.5 text-xs text-gray-800">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-white p-2.5 rounded-lg border border-amber-100 shadow-sm">
+                                <div>
+                                  <span className="text-gray-500 block text-[11px]">Knowledge Base</span>
+                                  <span className="font-bold text-amber-900">{kbVer}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 block text-[11px]">Procedure Version</span>
+                                  <span className="font-bold text-amber-900">{procVer}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 block text-[11px]">Prompt Version</span>
+                                  <span className="font-bold text-amber-900">{promptVer}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 block text-[11px]">Checklist Version</span>
+                                  <span className="font-bold text-amber-900">{chkVer}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <span className="font-semibold text-gray-700 block mb-1">Văn bản pháp luật áp dụng trong phiên bản này:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {docList.map((doc: string, idx: number) => (
+                                    <span key={idx} className="bg-amber-100/80 border border-amber-300 text-amber-950 px-2 py-0.5 rounded font-semibold text-[11px]">
+                                      {doc}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="bg-amber-100/60 border border-amber-300/80 p-2.5 rounded-lg text-amber-900 flex items-start gap-2">
+                                <span className="text-base leading-none mt-0.5">⚠️</span>
+                                <div className="space-y-0.5">
+                                  <span className="font-bold block">BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA</span>
+                                  <p className="text-amber-950 italic">
+                                    Căn cứ pháp lý hiển thị là phiên bản dữ liệu hệ thống ghi nhận tại thời điểm AI rà soát; cán bộ phải kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ địa phương tại thời điểm xử lý hồ sơ.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
                       {/* Export & Review Actions */}
                       <div className="pt-4 border-t flex flex-wrap items-center justify-between gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
                         {analysis.analysisType === 'LAND_FIRST_CERTIFICATE_REVIEW' ? (

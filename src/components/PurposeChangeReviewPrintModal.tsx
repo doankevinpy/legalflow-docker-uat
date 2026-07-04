@@ -226,6 +226,36 @@ export const PurposeChangeReviewPrintModal: React.FC<PurposeChangeReviewPrintMod
                   <div><span className="font-bold">Mức độ tin cậy AI:</span> <span className="font-semibold text-indigo-700">{confidenceLevel}</span></div>
                   <div><span className="font-bold">Thời điểm rà soát:</span> {createdAt}</div>
                 </div>
+
+                {/* Legal Snapshot & Admin Review */}
+                {(() => {
+                  const meta = outputPayload?.legalKnowledgeMetadata;
+                  const kbVer = meta?.knowledgeBaseVersion || 'LAND_KB_V1_2026';
+                  const procVer = meta?.procedureTypeVersion || 'Active Version';
+                  const promptVer = meta?.promptVersion || 'Active Version';
+                  const chkVer = meta?.checklistVersion || 'Active Version';
+                  const docList = Array.isArray(meta?.legalDocumentCodes) && meta.legalDocumentCodes.length > 0
+                    ? meta.legalDocumentCodes
+                    : ['Luật Đất đai 2024', 'NĐ 101/2024/NĐ-CP', 'NĐ 102/2024/NĐ-CP'];
+
+                  return (
+                    <div className="mt-3 p-3 bg-amber-50/70 border border-amber-300 rounded text-[12pt] space-y-2">
+                      <div className="font-bold text-amber-900">🏛️ CĂN CỨ PHÁP LÝ &amp; PHIÊN BẢN HỆ THỐNG (LEGAL SNAPSHOT):</div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <div><span className="font-semibold">Bộ dữ liệu (KB):</span> {kbVer}</div>
+                        <div><span className="font-semibold">Thủ tục:</span> {procVer}</div>
+                        <div><span className="font-semibold">Prompt AI:</span> {promptVer}</div>
+                        <div><span className="font-semibold">Checklist:</span> {chkVer}</div>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Văn bản pháp luật áp dụng:</span> {docList.join('; ')}
+                      </div>
+                      <div className="pt-1 border-t border-amber-200 text-[11.5pt] italic text-amber-950">
+                        <span className="font-bold not-italic">⚠️ BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA:</span> Căn cứ pháp lý hiển thị là phiên bản dữ liệu hệ thống ghi nhận tại thời điểm AI rà soát; cán bộ phải kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ địa phương tại thời điểm xử lý hồ sơ.
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* III. NHẬN DIỆN THÔNG TIN NGƯỜI SỬ DỤNG ĐẤT */}

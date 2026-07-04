@@ -66,6 +66,9 @@ export const procedureCasesApi = {
   getAiAnalyses: (caseId: string) =>
     apiClient.get<ProcedureAiAnalysis[]>(`/procedure-cases/${caseId}/ai-analyses`),
 
+  getAiAnalysisLegalSnapshot: (caseId: string, analysisId: string) =>
+    apiClient.get<any>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/legal-snapshot`),
+
   acceptAiAnalysis: (caseId: string, analysisId: string, options?: { saveToNote?: boolean; applyChecklist?: boolean }) =>
     apiClient.post<ProcedureAiAnalysis>(`/procedure-cases/${caseId}/ai-analyses/${analysisId}/accept`, options || {}),
 

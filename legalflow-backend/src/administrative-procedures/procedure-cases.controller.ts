@@ -103,6 +103,14 @@ export class ProcedureCasesController {
     return this.aiService.getAnalysesByCaseId(id);
   }
 
+  @Get(':id/ai-analyses/:analysisId/legal-snapshot')
+  async getAiAnalysisLegalSnapshot(
+    @Param('id') caseId: string,
+    @Param('analysisId') analysisId: string,
+  ) {
+    return this.aiService.getAnalysisLegalSnapshot(caseId, analysisId);
+  }
+
   @Post(':id/ai-analyses/:analysisId/accept')
   async acceptAiAnalysis(
     @Param('id') caseId: string,

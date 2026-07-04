@@ -135,6 +135,7 @@ export interface ProcedureAiAnalysis {
   reviewedById?: string;
   reviewedBy?: { id: string; fullName: string; email: string; role: string };
   reviewedAt?: string;
+  legalSnapshot?: any;
   createdAt: string;
   updatedAt: string;
 }

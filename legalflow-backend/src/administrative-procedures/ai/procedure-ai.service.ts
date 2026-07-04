@@ -6,6 +6,7 @@ import type { IAiProvider } from '../../ai/interfaces/ai-provider.interface';
 import { Packer } from 'docx';
 import { getAgencyConfig } from '../../config/agency.config';
 import { buildLandFirstCertReviewDocx, buildLandUsePurposeChangeReviewDocx } from './procedure-docx.helper';
+import { LegalKnowledgeService } from '../../legal-knowledge/legal-knowledge.service';
 
 @Injectable()
 export class ProcedureAiService {
@@ -15,6 +16,7 @@ export class ProcedureAiService {
     private readonly prisma: PrismaService,
     private readonly promptBuilder: ProcedureAiPromptBuilder,
     @Inject(AI_PROVIDER_TOKEN) private readonly aiProvider: IAiProvider,
+    private readonly legalKnowledgeService: LegalKnowledgeService,
   ) {}
 
   private async resolveUserId(userId?: string): Promise<string> {
@@ -217,6 +219,29 @@ export class ProcedureAiService {
       outputPayload = fallbackPayload;
     }
 
+    const legalContext = await this.legalKnowledgeService.resolveActiveLegalContext(
+      caseItem.procedureTypeId,
+      caseItem.procedureType?.code || null,
+      caseItem.procedureType?.group || null,
+      'LAND_FIRST_CERTIFICATE_REVIEW',
+    );
+
+    const legalKnowledgeMetadata = {
+      knowledgeBaseVersion: legalContext.knowledgeBaseVersion,
+      procedureTypeVersion: legalContext.procedureTypeVersion?.version || '',
+      promptVersion: legalContext.promptVersion?.version || '',
+      checklistVersion: legalContext.checklistVersion?.version || '',
+      legalDocumentCodes: (legalContext.legalDocuments || []).map((d: any) => d.documentCode).filter(Boolean),
+      requiresOfficerLegalVerification: true,
+      warning: legalContext.warning,
+      source: legalContext.source,
+    };
+
+    outputPayload = {
+      ...outputPayload,
+      legalKnowledgeMetadata,
+    };
+
     const analysis = await this.prisma.procedureAiAnalysis.create({
       data: {
         procedureCaseId: caseItem.id,
@@ -241,6 +266,17 @@ export class ProcedureAiService {
         outputPayload: { analysisId: analysis.id, status: analysis.status },
       },
     });
+
+    try {
+      await this.legalKnowledgeService.createLegalSnapshot(
+        analysis.id,
+        legalContext,
+        effectiveUserId,
+        caseItem.id,
+      );
+    } catch (err: any) {
+      this.logger.error(`Failed to create legal snapshot for analysis ${analysis.id}: ${err?.message || err}`);
+    }
 
     return analysis;
   }
@@ -449,6 +485,29 @@ export class ProcedureAiService {
       outputPayload = fallbackPayload;
     }
 
+    const legalContext = await this.legalKnowledgeService.resolveActiveLegalContext(
+      caseItem.procedureTypeId,
+      caseItem.procedureType?.code || null,
+      caseItem.procedureType?.group || null,
+      'LAND_USE_PURPOSE_CHANGE_REVIEW',
+    );
+
+    const legalKnowledgeMetadata = {
+      knowledgeBaseVersion: legalContext.knowledgeBaseVersion,
+      procedureTypeVersion: legalContext.procedureTypeVersion?.version || '',
+      promptVersion: legalContext.promptVersion?.version || '',
+      checklistVersion: legalContext.checklistVersion?.version || '',
+      legalDocumentCodes: (legalContext.legalDocuments || []).map((d: any) => d.documentCode).filter(Boolean),
+      requiresOfficerLegalVerification: true,
+      warning: legalContext.warning,
+      source: legalContext.source,
+    };
+
+    outputPayload = {
+      ...outputPayload,
+      legalKnowledgeMetadata,
+    };
+
     const analysis = await this.prisma.procedureAiAnalysis.create({
       data: {
         procedureCaseId: caseItem.id,
@@ -474,6 +533,17 @@ export class ProcedureAiService {
       },
     });
 
+    try {
+      await this.legalKnowledgeService.createLegalSnapshot(
+        analysis.id,
+        legalContext,
+        effectiveUserId,
+        caseItem.id,
+      );
+    } catch (err: any) {
+      this.logger.error(`Failed to create legal snapshot for analysis ${analysis.id}: ${err?.message || err}`);
+    }
+
     return analysis;
   }
 
@@ -483,9 +553,35 @@ export class ProcedureAiService {
       include: {
         createdBy: { select: { id: true, fullName: true, email: true, role: true } },
         reviewedBy: { select: { id: true, fullName: true, email: true, role: true } },
+        legalSnapshot: {
+          include: {
+            promptVersion: true,
+            checklistVersion: true,
+            procedureTypeVersion: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getAnalysisLegalSnapshot(caseId: string, analysisId: string) {
+    const analysis = await this.prisma.procedureAiAnalysis.findUnique({
+      where: { id: analysisId },
+      include: {
+        legalSnapshot: {
+          include: {
+            promptVersion: true,
+            checklistVersion: true,
+            procedureTypeVersion: true,
+          },
+        },
+      },
+    });
+    if (!analysis || analysis.procedureCaseId !== caseId) {
+      throw new NotFoundException('Không tìm thấy kết quả rà soát AI.');
+    }
+    return analysis.legalSnapshot || null;
   }
 
   async acceptAnalysis(
@@ -604,6 +700,13 @@ export class ProcedureAiService {
     const analysis = await this.prisma.procedureAiAnalysis.findUnique({
       where: { id: analysisId },
       include: {
+        legalSnapshot: {
+          include: {
+            promptVersion: true,
+            checklistVersion: true,
+            procedureTypeVersion: true,
+          },
+        },
         procedureCase: {
           include: {
             procedureType: true,
@@ -655,6 +758,13 @@ export class ProcedureAiService {
     const analysis = await this.prisma.procedureAiAnalysis.findUnique({
       where: { id: analysisId },
       include: {
+        legalSnapshot: {
+          include: {
+            promptVersion: true,
+            checklistVersion: true,
+            procedureTypeVersion: true,
+          },
+        },
         procedureCase: {
           include: {
             procedureType: true,
@@ -711,6 +821,7 @@ export class ProcedureAiService {
       createdAt: new Date(analysis.createdAt).toLocaleString('vi-VN'),
       confidenceLevel: analysis.confidenceLevel || 'MEDIUM',
       outputPayload: analysis.outputPayload || {},
+      legalSnapshot: analysis.legalSnapshot || null,
       agencyConfig: config,
       warningBanner: '⚠️ BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA',
       warningDisclaimer:
@@ -726,6 +837,13 @@ export class ProcedureAiService {
     const analysis = await this.prisma.procedureAiAnalysis.findUnique({
       where: { id: analysisId },
       include: {
+        legalSnapshot: {
+          include: {
+            promptVersion: true,
+            checklistVersion: true,
+            procedureTypeVersion: true,
+          },
+        },
         procedureCase: {
           include: {
             procedureType: true,
@@ -777,6 +895,13 @@ export class ProcedureAiService {
     const analysis = await this.prisma.procedureAiAnalysis.findUnique({
       where: { id: analysisId },
       include: {
+        legalSnapshot: {
+          include: {
+            promptVersion: true,
+            checklistVersion: true,
+            procedureTypeVersion: true,
+          },
+        },
         procedureCase: {
           include: {
             procedureType: true,
@@ -833,6 +958,7 @@ export class ProcedureAiService {
       createdAt: new Date(analysis.createdAt).toLocaleString('vi-VN'),
       confidenceLevel: analysis.confidenceLevel || 'MEDIUM',
       outputPayload: analysis.outputPayload || {},
+      legalSnapshot: analysis.legalSnapshot || null,
       agencyConfig: config,
       warningBanner: '⚠️ BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA',
       warningDisclaimer:

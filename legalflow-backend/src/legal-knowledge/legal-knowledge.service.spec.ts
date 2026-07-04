@@ -184,7 +184,13 @@ describe('LegalKnowledgeService', () => {
       ).toHaveBeenCalledWith({
         orderBy: { createdAt: 'desc' },
         include: {
-          procedureAiAnalysis: true,
+          procedureAiAnalysis: {
+            include: {
+              procedureCase: {
+                select: { id: true, caseCode: true, applicantName: true },
+              },
+            },
+          },
           procedureTypeVersion: true,
           promptVersion: true,
           checklistVersion: true,

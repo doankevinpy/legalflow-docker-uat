@@ -13,6 +13,38 @@ import {
 } from 'docx';
 import { AgencyConfig, getAgencyConfig } from '../../config/agency.config';
 
+function createLegalSnapshotSection(analysis: any, payload: any, createSubHeader: any): Paragraph[] {
+  const snapshot = analysis.legalSnapshot;
+  const meta = payload.legalKnowledgeMetadata;
+
+  if (snapshot || meta) {
+    const kbVer = snapshot?.knowledgeBaseVersion || meta?.knowledgeBaseVersion || 'LAND_KB_V1_2026';
+    const procVer = snapshot?.procedureTypeVersion?.version || meta?.procedureTypeVersion || 'Active Version';
+    const promptVer = snapshot?.promptVersion?.version || meta?.promptVersion || 'Active Version';
+    const chkVer = snapshot?.checklistVersion?.version || meta?.checklistVersion || 'Active Version';
+    let docList = 'Luật Đất đai 2024, NĐ 101/2024/NĐ-CP, NĐ 102/2024/NĐ-CP';
+    if (Array.isArray(snapshot?.legalDocumentIds) && snapshot.legalDocumentIds.length > 0) {
+      docList = snapshot.legalDocumentIds.join(', ');
+    } else if (Array.isArray(meta?.legalDocumentCodes) && meta.legalDocumentCodes.length > 0) {
+      docList = meta.legalDocumentCodes.join(', ');
+    }
+
+    return [
+      createSubHeader('Thông tin phiên bản căn cứ pháp lý đã ghi nhận:'),
+      new Paragraph({ children: [new TextRun({ text: 'Knowledge Base Version: ', bold: true }), new TextRun({ text: kbVer })], spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'Procedure Type Version: ', bold: true }), new TextRun({ text: procVer })], spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'AI Prompt Version: ', bold: true }), new TextRun({ text: promptVer })], spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'Checklist Version: ', bold: true }), new TextRun({ text: chkVer })], spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'Danh sách văn bản áp dụng: ', bold: true }), new TextRun({ text: docList })], spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'Lưu ý kiểm tra: ', bold: true, color: 'B45309' }), new TextRun({ text: 'Căn cứ pháp lý hiển thị là phiên bản dữ liệu hệ thống ghi nhận tại thời điểm AI rà soát; cán bộ phải kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có.', italics: true, color: 'B45309' })], spacing: { after: 180 } }),
+    ];
+  } else {
+    return [
+      new Paragraph({ children: [new TextRun({ text: '⚠️ Phiếu này chưa có dữ liệu legal snapshot; cán bộ phải kiểm tra căn cứ pháp lý hiện hành.', italics: true, color: 'B45309' })], spacing: { after: 180 } }),
+    ];
+  }
+}
+
 export function buildLandFirstCertReviewDocx(
   caseItem: any,
   analysis: any,
@@ -411,6 +443,7 @@ export function buildLandFirstCertReviewDocx(
           new Paragraph({ children: [new TextRun({ text: 'Loại phân tích: ', bold: true }), new TextRun({ text: 'Rà soát cấp Giấy chứng nhận lần đầu (LAND_FIRST_CERTIFICATE_REVIEW)' })], spacing: { after: 60 } }),
           new Paragraph({ children: [new TextRun({ text: 'Mức độ tin cậy AI: ', bold: true }), new TextRun({ text: analysis.confidenceLevel || 'MEDIUM' })], spacing: { after: 60 } }),
           new Paragraph({ children: [new TextRun({ text: 'Thời điểm phân tích: ', bold: true }), new TextRun({ text: new Date(analysis.createdAt).toLocaleString('vi-VN') })], spacing: { after: 180 } }),
+          ...createLegalSnapshotSection(analysis, payload, createSubHeader),
 
           // III. NHẬN DIỆN THÔNG TIN NGƯỜI SỬ DỤNG ĐẤT
           createSectionHeader('III. NHẬN DIỆN THÔNG TIN NGƯỜI SỬ DỤNG ĐẤT'),
@@ -921,6 +954,7 @@ export function buildLandUsePurposeChangeReviewDocx(
           new Paragraph({ children: [new TextRun({ text: 'Loại phân tích: ', bold: true }), new TextRun({ text: 'Rà soát chuyển mục đích sử dụng đất (LAND_USE_PURPOSE_CHANGE_REVIEW)' })], spacing: { after: 60 } }),
           new Paragraph({ children: [new TextRun({ text: 'Mức độ tin cậy AI: ', bold: true }), new TextRun({ text: analysis.confidenceLevel || 'MEDIUM' })], spacing: { after: 60 } }),
           new Paragraph({ children: [new TextRun({ text: 'Thời điểm phân tích: ', bold: true }), new TextRun({ text: new Date(analysis.createdAt).toLocaleString('vi-VN') })], spacing: { after: 180 } }),
+          ...createLegalSnapshotSection(analysis, payload, createSubHeader),
 
           // III. NHẬN DIỆN THÔNG TIN NGƯỜI SỬ DỤNG ĐẤT
           createSectionHeader('III. NHẬN DIỆN THÔNG TIN NGƯỜI SỬ DỤNG ĐẤT'),
