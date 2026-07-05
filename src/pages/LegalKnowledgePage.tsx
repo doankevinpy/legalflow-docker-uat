@@ -18,6 +18,7 @@ import {
   Database,
   FileText,
   Play,
+  CheckCircle2,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -132,6 +133,17 @@ export default function LegalKnowledgePage() {
   const [simChecklistVerId, setSimChecklistVerId] = useState<string>('');
   const [simNote, setSimNote] = useState<string>('');
   const [submittingSim, setSubmittingSim] = useState<boolean>(false);
+
+  // Phase 8F-E-C Activation Modal state
+  const [actModalOpen, setActModalOpen] = useState<boolean>(false);
+  const [actDraftType, setActDraftType] = useState<string>('PROCEDURE_TYPE_VERSION');
+  const [actDraftVerId, setActDraftVerId] = useState<string>('');
+  const [actReason, setActReason] = useState<string>('');
+  const [actEffectiveFrom, setActEffectiveFrom] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [actConfirmText, setActConfirmText] = useState<string>('');
+  const [actAgreedRisk, setActAgreedRisk] = useState<boolean>(false);
+  const [submittingAct, setSubmittingAct] = useState<boolean>(false);
+  const [actError, setActError] = useState<string>('');
 
   useEffect(() => {
     if (simModalOpen) {
@@ -251,6 +263,84 @@ export default function LegalKnowledgePage() {
       alert(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi chạy thử simulation.');
     } finally {
       setSubmittingSim(false);
+    }
+  };
+
+  useEffect(() => {
+    if (actModalOpen && selectedLogForDetail) {
+      let parsed: any = {};
+      try {
+        if (selectedLogForDetail.notes) {
+          const raw = JSON.parse(selectedLogForDetail.notes);
+          parsed = raw && typeof raw === 'object' ? raw : {};
+        }
+      } catch (e) {}
+      const drafts = parsed?.draftVersions?.list || [];
+      const filtered = drafts.filter((d: any) => d.type === actDraftType && (d.currentStatus || d.status || 'DRAFT') === 'DRAFT');
+      if (filtered.length > 0 && (!actDraftVerId || !filtered.some((item: any) => item.id === actDraftVerId))) {
+        setActDraftVerId(filtered[0].id);
+      } else if (filtered.length === 0) {
+        setActDraftVerId('');
+      }
+    }
+  }, [actModalOpen, actDraftType, selectedLogForDetail]);
+
+  const handleActivateVersion = async () => {
+    if (!selectedLogForDetail) return;
+    if (!actDraftVerId) {
+      setActError('Vui lòng chọn bản nháp version cần kích hoạt.');
+      return;
+    }
+    if (!actReason.trim()) {
+      setActError('Vui lòng nhập lý do kích hoạt.');
+      return;
+    }
+    if (!actEffectiveFrom) {
+      setActError('Vui lòng chọn ngày có hiệu lực.');
+      return;
+    }
+    if (actConfirmText !== 'KICH HOAT VERSION') {
+      setActError('Chuỗi xác nhận không chính xác. Vui lòng nhập đúng "KICH HOAT VERSION".');
+      return;
+    }
+    if (!actAgreedRisk) {
+      setActError('Vui lòng xác nhận đã kiểm tra simulation và hiểu rủi ro.');
+      return;
+    }
+
+    setSubmittingAct(true);
+    setActError('');
+    try {
+      const payload = {
+        draftType: actDraftType,
+        draftVersionId: actDraftVerId,
+        reason: actReason.trim(),
+        effectiveFrom: actEffectiveFrom,
+        confirmationText: actConfirmText,
+      };
+      const res = await legalKnowledgeApi.activateDraftVersion(selectedLogForDetail.id, payload);
+      const updatedLog = res?.updateLog || res?.log || res?.data?.updateLog || res?.data?.log;
+      if (updatedLog) {
+        setSelectedLogForDetail(updatedLog);
+      }
+      setActModalOpen(false);
+      setActReason('');
+      setActConfirmText('');
+      setActAgreedRisk(false);
+      await fetchAllData();
+      if (selectedLogForDetail?.id) {
+        try {
+          const freshLog = await legalKnowledgeApi.getUpdateLogById(selectedLogForDetail.id);
+          if (freshLog) setSelectedLogForDetail(freshLog);
+        } catch (e) {}
+      }
+      alert(res?.message || res?.data?.message || 'Kích hoạt version thủ công thành công! Version mới đã chuyển sang ACTIVE, version cũ đã chuyển sang REPLACED.');
+    } catch (err: any) {
+      console.error('Activate version error:', err);
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi kích hoạt version.';
+      setActError(Array.isArray(msg) ? msg.join('; ') : msg);
+    } finally {
+      setSubmittingAct(false);
     }
   };
 
@@ -1854,6 +1944,41 @@ export default function LegalKnowledgePage() {
                       </div>
                     )}
 
+                    {parsed.activationHistory?.length > 0 && (
+                      <div className="bg-emerald-50/60 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-3">
+                        <h4 className="font-bold text-xs text-emerald-900 dark:text-emerald-300 uppercase flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          Lịch sử kích hoạt version ({parsed.activationHistory.length}):
+                        </h4>
+                        <div className="space-y-2.5">
+                          {parsed.activationHistory.map((act: any, idx: number) => (
+                            <div key={idx} className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-900/40 shadow-sm text-xs space-y-1.5">
+                              <div className="flex flex-wrap items-center justify-between font-bold text-gray-800 dark:text-gray-200 border-b pb-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px]">ACTIVE</span>
+                                  <span>{act.draftType === 'PROCEDURE_TYPE_VERSION' ? 'Thủ tục hành chính' : act.draftType === 'AI_PROMPT_VERSION' ? 'Prompt AI' : 'Checklist'}</span>
+                                </div>
+                                <span className="text-[11px] text-gray-400">{new Date(act.activatedAt || act.createdAt || Date.now()).toLocaleString('vi-VN')}</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                                <div>• Version mới (ACTIVE): <span className="font-mono font-bold text-emerald-600">{act.newActiveVersionId || act.draftVersionId}</span></div>
+                                <div>• Version cũ (REPLACED): <span className="font-mono font-bold text-gray-500">{act.previousActiveVersionId || 'N/A'}</span></div>
+                              </div>
+                              <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                • Ngày hiệu lực: <span className="font-semibold text-gray-800 dark:text-gray-200">{act.effectiveFrom ? new Date(act.effectiveFrom).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                              </div>
+                              <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                • Thực hiện: <span className="font-semibold text-gray-800 dark:text-gray-200">{act.activatedByEmail || act.userEmail || 'N/A'} ({act.activatedByRole || act.userRole || 'N/A'})</span>
+                              </div>
+                              <div className="p-2 bg-gray-50 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300 italic text-[11px]">
+                                "Lý do: {act.reason}"
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {parsed.workflowHistory?.length > 0 && (
                       <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border space-y-3">
                         <h4 className="font-bold text-xs text-gray-700 dark:text-gray-300 uppercase flex items-center gap-1.5">
@@ -1870,6 +1995,7 @@ export default function LegalKnowledgePage() {
                               REJECT: 'Từ chối hướng xử lý',
                               CLOSE: 'Đóng nhật ký',
                               CREATE_DRAFT_VERSION: 'Tạo bản nháp version',
+                              ACTIVATE_DRAFT_VERSION: 'Kích hoạt version thủ công',
                             };
                             const actionText = actionMap[item.action] || item.actionLabel || item.action;
                             const timeVal = item.createdAt || item.timestamp;
@@ -1907,11 +2033,13 @@ export default function LegalKnowledgePage() {
                   const status = selectedLogForDetail.reviewStatus;
                   let isClosed = false;
                   let hasDrafts = false;
+                  let hasSimulations = false;
                   try {
                     if (selectedLogForDetail.notes) {
                       const p = JSON.parse(selectedLogForDetail.notes);
                       if (p.subStatus === 'CLOSED' || p.subStatus === 'REJECTED') isClosed = true;
                       if (p.draftVersions?.list?.length > 0) hasDrafts = true;
+                      if (p.simulations?.length > 0) hasSimulations = true;
                     }
                   } catch (e) {}
                   const isRejected = status === 'REJECTED' || isClosed;
@@ -2028,6 +2156,17 @@ export default function LegalKnowledgePage() {
                         </button>
                       )}
 
+                      {role === 'STAFF' && status === 'APPROVED' && !isRejected && (
+                        <button
+                          disabled
+                          title="Bạn không có quyền kích hoạt"
+                          className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Kích hoạt version
+                        </button>
+                      )}
+
                       {isLeader && status === 'APPROVED' && !isRejected ? (
                         <>
                           <button
@@ -2046,15 +2185,63 @@ export default function LegalKnowledgePage() {
                               Chạy thử bản nháp (Simulation)
                             </button>
                           )}
+                          {hasDrafts && hasSimulations ? (
+                            <button
+                              onClick={() => {
+                                let parsed: any = {};
+                                try {
+                                  if (selectedLogForDetail?.notes) parsed = JSON.parse(selectedLogForDetail.notes);
+                                } catch (e) {}
+                                const drafts = parsed?.draftVersions?.list || [];
+                                const firstDraft = drafts.find((d: any) => d.status === 'DRAFT');
+                                if (firstDraft) {
+                                  setActDraftType(firstDraft.type);
+                                  setActDraftVerId(firstDraft.id);
+                                } else {
+                                  setActDraftType('PROCEDURE_TYPE_VERSION');
+                                  setActDraftVerId('');
+                                }
+                                setActReason('');
+                                setActEffectiveFrom(new Date().toISOString().split('T')[0]);
+                                setActConfirmText('');
+                                setActAgreedRisk(false);
+                                setActError('');
+                                setActModalOpen(true);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs transition shadow-sm flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Kích hoạt version
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              title={!hasDrafts ? 'Chưa có bản nháp version' : 'Chưa chạy simulation'}
+                              className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Kích hoạt version
+                            </button>
+                          )}
                         </>
                       ) : isLeader ? (
-                        <button
-                          disabled
-                          title="Chỉ tạo bản nháp sau khi đã phê duyệt hướng xử lý."
-                          className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed"
-                        >
-                          Tạo bản nháp version
-                        </button>
+                        <>
+                          <button
+                            disabled
+                            title="Chỉ tạo bản nháp sau khi đã phê duyệt hướng xử lý."
+                            className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed"
+                          >
+                            Tạo bản nháp version
+                          </button>
+                          <button
+                            disabled
+                            title="Chưa phê duyệt hướng xử lý"
+                            className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Kích hoạt version
+                          </button>
+                        </>
                       ) : null}
                     </>
                   );
@@ -2368,6 +2555,190 @@ export default function LegalKnowledgePage() {
               >
                 {submittingSim && <span className="animate-spin">⌛</span>}
                 Bắt đầu chạy thử (Run Simulation)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 10: ACTIVATION MODAL (PHASE 8F-E-C) */}
+      {actModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-5 border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                Kích hoạt version pháp lý thủ công (Manual Activation)
+              </h3>
+              <button onClick={() => setActModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {actError && (
+              <div className="p-3 bg-red-100 dark:bg-red-950/60 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 rounded-xl text-xs font-semibold">
+                ⚠️ {actError}
+              </div>
+            )}
+
+            {/* Bước 1 – Chọn draft */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 uppercase flex items-center gap-1.5">
+                Bước 1 – Chọn bản nháp version cần kích hoạt:
+              </h4>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'PROCEDURE_TYPE_VERSION', label: 'Thủ tục hành chính' },
+                  { id: 'AI_PROMPT_VERSION', label: 'Prompt AI' },
+                  { id: 'CHECKLIST_VERSION', label: 'Checklist' },
+                ].map(type => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => setActDraftType(type.id)}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+                      actDraftType === type.id
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+
+              {(() => {
+                let parsed: any = {};
+                try {
+                  if (selectedLogForDetail?.notes) parsed = JSON.parse(selectedLogForDetail.notes);
+                } catch (e) {}
+                const drafts = parsed?.draftVersions?.list || [];
+                const filtered = drafts.filter((d: any) => d.type === actDraftType && (d.currentStatus || d.status || 'DRAFT') === 'DRAFT');
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 rounded-xl text-xs italic">
+                      {drafts.length > 0
+                        ? "Có bản nháp trong nhật ký nhưng không có bản nào còn ở trạng thái DRAFT. Vui lòng kiểm tra trạng thái version hoặc refresh dữ liệu."
+                        : "Không có bản nháp nào ở trạng thái DRAFT cho loại version này."}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
+                      Danh sách bản nháp DRAFT hợp lệ:
+                    </label>
+                    <select
+                      value={actDraftVerId}
+                      onChange={(e) => setActDraftVerId(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                    >
+                      {filtered.map((d: any) => (
+                        <option key={d.id} value={d.id}>
+                          [{d.version}] {d.name} (Trạng thái: {d.currentStatus || d.status || 'DRAFT'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Bước 2 – Xem cảnh báo */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-xs text-red-600 uppercase flex items-center gap-1.5">
+                Bước 2 – Cảnh báo rủi ro (Bắt buộc đọc kỹ):
+              </h4>
+              <div className="p-3.5 bg-red-100/80 dark:bg-red-950/60 border border-red-300 dark:border-red-800 text-red-950 dark:text-red-200 rounded-xl text-xs font-medium leading-relaxed shadow-inner">
+                <span className="font-bold block mb-1">⚠️ LƯU Ý TÁC ĐỘNG PHÁP LÝ:</span>
+                Kích hoạt version sẽ ảnh hưởng đến các kết quả AI review mới phát sinh sau thời điểm kích hoạt. Kết quả AI cũ vẫn giữ legal snapshot tại thời điểm tạo. Thao tác này không tự sửa hồ sơ cũ.
+              </div>
+            </div>
+
+            {/* Bước 3 – Nhập thông tin */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 uppercase flex items-center gap-1.5">
+                Bước 3 – Nhập thông tin kích hoạt:
+              </h4>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Lý do kích hoạt (Bắt buộc):
+                </label>
+                <textarea
+                  rows={2}
+                  value={actReason}
+                  onChange={(e) => setActReason(e.target.value)}
+                  placeholder="Nhập lý do nghiệp vụ hoặc căn cứ ban hành áp dụng version mới..."
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-xs focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Ngày có hiệu lực (Bắt buộc):
+                </label>
+                <input
+                  type="date"
+                  value={actEffectiveFrom}
+                  onChange={(e) => setActEffectiveFrom(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                />
+              </div>
+            </div>
+
+            {/* Bước 4 – Xác nhận thủ công */}
+            <div className="space-y-3 p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border">
+              <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 uppercase flex items-center gap-1.5">
+                Bước 4 – Xác nhận thủ công nhiều lớp:
+              </h4>
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={actAgreedRisk}
+                  onChange={(e) => setActAgreedRisk(e.target.checked)}
+                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 shrink-0"
+                />
+                <span className="font-medium">
+                  Tôi xác nhận đã kiểm tra simulation và hiểu rằng version mới sẽ ảnh hưởng đến AI review mới.
+                </span>
+              </label>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Nhập chính xác chuỗi <code className="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-emerald-600 font-mono">KICH HOAT VERSION</code> để xác nhận:
+                </label>
+                <input
+                  type="text"
+                  value={actConfirmText}
+                  onChange={(e) => setActConfirmText(e.target.value)}
+                  placeholder="KICH HOAT VERSION"
+                  className="w-full px-3.5 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none transition uppercase"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t">
+              <button
+                disabled={submittingAct}
+                onClick={() => setActModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={
+                  submittingAct ||
+                  !actDraftVerId ||
+                  !actReason.trim() ||
+                  !actEffectiveFrom ||
+                  actConfirmText !== 'KICH HOAT VERSION' ||
+                  !actAgreedRisk
+                }
+                onClick={handleActivateVersion}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submittingAct && <span className="animate-spin">⌛</span>}
+                Tôi hiểu rủi ro và kích hoạt version
               </button>
             </div>
           </div>

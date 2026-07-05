@@ -40,6 +40,8 @@ export const legalKnowledgeApi = {
   getSampleCases: () => apiClient.get<any[]>('/legal-knowledge/sample-cases'),
   runDraftSimulation: (id: string, data: { procedureCaseId: string; draftProcedureTypeVersionId?: string; draftPromptVersionId?: string; draftChecklistVersionId?: string; note?: string }) =>
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/run-draft-simulation`, data),
+  activateDraftVersion: (id: string, data: { draftType: string; draftVersionId: string; reason: string; effectiveFrom: string; confirmationText: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/activate-draft-version`, data),
 };
 
 

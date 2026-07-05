@@ -56,8 +56,64 @@ export class LegalKnowledgeService {
     });
   }
 
+  private async hydrateLogNotes(log: any, db: any = this.prisma): Promise<any> {
+    if (!log || !log.notes) return log;
+    try {
+      let parsedNotes: any;
+      if (typeof log.notes === 'string') {
+        parsedNotes = JSON.parse(log.notes);
+      } else if (typeof log.notes === 'object') {
+        parsedNotes = log.notes;
+      }
+      if (!parsedNotes || typeof parsedNotes !== 'object') return log;
+      if (parsedNotes.draftVersions && Array.isArray(parsedNotes.draftVersions.list) && parsedNotes.draftVersions.list.length > 0) {
+        const hydratedList = await Promise.all(
+          parsedNotes.draftVersions.list.map(async (draft: any) => {
+            if (!draft || !draft.id || !draft.type) return draft;
+            let record: any = null;
+            if (draft.type === 'PROCEDURE_TYPE_VERSION') {
+              record = await db.procedureTypeVersion.findUnique({ where: { id: draft.id } });
+            } else if (draft.type === 'AI_PROMPT_VERSION') {
+              record = await db.aiPromptVersion.findUnique({ where: { id: draft.id } });
+            } else if (draft.type === 'CHECKLIST_VERSION') {
+              record = await db.checklistVersion.findUnique({ where: { id: draft.id } });
+            }
+            if (record) {
+              const currentStatus = record.status;
+              return {
+                ...draft,
+                status: currentStatus,
+                currentStatus: currentStatus,
+                effectiveFrom: record.effectiveFrom ? record.effectiveFrom.toISOString() : null,
+                effectiveTo: record.effectiveTo ? record.effectiveTo.toISOString() : null,
+                isActivatable: currentStatus === 'DRAFT',
+              };
+            }
+            const fallbackStatus = draft.currentStatus || draft.status || 'DRAFT';
+            return {
+              ...draft,
+              status: fallbackStatus,
+              currentStatus: fallbackStatus,
+              isActivatable: fallbackStatus === 'DRAFT',
+            };
+          })
+        );
+        parsedNotes.draftVersions.list = hydratedList;
+        log.notes = typeof log.notes === 'string' ? JSON.stringify(parsedNotes) : parsedNotes;
+      }
+    } catch (e) {
+      // ignore JSON parse error
+    }
+    return log;
+  }
+
+  private async hydrateLogsNotes(logs: any[], db: any = this.prisma): Promise<any[]> {
+    if (!Array.isArray(logs)) return logs;
+    return Promise.all(logs.map(log => this.hydrateLogNotes(log, db)));
+  }
+
   async getUpdateLogs() {
-    return this.prisma.legalUpdateLog.findMany({
+    const logs = await this.prisma.legalUpdateLog.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         sourceDocument: true,
@@ -66,6 +122,7 @@ export class LegalKnowledgeService {
         },
       },
     });
+    return this.hydrateLogsNotes(logs);
   }
 
   async getSnapshots() {
@@ -276,7 +333,7 @@ export class LegalKnowledgeService {
     if (!log) {
       throw new NotFoundException(`LegalUpdateLog with ID "${id}" not found`);
     }
-    return log;
+    return this.hydrateLogNotes(log);
   }
 
   async analyzeImpact(sourceDocumentId?: string, title?: string, notes?: string) {
@@ -583,7 +640,7 @@ export class LegalKnowledgeService {
     return {
       success: true,
       message: `Đã thực hiện thành công thao tác ${action}`,
-      updateLog: updatedLog,
+      updateLog: await this.hydrateLogNotes(updatedLog),
     };
   }
 
@@ -698,6 +755,7 @@ export class LegalKnowledgeService {
         id: createdDraft.id,
         type: 'PROCEDURE_TYPE_VERSION',
         version: newVer,
+        status: 'DRAFT',
         name: source.procedureName,
         sourceVersionId: source.id,
         reason: reason.trim(),
@@ -756,6 +814,7 @@ export class LegalKnowledgeService {
         id: createdDraft.id,
         type: 'AI_PROMPT_VERSION',
         version: newVer,
+        status: 'DRAFT',
         name: source.promptKey,
         sourceVersionId: source.id,
         reason: reason.trim(),
@@ -812,6 +871,7 @@ export class LegalKnowledgeService {
         id: createdDraft.id,
         type: 'CHECKLIST_VERSION',
         version: newVer,
+        status: 'DRAFT',
         name: source.checklistKey,
         sourceVersionId: source.id,
         reason: reason.trim(),
@@ -876,7 +936,7 @@ export class LegalKnowledgeService {
       success: true,
       message: `Đã tạo bản nháp phiên bản mới (${draftSummary.version}) thành công.`,
       draftVersion: createdDraft,
-      updateLog: updatedLog,
+      updateLog: await this.hydrateLogNotes(updatedLog),
     };
   }
 
@@ -1100,7 +1160,7 @@ export class LegalKnowledgeService {
       success: true,
       message: 'Chạy kiểm thử song song (Simulation) bản nháp thành công. Bản chạy thử không làm thay đổi dữ liệu hồ sơ chính thức.',
       simulation: simulationResult,
-      updateLog: updatedLog,
+      updateLog: await this.hydrateLogNotes(updatedLog),
     };
   }
 
@@ -1357,7 +1417,7 @@ export class LegalKnowledgeService {
         draftType,
         previousActiveVersionId: oldActiveVersionId || null,
         newActiveVersionId,
-        updateLog: updatedLog,
+        updateLog: await this.hydrateLogNotes(updatedLog, tx),
       };
     });
   }
