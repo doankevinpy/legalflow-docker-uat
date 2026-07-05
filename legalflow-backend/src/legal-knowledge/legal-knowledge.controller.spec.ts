@@ -15,6 +15,7 @@ describe('LegalKnowledgeController', () => {
     getUpdateLogById: jest.fn(),
     getSnapshots: jest.fn(),
     analyzeImpact: jest.fn(),
+    handleWorkflowAction: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -124,6 +125,69 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.analyzeImpactFromDocument('doc-1', { title: 'Test' });
     expect(result).toEqual(mockResult);
     expect(mockService.analyzeImpact).toHaveBeenCalledWith('doc-1', 'Test', undefined);
+  });
+
+  it('startReview should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.startReview('1', { note: 'test' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'START_REVIEW', 'test', '', { id: 'u1' });
+  });
+
+  it('addReviewNote should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.addReviewNote('1', { note: 'test note' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'ADD_NOTE', 'test note', '', { id: 'u1' });
+  });
+
+  it('requestMoreInfo should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.requestMoreInfo('1', { note: 'need info' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'REQUEST_MORE_INFO', 'need info', '', { id: 'u1' });
+  });
+
+  it('approveForVersioning should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.approveForVersioning('1', { note: 'approved' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'APPROVE_FOR_VERSIONING', 'approved', '', { id: 'u1' });
+  });
+
+  it('rejectUpdate should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.rejectUpdate('1', { reason: 'rejected' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'REJECT', '', 'rejected', { id: 'u1' });
+  });
+
+  it('closeUpdate should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.closeUpdate('1', { note: 'closed' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'CLOSE', 'closed', '', { id: 'u1' });
+  });
+
+  it('workflowAction should call service.handleWorkflowAction', async () => {
+    const mockResult = { success: true };
+    mockService.handleWorkflowAction.mockResolvedValue(mockResult);
+
+    const result = await controller.workflowAction('1', { action: 'START_REVIEW', note: 'test' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'START_REVIEW', 'test', '', { id: 'u1' });
   });
 });
 

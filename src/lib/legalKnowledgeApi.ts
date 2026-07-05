@@ -21,5 +21,19 @@ export const legalKnowledgeApi = {
     apiClient.post<any>('/legal-knowledge/update-logs/analyze-impact', data),
   analyzeImpactFromDoc: (id: string, data?: { title?: string; notes?: string }) =>
     apiClient.post<any>(`/legal-knowledge/documents/${id}/analyze-impact`, data || {}),
+  startReview: (id: string, data?: { note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/start-review`, data || {}),
+  addReviewNote: (id: string, data?: { note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/add-review-note`, data || {}),
+  requestMoreInfo: (id: string, data?: { note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/request-more-info`, data || {}),
+  approveForVersioning: (id: string, data?: { note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/approve-for-versioning`, data || {}),
+  rejectUpdate: (id: string, data?: { note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/reject`, data || {}),
+  closeUpdate: (id: string, data?: { note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/close`, data || {}),
+  workflowAction: (id: string, data: { action: string; note?: string; reason?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/workflow-action`, data),
 };
 

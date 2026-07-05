@@ -65,6 +65,54 @@ export default function LegalKnowledgePage() {
   const [impactResult, setImpactResult] = useState<any | null>(null);
   const [selectedLogForDetail, setSelectedLogForDetail] = useState<LegalUpdateLog | null>(null);
 
+  // Workflow action modal states
+  const [workflowModal, setWorkflowModal] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    requireNote: boolean;
+    requireReason: boolean;
+    isWarning: boolean;
+    buttonLabel: string;
+    buttonClass: string;
+  } | null>(null);
+  const [workflowNote, setWorkflowNote] = useState<string>('');
+  const [workflowReason, setWorkflowReason] = useState<string>('');
+  const [submittingWorkflow, setSubmittingWorkflow] = useState<boolean>(false);
+
+  const handleWorkflowSubmit = async () => {
+    if (!selectedLogForDetail || !workflowModal) return;
+    if (workflowModal.requireNote && !workflowNote.trim() && !workflowReason.trim()) {
+      alert('Vui lòng nhập ghi chú hoặc lý do theo yêu cầu.');
+      return;
+    }
+    if (workflowModal.requireReason && !workflowReason.trim() && !workflowNote.trim()) {
+      alert('Vui lòng nhập lý do theo yêu cầu.');
+      return;
+    }
+    setSubmittingWorkflow(true);
+    try {
+      const res = await legalKnowledgeApi.workflowAction(selectedLogForDetail.id, {
+        action: workflowModal.action,
+        note: workflowNote,
+        reason: workflowReason,
+      });
+      const updatedLog = res?.updateLog || res?.log || res?.data?.updateLog || res?.data?.log;
+      if (updatedLog) {
+        setSelectedLogForDetail(updatedLog);
+      }
+      setWorkflowModal(null);
+      setWorkflowNote('');
+      setWorkflowReason('');
+      await fetchAllData();
+    } catch (err: any) {
+      console.error('Workflow action error:', err);
+      alert(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi thực hiện thao tác workflow.');
+    } finally {
+      setSubmittingWorkflow(false);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
@@ -101,13 +149,14 @@ export default function LegalKnowledgePage() {
         title: impactTitle || undefined,
         notes: impactNotes || undefined,
       });
-      if (res.data && res.data.impactAnalysis) {
-        setImpactResult(res.data.impactAnalysis);
+      const analysis = res?.impactAnalysis || res?.data?.impactAnalysis;
+      if (analysis) {
+        setImpactResult(analysis);
         fetchAllData();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to analyze impact:', err);
-      alert('Có lỗi xảy ra khi phân tích tác động pháp lý.');
+      alert(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi phân tích tác động pháp lý.');
     } finally {
       setAnalyzingImpact(false);
     }
@@ -152,8 +201,24 @@ export default function LegalKnowledgePage() {
         label = 'Hết hiệu lực';
         break;
       case 'APPROVED':
-        bg = 'bg-blue-50 text-blue-700 border-blue-200';
-        label = 'Đã phê duyệt';
+        bg = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300';
+        label = 'Đã phê duyệt (Approved)';
+        break;
+      case 'PENDING':
+        bg = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300';
+        label = 'Chờ rà soát (Pending)';
+        break;
+      case 'REVIEWING':
+        bg = 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300';
+        label = 'Đang rà soát (Reviewing)';
+        break;
+      case 'REJECTED':
+        bg = 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300';
+        label = 'Đã từ chối (Rejected)';
+        break;
+      case 'APPLIED':
+        bg = 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300';
+        label = 'Đã áp dụng (Applied)';
         break;
     }
     return (
@@ -707,14 +772,41 @@ export default function LegalKnowledgePage() {
                       Phân tích tác động
                     </button>
                   )}
-                  <span className="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded font-medium">Chỉ xem / Phân tích (Phase 8E)</span>
+                  <span className="text-xs px-2.5 py-1 bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 rounded font-semibold">Quy trình rà soát / Phê duyệt (Phase 8F-B)</span>
                 </div>
               </div>
               {updateLogs.length === 0 ? (
-                <div className="p-12 text-center text-gray-500 space-y-2">
-                  <History className="h-8 w-8 mx-auto text-gray-400" />
-                  <p className="text-sm font-medium">Chưa có nhật ký cập nhật pháp lý nào được ghi nhận.</p>
-                  <p className="text-xs text-gray-400">Các biến động pháp lý hoặc thao tác cập nhật phiên bản luật sẽ được lưu vết tại đây.</p>
+                <div className="p-12 text-center text-gray-500 space-y-4">
+                  <div className="w-16 h-16 bg-blue-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400">
+                    <History className="h-8 w-8" />
+                  </div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <p className="text-base font-bold text-gray-800 dark:text-gray-200">Chưa có nhật ký cập nhật pháp lý nào</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      Hệ thống tự động ghi nhận nhật ký khi phát hiện văn bản mới hoặc khi chuyên viên tiến hành Phân tích tác động pháp lý (Phase 8E/8F-B).
+                    </p>
+                  </div>
+                  {canAnalyzeImpact ? (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => {
+                          setImpactSourceDocId('');
+                          setImpactTitle('');
+                          setImpactNotes('');
+                          setImpactResult(null);
+                          setShowImpactModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md hover:shadow-lg"
+                      >
+                        <ShieldAlert className="h-4 w-4" />
+                        + Tạo nhật ký đầu tiên (Phân tích tác động)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-gray-100 dark:bg-slate-800 rounded-lg text-xs text-gray-600 max-w-sm mx-auto">
+                      Bạn đang ở quyền <strong className="text-gray-900 dark:text-white">{role}</strong>. Vui lòng liên hệ Quản lý hoặc Quản trị viên để thực hiện phân tích tác động pháp lý.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -743,9 +835,20 @@ export default function LegalKnowledgePage() {
                           <td className="p-4 font-mono text-xs text-blue-600">{log.sourceDocument?.documentCode || log.sourceDocumentId || '---'}</td>
                           <td className="p-4 text-xs text-gray-600 max-w-md">{log.impactSummary || '---'}</td>
                           <td className="p-4">
-                            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-semibold">
-                              {log.reviewStatus}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              {formatStatusBadge(log.reviewStatus)}
+                              {(() => {
+                                try {
+                                  if (log.notes) {
+                                    const p = JSON.parse(log.notes);
+                                    if (p.subStatus && p.subStatus !== log.reviewStatus) {
+                                      return <span className="text-[10px] text-gray-500 font-mono">({p.subStatus})</span>;
+                                    }
+                                  }
+                                } catch (e) {}
+                                return null;
+                              })()}
+                            </div>
                           </td>
                           <td className="p-4 text-xs text-gray-500">{new Date(log.createdAt).toLocaleString('vi-VN')}</td>
                         </tr>
@@ -1467,14 +1570,248 @@ export default function LegalKnowledgePage() {
                         ))}
                       </div>
                     )}
+
+                    {parsed.workflowHistory?.length > 0 && (
+                      <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border space-y-3">
+                        <h4 className="font-bold text-xs text-gray-700 dark:text-gray-300 uppercase flex items-center gap-1.5">
+                          <History className="h-4 w-4 text-blue-600" />
+                          Lịch sử rà soát / Workflow ({parsed.workflowHistory.length}):
+                        </h4>
+                        <div className="space-y-2.5">
+                          {parsed.workflowHistory.map((item: any, i: number) => {
+                            const actionMap: Record<string, string> = {
+                              START_REVIEW: 'Bắt đầu rà soát',
+                              ADD_NOTE: 'Thêm ghi chú rà soát',
+                              REQUEST_MORE_INFO: 'Yêu cầu bổ sung thông tin',
+                              APPROVE_FOR_VERSIONING: 'Phê duyệt hướng xử lý',
+                              REJECT: 'Từ chối hướng xử lý',
+                              CLOSE: 'Đóng nhật ký',
+                            };
+                            const actionText = actionMap[item.action] || item.actionLabel || item.action;
+                            const timeVal = item.createdAt || item.timestamp;
+                            const timeText = timeVal ? new Date(timeVal).toLocaleString('vi-VN') : '';
+                            const actorText = item.userEmail || item.actorName || item.actor || item.userId || 'Hệ thống';
+                            const roleText = item.userRole || item.actorRole || 'N/A';
+                            return (
+                              <div key={i} className="p-3 bg-white dark:bg-slate-900 rounded-lg border text-xs space-y-1">
+                                <div className="flex items-center justify-between font-semibold">
+                                  <span className="text-blue-600">{actionText}</span>
+                                  <span className="text-gray-400 text-[11px]">{timeText}</span>
+                                </div>
+                                <div className="text-gray-600 dark:text-gray-400">
+                                  Thực hiện: <span className="font-medium text-gray-800 dark:text-gray-200">{actorText} ({roleText})</span>
+                                </div>
+                                {(item.note || item.reason) && (
+                                  <div className="mt-1 p-2 bg-gray-50 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300 italic">
+                                    "{item.note || item.reason}"
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
             </div>
 
-            <div className="p-4 border-t bg-gray-50 dark:bg-slate-800 flex justify-end">
-              <button onClick={() => setSelectedLogForDetail(null)} className="px-5 py-2 bg-gray-200 dark:bg-slate-700 rounded-xl font-semibold text-xs">
-                Đóng
+            <div className="p-4 border-t bg-gray-50 dark:bg-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {(() => {
+                  const status = selectedLogForDetail.reviewStatus;
+                  let isClosed = false;
+                  try {
+                    if (selectedLogForDetail.notes) {
+                      const p = JSON.parse(selectedLogForDetail.notes);
+                      if (p.subStatus === 'CLOSED' || p.subStatus === 'REJECTED') isClosed = true;
+                    }
+                  } catch (e) {}
+                  const isRejected = status === 'REJECTED' || isClosed;
+                  const canAct = role === 'STAFF' || role === 'MANAGER' || role === 'ADMIN';
+                  const isLeader = role === 'MANAGER' || role === 'ADMIN';
+
+                  return (
+                    <>
+                      {canAct && status === 'PENDING' && !isRejected && (
+                        <button
+                          onClick={() => setWorkflowModal({
+                            isOpen: true,
+                            action: 'START_REVIEW',
+                            title: 'Bắt đầu rà soát nhật ký cập nhật',
+                            requireNote: false,
+                            requireReason: false,
+                            isWarning: false,
+                            buttonLabel: 'Xác nhận bắt đầu',
+                            buttonClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+                          })}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs transition shadow-sm"
+                        >
+                          Bắt đầu rà soát
+                        </button>
+                      )}
+
+                      {canAct && !isRejected && (
+                        <>
+                          <button
+                            onClick={() => setWorkflowModal({
+                              isOpen: true,
+                              action: 'ADD_NOTE',
+                              title: 'Thêm ghi chú rà soát',
+                              requireNote: true,
+                              requireReason: false,
+                              isWarning: false,
+                              buttonLabel: 'Lưu ghi chú',
+                              buttonClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+                            })}
+                            className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-xl font-semibold text-xs transition"
+                          >
+                            Thêm ghi chú
+                          </button>
+
+                          <button
+                            onClick={() => setWorkflowModal({
+                              isOpen: true,
+                              action: 'REQUEST_MORE_INFO',
+                              title: 'Yêu cầu bổ sung thông tin rà soát',
+                              requireNote: true,
+                              requireReason: false,
+                              isWarning: false,
+                              buttonLabel: 'Gửi yêu cầu',
+                              buttonClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+                            })}
+                            className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 rounded-xl font-semibold text-xs transition"
+                          >
+                            Yêu cầu bổ sung
+                          </button>
+                        </>
+                      )}
+
+                      {isLeader && !isRejected && status !== 'APPROVED' && (
+                        <button
+                          onClick={() => setWorkflowModal({
+                            isOpen: true,
+                            action: 'APPROVE_FOR_VERSIONING',
+                            title: 'Phê duyệt hướng xử lý cập nhật',
+                            requireNote: true,
+                            requireReason: false,
+                            isWarning: true,
+                            buttonLabel: 'Phê duyệt',
+                            buttonClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                          })}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs transition shadow-sm"
+                        >
+                          Phê duyệt hướng xử lý
+                        </button>
+                      )}
+
+                      {isLeader && !isRejected && (
+                        <button
+                          onClick={() => setWorkflowModal({
+                            isOpen: true,
+                            action: 'REJECT',
+                            title: 'Từ chối hướng xử lý cập nhật',
+                            requireNote: false,
+                            requireReason: true,
+                            isWarning: true,
+                            buttonLabel: 'Từ chối',
+                            buttonClass: 'bg-red-600 hover:bg-red-700 text-white',
+                          })}
+                          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-950/50 dark:text-red-300 rounded-xl font-semibold text-xs transition"
+                        >
+                          Từ chối
+                        </button>
+                      )}
+
+                      {isLeader && !isRejected && (
+                        <button
+                          onClick={() => setWorkflowModal({
+                            isOpen: true,
+                            action: 'CLOSE',
+                            title: 'Đóng nhật ký cập nhật',
+                            requireNote: false,
+                            requireReason: false,
+                            isWarning: false,
+                            buttonLabel: 'Xác nhận đóng',
+                            buttonClass: 'bg-gray-600 hover:bg-gray-700 text-white',
+                          })}
+                          className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-xs transition"
+                        >
+                          Đóng
+                        </button>
+                      )}
+
+                      <button
+                        disabled
+                        title="Phase sau mới hỗ trợ tạo draft version mới"
+                        className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed"
+                      >
+                        Tạo version mới (Phase sau)
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+              <button onClick={() => setSelectedLogForDetail(null)} className="px-5 py-2 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-xl font-semibold text-xs transition">
+                Đóng cửa sổ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: WORKFLOW CONFIRM MODAL (PHASE 8F-B) */}
+      {workflowModal && workflowModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 border">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-blue-600" />
+                {workflowModal.title}
+              </h3>
+              <button onClick={() => setWorkflowModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {workflowModal.isWarning && (
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs font-medium leading-relaxed">
+                <span className="font-bold block mb-1">CẢNH BÁO HỆ THỐNG:</span>
+                Phê duyệt hướng xử lý không đồng nghĩa với kích hoạt version pháp lý. Hệ thống chưa tự thay đổi ProcedureTypeVersion, AiPromptVersion, ChecklistVersion hoặc LegalDocument.
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  {workflowModal.requireReason ? 'Lý do từ chối (Bắt buộc):' : workflowModal.requireNote ? 'Ghi chú rà soát (Bắt buộc):' : 'Ghi chú / Ý kiến (Tùy chọn):'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={workflowModal.requireReason ? workflowReason : workflowNote}
+                  onChange={(e) => workflowModal.requireReason ? setWorkflowReason(e.target.value) : setWorkflowNote(e.target.value)}
+                  placeholder="Nhập nội dung ý kiến rà soát, chỉ đạo hoặc lý do..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t">
+              <button
+                disabled={submittingWorkflow}
+                onClick={() => setWorkflowModal(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={submittingWorkflow}
+                onClick={handleWorkflowSubmit}
+                className={`px-5 py-2 rounded-xl text-xs font-semibold transition shadow-sm flex items-center gap-1.5 ${workflowModal.buttonClass}`}
+              >
+                {submittingWorkflow && <span className="animate-spin">⌛</span>}
+                {workflowModal.buttonLabel}
               </button>
             </div>
           </div>

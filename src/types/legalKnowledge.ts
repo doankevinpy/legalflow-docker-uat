@@ -109,6 +109,7 @@ export interface LegalUpdateLog {
   impactSummary?: string;
   reviewStatus: LegalUpdateReviewStatus;
   reviewedById?: string;
+  reviewedBy?: { id: string; email: string; fullName: string; role: string };
   reviewedAt?: string;
   appliedAt?: string;
   notes?: string;

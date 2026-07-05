@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LegalUpdateReviewStatus } from '@prisma/client';
 
 @Injectable()
 export class LegalKnowledgeService {
@@ -60,6 +61,9 @@ export class LegalKnowledgeService {
       orderBy: { createdAt: 'desc' },
       include: {
         sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
       },
     });
   }
@@ -264,6 +268,9 @@ export class LegalKnowledgeService {
       where: { id },
       include: {
         sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
       },
     });
     if (!log) {
@@ -439,6 +446,9 @@ export class LegalKnowledgeService {
       },
       include: {
         sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
       },
     });
 
@@ -447,6 +457,133 @@ export class LegalKnowledgeService {
       logId: log.id,
       updateLog: log,
       impactAnalysis,
+    };
+  }
+
+  async handleWorkflowAction(id: string, action: string, note: string, reason: string, user: any) {
+    if (!user || user.role === 'VIEWER') {
+      throw new ForbiddenException('Tài khoản VIEWER không được quyền thao tác rà soát cập nhật pháp lý.');
+    }
+
+    const log = await this.prisma.legalUpdateLog.findUnique({
+      where: { id },
+      include: {
+        sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
+      },
+    });
+    if (!log) {
+      throw new NotFoundException(`Không tìm thấy nhật ký cập nhật pháp lý với ID "${id}"`);
+    }
+
+    let parsedNotes: any = {};
+    try {
+      if (log.notes) {
+        const raw = JSON.parse(log.notes);
+        if (raw && (raw.impactAnalysis !== undefined || raw.workflowHistory !== undefined)) {
+          parsedNotes = raw;
+        } else {
+          parsedNotes = { impactAnalysis: raw };
+        }
+      }
+    } catch (e) {
+      parsedNotes = { impactAnalysis: { impactSummary: log.notes } };
+    }
+
+    if (log.reviewStatus === 'REJECTED' || parsedNotes.subStatus === 'CLOSED' || parsedNotes.subStatus === 'REJECTED') {
+      throw new BadRequestException('Nhật ký cập nhật này đã bị từ chối hoặc đã đóng, không thể tiếp tục thao tác.');
+    }
+
+    const trimmedNote = (note || '').trim();
+    const trimmedReason = (reason || '').trim();
+    const inputContent = trimmedNote || trimmedReason;
+
+    let newDbStatus: LegalUpdateReviewStatus = log.reviewStatus;
+    let newSubStatus = parsedNotes.subStatus || log.reviewStatus;
+    const oldStatusLabel = parsedNotes.subStatus || log.reviewStatus;
+
+    switch (action) {
+      case 'START_REVIEW':
+        newDbStatus = 'REVIEWING';
+        newSubStatus = 'REVIEWING';
+        break;
+      case 'ADD_NOTE':
+        newDbStatus = log.reviewStatus === 'PENDING' ? 'REVIEWING' : log.reviewStatus;
+        newSubStatus = parsedNotes.subStatus || log.reviewStatus;
+        break;
+      case 'REQUEST_MORE_INFO':
+        newDbStatus = log.reviewStatus === 'PENDING' ? 'REVIEWING' : log.reviewStatus;
+        newSubStatus = 'NEEDS_MORE_INFO';
+        break;
+      case 'APPROVE_FOR_VERSIONING':
+        if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
+          throw new ForbiddenException('Chỉ Lãnh đạo (MANAGER/ADMIN) mới có quyền phê duyệt hướng xử lý cập nhật pháp lý.');
+        }
+        if (!inputContent) {
+          throw new BadRequestException('Vui lòng nhập ghi chú hoặc lý do phê duyệt hướng xử lý.');
+        }
+        newDbStatus = 'APPROVED';
+        newSubStatus = 'APPROVED_FOR_VERSIONING';
+        break;
+      case 'REJECT':
+        if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
+          throw new ForbiddenException('Chỉ Lãnh đạo (MANAGER/ADMIN) mới có quyền từ chối hướng xử lý cập nhật pháp lý.');
+        }
+        if (!inputContent) {
+          throw new BadRequestException('Vui lòng nhập lý do từ chối hướng xử lý.');
+        }
+        newDbStatus = 'REJECTED';
+        newSubStatus = 'REJECTED';
+        break;
+      case 'CLOSE':
+        if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
+          throw new ForbiddenException('Chỉ Lãnh đạo (MANAGER/ADMIN) mới có quyền đóng nhật ký cập nhật pháp lý.');
+        }
+        newDbStatus = log.reviewStatus;
+        newSubStatus = 'CLOSED';
+        break;
+      default:
+        throw new BadRequestException(`Hành động workflow "${action}" không hợp lệ.`);
+    }
+
+    const historyEntry = {
+      action,
+      userId: user.id || 'SYSTEM',
+      userEmail: user.email || '',
+      userRole: user.role || '',
+      oldStatus: oldStatusLabel,
+      newStatus: newSubStatus,
+      note: inputContent,
+      createdAt: new Date().toISOString(),
+    };
+
+    const workflowHistory = Array.isArray(parsedNotes.workflowHistory) ? parsedNotes.workflowHistory : [];
+    workflowHistory.push(historyEntry);
+    parsedNotes.workflowHistory = workflowHistory;
+    parsedNotes.subStatus = newSubStatus;
+
+    const updatedLog = await this.prisma.legalUpdateLog.update({
+      where: { id },
+      data: {
+        reviewStatus: newDbStatus,
+        reviewedById: user.id || log.reviewedById,
+        reviewedAt: new Date(),
+        notes: JSON.stringify(parsedNotes, null, 2),
+      },
+      include: {
+        sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Đã thực hiện thành công thao tác ${action}`,
+      updateLog: updatedLog,
     };
   }
 }

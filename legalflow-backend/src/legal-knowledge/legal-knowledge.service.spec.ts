@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LegalKnowledgeService } from './legal-knowledge.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 
 describe('LegalKnowledgeService', () => {
   let service: LegalKnowledgeService;
@@ -24,6 +24,7 @@ describe('LegalKnowledgeService', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     procedureAiAnalysisLegalSnapshot: {
       findMany: jest.fn(),
@@ -170,6 +171,9 @@ describe('LegalKnowledgeService', () => {
         orderBy: { createdAt: 'desc' },
         include: {
           sourceDocument: true,
+          reviewedBy: {
+            select: { id: true, email: true, fullName: true, role: true },
+          },
         },
       });
     });
@@ -184,7 +188,12 @@ describe('LegalKnowledgeService', () => {
       expect(result).toEqual(mockLog);
       expect(mockPrismaService.legalUpdateLog.findUnique).toHaveBeenCalledWith({
         where: { id: '1' },
-        include: { sourceDocument: true },
+        include: {
+          sourceDocument: true,
+          reviewedBy: {
+            select: { id: true, email: true, fullName: true, role: true },
+          },
+        },
       });
     });
 
@@ -239,6 +248,54 @@ describe('LegalKnowledgeService', () => {
       expect(result.logId).toBe('log-1');
       expect(result.impactAnalysis.requiresOfficerVerification).toBe(true);
       expect(mockPrismaService.legalUpdateLog.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleWorkflowAction', () => {
+    it('should throw ForbiddenException if user is VIEWER', async () => {
+      await expect(service.handleWorkflowAction('1', 'START_REVIEW', '', '', { id: 'u1', role: 'VIEWER' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException if log not found', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(null);
+      await expect(service.handleWorkflowAction('999', 'START_REVIEW', '', '', { id: 'u1', role: 'STAFF' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('should start review and update status to REVIEWING', async () => {
+      const mockLog = { id: '1', reviewStatus: 'PENDING', notes: null };
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      mockPrismaService.legalUpdateLog.update.mockResolvedValue({ ...mockLog, reviewStatus: 'REVIEWING' });
+
+      const result = await service.handleWorkflowAction('1', 'START_REVIEW', 'Bắt đầu rà soát', '', { id: 'u1', role: 'STAFF', email: 'staff@test.com' });
+      expect(result.success).toBe(true);
+      expect(mockPrismaService.legalUpdateLog.update).toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException if STAFF tries to APPROVE_FOR_VERSIONING', async () => {
+      const mockLog = { id: '1', reviewStatus: 'REVIEWING', notes: null };
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      await expect(service.handleWorkflowAction('1', 'APPROVE_FOR_VERSIONING', 'Duyệt', '', { id: 'u1', role: 'STAFF' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException if MANAGER tries to APPROVE without note/reason', async () => {
+      const mockLog = { id: '1', reviewStatus: 'REVIEWING', notes: null };
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      await expect(service.handleWorkflowAction('1', 'APPROVE_FOR_VERSIONING', '', '', { id: 'u1', role: 'MANAGER' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('should approve for versioning when MANAGER provides note', async () => {
+      const mockLog = { id: '1', reviewStatus: 'REVIEWING', notes: null };
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      mockPrismaService.legalUpdateLog.update.mockResolvedValue({ ...mockLog, reviewStatus: 'APPROVED' });
+
+      const result = await service.handleWorkflowAction('1', 'APPROVE_FOR_VERSIONING', 'Đồng ý hướng xử lý', '', { id: 'u1', role: 'MANAGER', email: 'mgr@test.com' });
+      expect(result.success).toBe(true);
+    });
+
+    it('should throw BadRequestException if log is already REJECTED', async () => {
+      const mockLog = { id: '1', reviewStatus: 'REJECTED', notes: null };
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      await expect(service.handleWorkflowAction('1', 'ADD_NOTE', 'note', '', { id: 'u1', role: 'MANAGER' })).rejects.toThrow(BadRequestException);
     });
   });
 });
