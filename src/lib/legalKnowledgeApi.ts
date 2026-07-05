@@ -37,6 +37,9 @@ export const legalKnowledgeApi = {
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/workflow-action`, data),
   createDraftVersion: (id: string, data: { draftType: string; sourceVersionId: string; reason: string; draftVersion?: string }) =>
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/create-draft-version`, data),
+  getSampleCases: () => apiClient.get<any[]>('/legal-knowledge/sample-cases'),
+  runDraftSimulation: (id: string, data: { procedureCaseId: string; draftProcedureTypeVersionId?: string; draftPromptVersionId?: string; draftChecklistVersionId?: string; note?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/run-draft-simulation`, data),
 };
 
 

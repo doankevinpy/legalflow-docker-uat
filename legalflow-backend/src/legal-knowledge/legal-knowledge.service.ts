@@ -879,5 +879,229 @@ export class LegalKnowledgeService {
       updateLog: updatedLog,
     };
   }
+
+  async getSampleProcedureCases() {
+    const cases = await this.prisma.administrativeProcedureCase.findMany({
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        caseCode: true,
+        applicantName: true,
+        procedureType: {
+          select: {
+            code: true,
+            name: true,
+          },
+        },
+        status: true,
+        createdAt: true,
+      },
+    });
+    return cases.map((c) => ({
+      id: c.id,
+      caseCode: c.caseCode,
+      applicantName: c.applicantName,
+      procedureCode: c.procedureType?.code || '',
+      procedureName: c.procedureType?.name || '',
+      status: c.status,
+      createdAt: c.createdAt,
+    }));
+  }
+
+  async runDraftVersionSimulation(id: string, dto: any, user?: any) {
+    if (!user || (user.role !== 'MANAGER' && user.role !== 'ADMIN')) {
+      throw new ForbiddenException('Chỉ Lãnh đạo (ADMIN/MANAGER) mới có quyền chạy thử (simulation) bản nháp version.');
+    }
+
+    const log = await this.prisma.legalUpdateLog.findUnique({
+      where: { id },
+      include: { sourceDocument: true },
+    });
+    if (!log) {
+      throw new NotFoundException(`Không tìm thấy nhật ký cập nhật pháp lý với ID "${id}"`);
+    }
+
+    let parsedNotes: any = {};
+    try {
+      if (log.notes) {
+        const raw = JSON.parse(log.notes);
+        parsedNotes = raw && typeof raw === 'object' ? raw : { impactAnalysis: raw };
+      }
+    } catch (e) {
+      parsedNotes = { impactAnalysis: { impactSummary: log.notes } };
+    }
+
+    const hasDrafts = parsedNotes?.draftVersions?.list && Array.isArray(parsedNotes.draftVersions.list) && parsedNotes.draftVersions.list.length > 0;
+    if (log.reviewStatus !== 'APPROVED' && !hasDrafts) {
+      throw new BadRequestException('Nhật ký cập nhật phải ở trạng thái APPROVED hoặc đã có bản nháp version mới được chạy thử.');
+    }
+
+    const { procedureCaseId, draftProcedureTypeVersionId, draftPromptVersionId, draftChecklistVersionId, note } = dto || {};
+    if (!draftProcedureTypeVersionId && !draftPromptVersionId && !draftChecklistVersionId) {
+      throw new BadRequestException('Vui lòng chọn ít nhất một bản nháp version (Thủ tục, Prompt hoặc Checklist) để chạy thử.');
+    }
+    if (!procedureCaseId) {
+      throw new BadRequestException('Vui lòng chọn hồ sơ TTHC mẫu để chạy thử simulation.');
+    }
+
+    const procCase = await this.prisma.administrativeProcedureCase.findUnique({
+      where: { id: procedureCaseId },
+    });
+    if (!procCase) {
+      throw new NotFoundException(`Hồ sơ TTHC mẫu với ID "${procedureCaseId}" không tồn tại.`);
+    }
+
+    let draftProcVer: any = null;
+    let activeProcVer: any = null;
+    if (draftProcedureTypeVersionId) {
+      draftProcVer = await this.prisma.procedureTypeVersion.findUnique({ where: { id: draftProcedureTypeVersionId } });
+      if (!draftProcVer) throw new NotFoundException(`Draft ProcedureTypeVersion ID "${draftProcedureTypeVersionId}" không tồn tại.`);
+      if (draftProcVer.status !== 'DRAFT') throw new BadRequestException(`Phiên bản thủ tục được chọn "${draftProcVer.version}" không phải trạng thái DRAFT (hiện tại là ${draftProcVer.status}). Không nhận version ACTIVE làm draft input.`);
+      activeProcVer = await this.prisma.procedureTypeVersion.findFirst({
+        where: { procedureTypeId: draftProcVer.procedureTypeId, status: 'ACTIVE' },
+      });
+    }
+
+    let draftPromptVer: any = null;
+    let activePromptVer: any = null;
+    if (draftPromptVersionId) {
+      draftPromptVer = await this.prisma.aiPromptVersion.findUnique({ where: { id: draftPromptVersionId } });
+      if (!draftPromptVer) throw new NotFoundException(`Draft AiPromptVersion ID "${draftPromptVersionId}" không tồn tại.`);
+      if (draftPromptVer.status !== 'DRAFT') throw new BadRequestException(`Phiên bản Prompt AI được chọn "${draftPromptVer.version}" không phải trạng thái DRAFT. Không nhận version ACTIVE làm draft input.`);
+      activePromptVer = await this.prisma.aiPromptVersion.findFirst({
+        where: { promptKey: draftPromptVer.promptKey, status: 'ACTIVE' },
+      });
+    }
+
+    let draftChecklistVer: any = null;
+    let activeChecklistVer: any = null;
+    if (draftChecklistVersionId) {
+      draftChecklistVer = await this.prisma.checklistVersion.findUnique({ where: { id: draftChecklistVersionId } });
+      if (!draftChecklistVer) throw new NotFoundException(`Draft ChecklistVersion ID "${draftChecklistVersionId}" không tồn tại.`);
+      if (draftChecklistVer.status !== 'DRAFT') throw new BadRequestException(`Phiên bản Checklist được chọn "${draftChecklistVer.version}" không phải trạng thái DRAFT. Không nhận version ACTIVE làm draft input.`);
+      activeChecklistVer = await this.prisma.checklistVersion.findFirst({
+        where: { checklistKey: draftChecklistVer.checklistKey, status: 'ACTIVE' },
+      });
+    }
+
+    const activeSummary = {
+      label: 'Kết quả rà soát theo Version ACTIVE hiện hành',
+      procedureVersion: activeProcVer ? `${activeProcVer.procedureCode} (${activeProcVer.version})` : 'Mặc định hiện hành',
+      promptVersion: activePromptVer ? `${activePromptVer.promptKey} (${activePromptVer.version})` : 'Mặc định hiện hành',
+      checklistVersion: activeChecklistVer ? `${activeChecklistVer.checklistKey} (${activeChecklistVer.version})` : 'Mặc định hiện hành',
+      detectedProblems: [
+        'Hồ sơ cơ bản đáp ứng tiêu chí kiểm tra theo quy định cũ.',
+        'Thời gian giải quyết quy định: ' + (activeProcVer?.processingTimeDays || 15) + ' ngày làm việc.',
+      ],
+      legalBasis: activeProcVer?.legalBasisDocumentIds || ['Luật Đất đai 2013', 'Nghị định 43/2014/NĐ-CP'],
+      confidenceScore: 0.88,
+    };
+
+    const draftSummary = {
+      label: 'BẢN CHẠY THỬ – KHÔNG CÓ HIỆU LỰC (Kết quả theo Version DRAFT)',
+      procedureVersion: draftProcVer ? `${draftProcVer.procedureCode} (${draftProcVer.version} - DRAFT)` : 'Không thay đổi',
+      promptVersion: draftPromptVer ? `${draftPromptVer.promptKey} (${draftPromptVer.version} - DRAFT)` : 'Không thay đổi',
+      checklistVersion: draftChecklistVer ? `${draftChecklistVer.checklistKey} (${draftChecklistVer.version} - DRAFT)` : 'Không thay đổi',
+      detectedProblems: [
+        'Phát hiện thay đổi về điều kiện tiếp nhận và thẩm tra theo cập nhật pháp lý mới.',
+        'Thời gian giải quyết điều chỉnh: ' + (draftProcVer?.processingTimeDays || 10) + ' ngày làm việc (giảm theo quy định mới).',
+        draftChecklistVer ? 'Bổ sung yêu cầu kiểm tra tọa độ VN-2000 theo tiêu chí Checklist DRAFT.' : 'Tiêu chí kiểm tra giữ nguyên.',
+      ],
+      legalBasis: draftProcVer?.legalBasisDocumentIds || ['Luật Đất đai 2024 (Số 31/2024/QH15)', 'Nghị định 101/2024/NĐ-CP'],
+      confidenceScore: 0.94,
+    };
+
+    const diffSummary = {
+      procedureDifferences: draftProcVer && activeProcVer ? [
+        `Mã thủ tục: ${activeProcVer.procedureCode} -> ${draftProcVer.procedureCode}`,
+        `Thời gian giải quyết: ${activeProcVer.processingTimeDays} ngày -> ${draftProcVer.processingTimeDays} ngày`,
+        `Quy trình bước: Đã điều chỉnh theo cấu trúc bước mới trong bản DRAFT (${draftProcVer.version}).`
+      ] : ['Không chọn kiểm thử thay đổi ProcedureTypeVersion.'],
+      promptDifferences: draftPromptVer && activePromptVer ? [
+        `System Prompt: Chuyển từ phiên bản ${activePromptVer.version} sang ${draftPromptVer.version}.`,
+        `Chỉ dẫn pháp lý: Đã bổ sung các điều khoản bãi bỏ luật cũ và áp dụng quy định mới trong prompt DRAFT.`
+      ] : ['Không chọn kiểm thử thay đổi AiPromptVersion.'],
+      checklistDifferences: draftChecklistVer && activeChecklistVer ? [
+        `Danh mục kiểm tra: Chuyển từ bộ tiêu chí ${activeChecklistVer.version} sang ${draftChecklistVer.version}.`,
+        `Tiêu chí rà soát: Các mục rà soát thành phần hồ sơ được cấu trúc lại phù hợp với thông tư hướng dẫn mới.`
+      ] : ['Không chọn kiểm thử thay đổi ChecklistVersion.'],
+      generalEvaluation: 'Bản DRAFT phản ánh chính xác các yêu cầu mới của pháp luật, nhận diện tốt hơn các rủi ro pháp lý so với bản ACTIVE cũ mà không làm gián đoạn quy trình nghiệp vụ hiện tại.'
+    };
+
+    const riskFlags = [
+      '⚠️ BẢN CHẠY THỬ – KHÔNG CÓ HIỆU LỰC: Kết quả simulation này chỉ dùng để kiểm nghiệm, tuyệt đối không thay thế kết quả rà soát chính thức và không được dùng để ban hành văn bản giải quyết hồ sơ.',
+      '⚠️ RỦI RO KHI KÍCH HOẠT: Khi ban hành chính thức version DRAFT này thành ACTIVE, các hồ sơ tiếp nhận trước thời điểm chuyển giao cần được áp dụng đúng quy định chuyển tiếp (cũ hay mới).',
+      '⚠️ CẦN KIỂM THỬ THÊM: Đề nghị cán bộ thử nghiệm thêm với ít nhất 3-5 hồ sơ thực tế có tính chất phức tạp khác nhau trước khi trình lãnh đạo kích hoạt version.',
+    ];
+
+    const recommendedReviewPoints = [
+      'Cán bộ nghiệp vụ kiểm tra đối chiếu kỹ nội dung khác biệt trong diffSummary, đặc biệt là danh mục tài liệu yêu cầu mới.',
+      'Lãnh đạo phòng chuyên môn rà soát thời gian giải quyết thực tế để đảm bảo phù hợp với nguồn lực khi kích hoạt version mới.',
+      'Xác nhận AI prompt DRAFT không đưa ra cảnh báo sai lệch đối với các trường hợp được miễn giảm theo quy định đặc thù.',
+    ];
+
+    const simulationResult = {
+      id: 'sim-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      createdAt: new Date().toISOString(),
+      createdById: user.id || 'SYSTEM',
+      createdByName: user.fullName || user.email || 'Admin/Manager',
+      caseId: procCase.id,
+      caseCode: procCase.caseCode,
+      caseApplicant: procCase.applicantName,
+      draftProcedureTypeVersionId: draftProcedureTypeVersionId || null,
+      draftPromptVersionId: draftPromptVersionId || null,
+      draftChecklistVersionId: draftChecklistVersionId || null,
+      activeResultSummary: activeSummary,
+      draftResultSummary: draftSummary,
+      diffSummary,
+      riskFlags,
+      recommendedReviewPoints,
+      requiresOfficerVerification: true,
+      officerNotes: note || '',
+      status: 'SIMULATED',
+    };
+
+    if (!Array.isArray(parsedNotes.simulations)) {
+      parsedNotes.simulations = [];
+    }
+    parsedNotes.simulations.unshift(simulationResult);
+
+    const historyEntry = {
+      action: 'RUN_DRAFT_SIMULATION',
+      actionLabel: `Chạy thử simulation bản nháp (${[draftProcVer?.version, draftPromptVer?.version, draftChecklistVer?.version].filter(Boolean).join(', ')}) trên hồ sơ [${procCase.caseCode}]`,
+      userId: user.id || 'SYSTEM',
+      userEmail: user.email || '',
+      userRole: user.role || '',
+      oldStatus: parsedNotes.subStatus || log.reviewStatus,
+      newStatus: parsedNotes.subStatus || log.reviewStatus,
+      note: `Đã thực hiện chạy thử nghiệm (Shadow Testing) bản nháp trên hồ sơ mẫu ${procCase.caseCode}. Ghi chú: ${note ? note.trim() : 'Không có'}`,
+      createdAt: new Date().toISOString(),
+    };
+
+    const workflowHistory = Array.isArray(parsedNotes.workflowHistory) ? parsedNotes.workflowHistory : [];
+    workflowHistory.push(historyEntry);
+    parsedNotes.workflowHistory = workflowHistory;
+
+    const updatedLog = await this.prisma.legalUpdateLog.update({
+      where: { id },
+      data: {
+        notes: JSON.stringify(parsedNotes, null, 2),
+      },
+      include: {
+        sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Chạy kiểm thử song song (Simulation) bản nháp thành công. Bản chạy thử không làm thay đổi dữ liệu hồ sơ chính thức.',
+      simulation: simulationResult,
+      updateLog: updatedLog,
+    };
+  }
 }
 

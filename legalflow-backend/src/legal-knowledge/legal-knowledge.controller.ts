@@ -179,6 +179,22 @@ export class LegalKnowledgeController {
       req.user,
     );
   }
+
+  @Get('sample-cases')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  getSampleCases() {
+    return this.service.getSampleProcedureCases();
+  }
+
+  @Post('update-logs/:id/run-draft-simulation')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  runDraftSimulation(
+    @Param('id') id: string,
+    @Body() body: { procedureCaseId: string; draftProcedureTypeVersionId?: string; draftPromptVersionId?: string; draftChecklistVersionId?: string; note?: string },
+    @Request() req: any,
+  ) {
+    return this.service.runDraftVersionSimulation(id, body || {}, req.user);
+  }
 }
 
 

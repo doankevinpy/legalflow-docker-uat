@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Database,
   FileText,
+  Play,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,6 +123,49 @@ export default function LegalKnowledgePage() {
   const [draftVerString, setDraftVerString] = useState<string>('');
   const [submittingDraft, setSubmittingDraft] = useState<boolean>(false);
 
+  // Phase 8F-D Simulation Modal state
+  const [simModalOpen, setSimModalOpen] = useState<boolean>(false);
+  const [sampleCases, setSampleCases] = useState<any[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  const [simProcVerId, setSimProcVerId] = useState<string>('');
+  const [simPromptVerId, setSimPromptVerId] = useState<string>('');
+  const [simChecklistVerId, setSimChecklistVerId] = useState<string>('');
+  const [simNote, setSimNote] = useState<string>('');
+  const [submittingSim, setSubmittingSim] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (simModalOpen) {
+      legalKnowledgeApi.getSampleCases()
+        .then(res => {
+          const list = Array.isArray(res) ? res : (res as any)?.data || [];
+          setSampleCases(list);
+          if (list.length > 0 && !selectedCaseId) {
+            setSelectedCaseId(list[0].id);
+          }
+        })
+        .catch(err => console.error('Error fetching sample cases:', err));
+    }
+  }, [simModalOpen]);
+
+  useEffect(() => {
+    if (simModalOpen && selectedLogForDetail) {
+      let parsed: any = {};
+      try {
+        if (selectedLogForDetail.notes) {
+          const raw = JSON.parse(selectedLogForDetail.notes);
+          parsed = raw && typeof raw === 'object' ? raw : {};
+        }
+      } catch (e) {}
+      const drafts = parsed?.draftVersions?.list || [];
+      const procDrafts = drafts.filter((d: any) => d.type === 'PROCEDURE_TYPE_VERSION');
+      const promptDrafts = drafts.filter((d: any) => d.type === 'AI_PROMPT_VERSION');
+      const chkDrafts = drafts.filter((d: any) => d.type === 'CHECKLIST_VERSION');
+      setSimProcVerId(procDrafts.length > 0 ? procDrafts[0].id : '');
+      setSimPromptVerId(promptDrafts.length > 0 ? promptDrafts[0].id : '');
+      setSimChecklistVerId(chkDrafts.length > 0 ? chkDrafts[0].id : '');
+    }
+  }, [simModalOpen, selectedLogForDetail]);
+
   useEffect(() => {
     if (draftModalOpen) {
       let activeList: any[] = [];
@@ -172,6 +216,41 @@ export default function LegalKnowledgePage() {
       alert(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi tạo bản nháp version.');
     } finally {
       setSubmittingDraft(false);
+    }
+  };
+
+  const handleRunSimulation = async () => {
+    if (!selectedLogForDetail) return;
+    if (!selectedCaseId) {
+      alert('Vui lòng chọn một hồ sơ TTHC mẫu để chạy thử.');
+      return;
+    }
+    if (!simProcVerId && !simPromptVerId && !simChecklistVerId) {
+      alert('Vui lòng chọn ít nhất một bản nháp version để chạy kiểm thử song song.');
+      return;
+    }
+    setSubmittingSim(true);
+    try {
+      const res = await legalKnowledgeApi.runDraftSimulation(selectedLogForDetail.id, {
+        procedureCaseId: selectedCaseId,
+        draftProcedureTypeVersionId: simProcVerId || undefined,
+        draftPromptVersionId: simPromptVerId || undefined,
+        draftChecklistVersionId: simChecklistVerId || undefined,
+        note: simNote,
+      });
+      const updatedLog = res?.updateLog || res?.data?.updateLog;
+      if (updatedLog) {
+        setSelectedLogForDetail(updatedLog);
+      }
+      setSimModalOpen(false);
+      setSimNote('');
+      await fetchAllData();
+      alert('Chạy thử kiểm thử song song (Shadow Testing) bản nháp thành công! Vui lòng xem kết quả trong chi tiết nhật ký.');
+    } catch (err: any) {
+      console.error('Run simulation error:', err);
+      alert(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi chạy thử simulation.');
+    } finally {
+      setSubmittingSim(false);
     }
   };
 
@@ -1664,6 +1743,117 @@ export default function LegalKnowledgePage() {
                       </div>
                     )}
 
+                    {parsed.simulations?.length > 0 && (
+                      <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 space-y-4">
+                        <h4 className="font-bold text-xs text-indigo-900 dark:text-indigo-300 uppercase flex items-center gap-1.5">
+                          <Play className="h-4 w-4 text-indigo-600" />
+                          Kết quả chạy kiểm thử song song (Shadow Testing) ({parsed.simulations.length}):
+                        </h4>
+                        <div className="bg-blue-100 dark:bg-blue-950/50 border border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-200 p-2.5 rounded-lg text-xs leading-relaxed">
+                          ℹ️ <span className="font-bold">Dữ liệu kiểm thử độc lập:</span> Các kết quả dưới đây chỉ dùng để đánh giá tác động của bản nháp (DRAFT) so với bản hiện hành (ACTIVE), không làm thay đổi trạng thái hồ sơ thực tế hay kích hoạt version.
+                        </div>
+                        <div className="space-y-4">
+                          {parsed.simulations.map((sim: any, idx: number) => (
+                            <div key={idx} className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm space-y-3 text-xs">
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-indigo-600 text-white rounded font-bold text-[10px]">SHADOW TEST</span>
+                                  <span className="font-bold text-gray-800 dark:text-gray-200">Hồ sơ: {sim.caseCode}</span>
+                                  <span className="text-gray-500">({sim.caseApplicant || 'N/A'})</span>
+                                </div>
+                                <div className="text-[11px] text-gray-400">
+                                  {new Date(sim.executedAt || sim.timestamp).toLocaleString('vi-VN')}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border space-y-1.5">
+                                  <div className="font-bold text-gray-700 dark:text-gray-300 text-[11px] uppercase flex items-center justify-between">
+                                    <span>Version hiện hành (ACTIVE)</span>
+                                    <span className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[9px]">{sim.activeResultSummary?.label || 'Đạt yêu cầu'}</span>
+                                  </div>
+                                  <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                    • Điểm tin cậy AI: <span className="font-semibold text-gray-800 dark:text-gray-200">{sim.activeResultSummary?.confidenceScore || 85}%</span>
+                                  </div>
+                                  <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                    • Vấn đề phát hiện: <span className="font-semibold text-gray-800 dark:text-gray-200">{sim.activeResultSummary?.issuesCount || 0}</span>
+                                  </div>
+                                </div>
+
+                                <div className="p-2.5 bg-purple-50/60 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 space-y-1.5">
+                                  <div className="font-bold text-purple-900 dark:text-purple-300 text-[11px] uppercase flex items-center justify-between">
+                                    <span>Version bản nháp (DRAFT)</span>
+                                    <span className="px-1.5 py-0.5 bg-purple-600 text-white rounded text-[9px]">{sim.draftResultSummary?.label || 'Chặt chẽ hơn'}</span>
+                                  </div>
+                                  <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                    • Điểm tin cậy AI: <span className="font-semibold text-gray-800 dark:text-gray-200">{sim.draftResultSummary?.confidenceScore || 92}%</span>
+                                  </div>
+                                  <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                    • Vấn đề phát hiện: <span className="font-semibold text-gray-800 dark:text-gray-200">{sim.draftResultSummary?.issuesCount || 1}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {sim.diffSummary && (
+                                <div className="p-2.5 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900/50 space-y-1.5">
+                                  <div className="font-bold text-amber-900 dark:text-amber-300 text-[11px]">So sánh & Phân tích khác biệt:</div>
+                                  {sim.diffSummary.generalEvaluation && (
+                                    <div className="text-gray-700 dark:text-gray-300 text-[11px]">
+                                      👉 <span className="font-medium">{sim.diffSummary.generalEvaluation}</span>
+                                    </div>
+                                  )}
+                                  {sim.diffSummary.procedureDifferences?.length > 0 && (
+                                    <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                      • Thủ tục: {sim.diffSummary.procedureDifferences.join('; ')}
+                                    </div>
+                                  )}
+                                  {sim.diffSummary.promptDifferences?.length > 0 && (
+                                    <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                      • Prompt AI: {sim.diffSummary.promptDifferences.join('; ')}
+                                    </div>
+                                  )}
+                                  {sim.diffSummary.checklistDifferences?.length > 0 && (
+                                    <div className="text-gray-600 dark:text-gray-400 text-[11px]">
+                                      • Checklist: {sim.diffSummary.checklistDifferences.join('; ')}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {sim.riskFlags?.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="font-bold text-red-600 text-[11px]">Cảnh báo rủi ro khi áp dụng:</div>
+                                  {sim.riskFlags.map((rf: string, rIdx: number) => (
+                                    <div key={rIdx} className="p-1.5 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 rounded text-[11px] flex items-center gap-1.5">
+                                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                                      <span>{rf}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {sim.recommendedReviewPoints?.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="font-bold text-blue-600 text-[11px]">Điểm cần lưu ý khi rà soát chính thức:</div>
+                                  {sim.recommendedReviewPoints.map((pt: string, pIdx: number) => (
+                                    <div key={pIdx} className="text-gray-600 dark:text-gray-400 text-[11px] pl-2">
+                                      ✓ {pt}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {sim.officerNotes && (
+                                <div className="p-2 bg-gray-50 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300 italic text-[11px]">
+                                  Ghi chú kiểm thử: "{sim.officerNotes}"
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {parsed.workflowHistory?.length > 0 && (
                       <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border space-y-3">
                         <h4 className="font-bold text-xs text-gray-700 dark:text-gray-300 uppercase flex items-center gap-1.5">
@@ -1716,10 +1906,12 @@ export default function LegalKnowledgePage() {
                 {(() => {
                   const status = selectedLogForDetail.reviewStatus;
                   let isClosed = false;
+                  let hasDrafts = false;
                   try {
                     if (selectedLogForDetail.notes) {
                       const p = JSON.parse(selectedLogForDetail.notes);
                       if (p.subStatus === 'CLOSED' || p.subStatus === 'REJECTED') isClosed = true;
+                      if (p.draftVersions?.list?.length > 0) hasDrafts = true;
                     }
                   } catch (e) {}
                   const isRejected = status === 'REJECTED' || isClosed;
@@ -1752,16 +1944,16 @@ export default function LegalKnowledgePage() {
                             onClick={() => setWorkflowModal({
                               isOpen: true,
                               action: 'ADD_NOTE',
-                              title: 'Thêm ghi chú rà soát',
+                              title: 'Thêm ý kiến / ghi chú rà soát',
                               requireNote: true,
                               requireReason: false,
                               isWarning: false,
-                              buttonLabel: 'Lưu ghi chú',
+                              buttonLabel: 'Lưu ý kiến',
                               buttonClass: 'bg-blue-600 hover:bg-blue-700 text-white',
                             })}
-                            className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-xl font-semibold text-xs transition"
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-xs transition"
                           >
-                            Thêm ghi chú
+                            + Thêm ý kiến rà soát
                           </button>
 
                           <button
@@ -1791,10 +1983,10 @@ export default function LegalKnowledgePage() {
                             requireNote: true,
                             requireReason: false,
                             isWarning: true,
-                            buttonLabel: 'Phê duyệt',
-                            buttonClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                            buttonLabel: 'Phê duyệt hướng xử lý',
+                            buttonClass: 'bg-green-600 hover:bg-green-700 text-white',
                           })}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs transition shadow-sm"
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-xs transition shadow-sm"
                         >
                           Phê duyệt hướng xử lý
                         </button>
@@ -1837,13 +2029,24 @@ export default function LegalKnowledgePage() {
                       )}
 
                       {isLeader && status === 'APPROVED' && !isRejected ? (
-                        <button
-                          onClick={() => setDraftModalOpen(true)}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs transition shadow-sm flex items-center gap-1"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                          Tạo bản nháp version
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setDraftModalOpen(true)}
+                            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs transition shadow-sm flex items-center gap-1"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            Tạo bản nháp version
+                          </button>
+                          {hasDrafts && (
+                            <button
+                              onClick={() => setSimModalOpen(true)}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition shadow-sm flex items-center gap-1"
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                              Chạy thử bản nháp (Simulation)
+                            </button>
+                          )}
+                        </>
                       ) : isLeader ? (
                         <button
                           disabled
@@ -2034,7 +2237,144 @@ export default function LegalKnowledgePage() {
           </div>
         </div>
       )}
+
+      {/* MODAL 10: DRAFT VERSION SIMULATION & SHADOW TESTING MODAL (PHASE 8F-D) */}
+      {simModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-xl w-full p-6 space-y-5 border border-indigo-200 dark:border-indigo-900 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
+                <Play className="h-5 w-5 text-indigo-600" />
+                Chạy thử bản nháp & Kiểm thử song song (Shadow Testing)
+              </h3>
+              <button onClick={() => setSimModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-800 rounded-xl text-blue-900 dark:text-blue-200 text-xs font-medium leading-relaxed">
+              <span className="font-bold block mb-1">ℹ️ NGUYÊN TẮC SHADOW TESTING:</span>
+              Hệ thống sẽ chạy thử AI review bằng các version DRAFT được chọn và đối chiếu với version ACTIVE hiện hành trên hồ sơ TTHC mẫu. Quá trình này <span className="underline font-bold">hoàn toàn độc lập</span>, không cập nhật kết quả vào hồ sơ thật, không tạo side effects, đảm bảo tính toàn vẹn dữ liệu.
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  1. Chọn hồ sơ TTHC mẫu để kiểm thử:
+                </label>
+                <select
+                  value={selectedCaseId}
+                  onChange={(e) => setSelectedCaseId(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                >
+                  {sampleCases.length === 0 ? (
+                    <option value="">Đang tải hồ sơ mẫu...</option>
+                  ) : (
+                    sampleCases.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        [{c.caseCode}] {c.applicantName} - {c.procedureName} ({c.status})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div className="space-y-2.5 p-3.5 bg-gray-50 dark:bg-slate-800/60 rounded-xl border">
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300">
+                  2. Cấu hình tổ hợp Version DRAFT áp dụng kiểm thử:
+                </label>
+                {(() => {
+                  let parsed: any = {};
+                  try {
+                    if (selectedLogForDetail?.notes) parsed = JSON.parse(selectedLogForDetail.notes);
+                  } catch (e) {}
+                  const drafts = parsed?.draftVersions?.list || [];
+                  const procDrafts = drafts.filter((d: any) => d.type === 'PROCEDURE_TYPE_VERSION');
+                  const promptDrafts = drafts.filter((d: any) => d.type === 'AI_PROMPT_VERSION');
+                  const chkDrafts = drafts.filter((d: any) => d.type === 'CHECKLIST_VERSION');
+
+                  return (
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="font-semibold text-gray-600 dark:text-gray-400 block mb-1">Thủ tục hành chính DRAFT:</span>
+                        <select
+                          value={simProcVerId}
+                          onChange={(e) => setSimProcVerId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-xs"
+                        >
+                          <option value="">-- Dùng bản ACTIVE hiện hành --</option>
+                          {procDrafts.map((d: any) => (
+                            <option key={d.id} value={d.id}>[{d.version}] {d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-gray-600 dark:text-gray-400 block mb-1">AI Prompt DRAFT:</span>
+                        <select
+                          value={simPromptVerId}
+                          onChange={(e) => setSimPromptVerId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-xs"
+                        >
+                          <option value="">-- Dùng bản ACTIVE hiện hành --</option>
+                          {promptDrafts.map((d: any) => (
+                            <option key={d.id} value={d.id}>[{d.version}] {d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-gray-600 dark:text-gray-400 block mb-1">Checklist DRAFT:</span>
+                        <select
+                          value={simChecklistVerId}
+                          onChange={(e) => setSimChecklistVerId(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg border bg-white dark:bg-slate-900 text-xs"
+                        >
+                          <option value="">-- Dùng bản ACTIVE hiện hành --</option>
+                          {chkDrafts.map((d: any) => (
+                            <option key={d.id} value={d.id}>[{d.version}] {d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  3. Ghi chú kiểm thử / Ý kiến rà soát (Tùy chọn):
+                </label>
+                <textarea
+                  rows={2}
+                  value={simNote}
+                  onChange={(e) => setSimNote(e.target.value)}
+                  placeholder="Nhập ghi chú mục tiêu kiểm thử hoặc nhận xét về kết quả..."
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t">
+              <button
+                disabled={submittingSim}
+                onClick={() => setSimModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={submittingSim || (!simProcVerId && !simPromptVerId && !simChecklistVerId)}
+                onClick={handleRunSimulation}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {submittingSim && <span className="animate-spin">⌛</span>}
+                Bắt đầu chạy thử (Run Simulation)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 

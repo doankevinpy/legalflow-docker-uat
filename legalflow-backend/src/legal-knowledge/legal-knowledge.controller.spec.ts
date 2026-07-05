@@ -17,6 +17,8 @@ describe('LegalKnowledgeController', () => {
     analyzeImpact: jest.fn(),
     handleWorkflowAction: jest.fn(),
     createDraftVersion: jest.fn(),
+    getSampleProcedureCases: jest.fn(),
+    runDraftVersionSimulation: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -225,6 +227,25 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.createChecklistDraft('1', { sourceVersionId: 'src1', reason: 'test' }, { user: { id: 'u1' } });
     expect(result).toEqual(mockResult);
     expect(mockService.createDraftVersion).toHaveBeenCalledWith('1', 'CHECKLIST_VERSION', 'src1', 'test', undefined, { id: 'u1' });
+  });
+
+  it('getSampleCases should call service.getSampleProcedureCases', async () => {
+    const mockResult = [{ id: 'case1' }];
+    mockService.getSampleProcedureCases.mockResolvedValue(mockResult);
+
+    const result = await controller.getSampleCases();
+    expect(result).toEqual(mockResult);
+    expect(mockService.getSampleProcedureCases).toHaveBeenCalled();
+  });
+
+  it('runDraftSimulation should call service.runDraftVersionSimulation', async () => {
+    const mockResult = { success: true };
+    mockService.runDraftVersionSimulation.mockResolvedValue(mockResult);
+
+    const body = { procedureCaseId: 'c1', draftProcedureTypeVersionId: 'v1', note: 'sim' };
+    const result = await controller.runDraftSimulation('1', body, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.runDraftVersionSimulation).toHaveBeenCalledWith('1', body, { id: 'u1' });
   });
 });
 

@@ -14,16 +14,19 @@ describe('LegalKnowledgeService', () => {
     procedureTypeVersion: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     aiPromptVersion: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     checklistVersion: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     legalUpdateLog: {
@@ -37,6 +40,7 @@ describe('LegalKnowledgeService', () => {
     },
     administrativeProcedureCase: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
     },
   };
 
@@ -338,6 +342,76 @@ describe('LegalKnowledgeService', () => {
       expect(mockPrismaService.legalUpdateLog.update).toHaveBeenCalled();
     });
   });
+
+  describe('getSampleProcedureCases', () => {
+    it('should return sample procedure cases', async () => {
+      const date = new Date('2026-07-05');
+      const mockCases = [
+        {
+          id: 'case1',
+          caseCode: 'C001',
+          applicantName: 'Nguyen Van A',
+          procedureType: { code: 'PROC01', name: 'Thu tuc 1' },
+          status: 'SUBMITTED',
+          createdAt: date,
+        },
+      ];
+      mockPrismaService.administrativeProcedureCase.findMany.mockResolvedValue(mockCases);
+      const res = await service.getSampleProcedureCases();
+      expect(res).toEqual([
+        {
+          id: 'case1',
+          caseCode: 'C001',
+          applicantName: 'Nguyen Van A',
+          procedureCode: 'PROC01',
+          procedureName: 'Thu tuc 1',
+          status: 'SUBMITTED',
+          createdAt: date,
+        },
+      ]);
+      expect(mockPrismaService.administrativeProcedureCase.findMany).toHaveBeenCalled();
+    });
+  });
+
+  describe('runDraftVersionSimulation', () => {
+    it('should throw ForbiddenException if user is STAFF or VIEWER', async () => {
+      await expect(
+        service.runDraftVersionSimulation('1', { procedureCaseId: 'c1', draftProcedureTypeVersionId: 'v1' }, { role: 'STAFF' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException if log not found', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(null);
+      await expect(
+        service.runDraftVersionSimulation('999', { procedureCaseId: 'c1', draftProcedureTypeVersionId: 'v1' }, { role: 'MANAGER' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should run simulation successfully when valid inputs are provided', async () => {
+      const mockLog = { id: '1', reviewStatus: 'APPROVED', notes: '{}' };
+      const mockCase = { id: 'c1', caseCode: 'C001', applicantName: 'Nguyen Van A' };
+      const mockDraftVer = { id: 'v1', version: '1.1-draft', status: 'DRAFT', procedureCode: 'P01', procedureTypeId: 'pt1', processingTimeDays: 10 };
+      const mockActiveVer = { id: 'v0', version: '1.0', status: 'ACTIVE', procedureCode: 'P01', procedureTypeId: 'pt1', processingTimeDays: 15 };
+
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      mockPrismaService.administrativeProcedureCase.findUnique.mockResolvedValue(mockCase);
+      mockPrismaService.procedureTypeVersion.findUnique.mockResolvedValue(mockDraftVer);
+      mockPrismaService.procedureTypeVersion.findFirst.mockResolvedValue(mockActiveVer);
+      mockPrismaService.legalUpdateLog.update.mockResolvedValue({ ...mockLog, notes: '...' });
+
+      const res = await service.runDraftVersionSimulation(
+        '1',
+        { procedureCaseId: 'c1', draftProcedureTypeVersionId: 'v1', note: 'Test sim' },
+        { id: 'u1', role: 'ADMIN', fullName: 'Admin' },
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.simulation).toBeDefined();
+      expect(res.simulation.caseCode).toBe('C001');
+      expect(mockPrismaService.legalUpdateLog.update).toHaveBeenCalled();
+    });
+  });
 });
+
 
 
