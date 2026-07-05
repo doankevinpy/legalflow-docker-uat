@@ -111,5 +111,74 @@ export class LegalKnowledgeController {
   workflowAction(@Param('id') id: string, @Body() body: { action: string; note?: string; reason?: string }, @Request() req: any) {
     return this.service.handleWorkflowAction(id, body?.action || '', body?.note || '', body?.reason || '', req.user);
   }
+
+  @Post('update-logs/:id/create-draft-version')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  createDraftVersion(
+    @Param('id') id: string,
+    @Body() body: { draftType: string; sourceVersionId: string; reason: string; draftVersion?: string },
+    @Request() req: any,
+  ) {
+    return this.service.createDraftVersion(
+      id,
+      body?.draftType || '',
+      body?.sourceVersionId || '',
+      body?.reason || '',
+      body?.draftVersion,
+      req.user,
+    );
+  }
+
+  @Post('update-logs/:id/create-procedure-type-draft')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  createProcedureTypeDraft(
+    @Param('id') id: string,
+    @Body() body: { sourceVersionId: string; reason: string; draftVersion?: string },
+    @Request() req: any,
+  ) {
+    return this.service.createDraftVersion(
+      id,
+      'PROCEDURE_TYPE_VERSION',
+      body?.sourceVersionId || '',
+      body?.reason || '',
+      body?.draftVersion,
+      req.user,
+    );
+  }
+
+  @Post('update-logs/:id/create-prompt-draft')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  createPromptDraft(
+    @Param('id') id: string,
+    @Body() body: { sourceVersionId: string; reason: string; draftVersion?: string },
+    @Request() req: any,
+  ) {
+    return this.service.createDraftVersion(
+      id,
+      'AI_PROMPT_VERSION',
+      body?.sourceVersionId || '',
+      body?.reason || '',
+      body?.draftVersion,
+      req.user,
+    );
+  }
+
+  @Post('update-logs/:id/create-checklist-draft')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  createChecklistDraft(
+    @Param('id') id: string,
+    @Body() body: { sourceVersionId: string; reason: string; draftVersion?: string },
+    @Request() req: any,
+  ) {
+    return this.service.createDraftVersion(
+      id,
+      'CHECKLIST_VERSION',
+      body?.sourceVersionId || '',
+      body?.reason || '',
+      body?.draftVersion,
+      req.user,
+    );
+  }
 }
+
 

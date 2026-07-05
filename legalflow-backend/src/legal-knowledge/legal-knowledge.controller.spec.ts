@@ -16,6 +16,7 @@ describe('LegalKnowledgeController', () => {
     getSnapshots: jest.fn(),
     analyzeImpact: jest.fn(),
     handleWorkflowAction: jest.fn(),
+    createDraftVersion: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -189,5 +190,42 @@ describe('LegalKnowledgeController', () => {
     expect(result).toEqual(mockResult);
     expect(mockService.handleWorkflowAction).toHaveBeenCalledWith('1', 'START_REVIEW', 'test', '', { id: 'u1' });
   });
+
+  it('createDraftVersion should call service.createDraftVersion', async () => {
+    const mockResult = { success: true };
+    mockService.createDraftVersion.mockResolvedValue(mockResult);
+
+    const result = await controller.createDraftVersion('1', { draftType: 'PROCEDURE_TYPE_VERSION', sourceVersionId: 'src1', reason: 'test' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.createDraftVersion).toHaveBeenCalledWith('1', 'PROCEDURE_TYPE_VERSION', 'src1', 'test', undefined, { id: 'u1' });
+  });
+
+  it('createProcedureTypeDraft should call service.createDraftVersion with PROCEDURE_TYPE_VERSION', async () => {
+    const mockResult = { success: true };
+    mockService.createDraftVersion.mockResolvedValue(mockResult);
+
+    const result = await controller.createProcedureTypeDraft('1', { sourceVersionId: 'src1', reason: 'test' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.createDraftVersion).toHaveBeenCalledWith('1', 'PROCEDURE_TYPE_VERSION', 'src1', 'test', undefined, { id: 'u1' });
+  });
+
+  it('createPromptDraft should call service.createDraftVersion with AI_PROMPT_VERSION', async () => {
+    const mockResult = { success: true };
+    mockService.createDraftVersion.mockResolvedValue(mockResult);
+
+    const result = await controller.createPromptDraft('1', { sourceVersionId: 'src1', reason: 'test' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.createDraftVersion).toHaveBeenCalledWith('1', 'AI_PROMPT_VERSION', 'src1', 'test', undefined, { id: 'u1' });
+  });
+
+  it('createChecklistDraft should call service.createDraftVersion with CHECKLIST_VERSION', async () => {
+    const mockResult = { success: true };
+    mockService.createDraftVersion.mockResolvedValue(mockResult);
+
+    const result = await controller.createChecklistDraft('1', { sourceVersionId: 'src1', reason: 'test' }, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.createDraftVersion).toHaveBeenCalledWith('1', 'CHECKLIST_VERSION', 'src1', 'test', undefined, { id: 'u1' });
+  });
 });
+
 

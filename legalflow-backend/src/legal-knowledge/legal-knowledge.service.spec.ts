@@ -13,12 +13,18 @@ describe('LegalKnowledgeService', () => {
     },
     procedureTypeVersion: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     aiPromptVersion: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     checklistVersion: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     legalUpdateLog: {
       findMany: jest.fn(),
@@ -298,5 +304,40 @@ describe('LegalKnowledgeService', () => {
       await expect(service.handleWorkflowAction('1', 'ADD_NOTE', 'note', '', { id: 'u1', role: 'MANAGER' })).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('createDraftVersion', () => {
+    it('should throw ForbiddenException if user is STAFF or VIEWER', async () => {
+      await expect(
+        service.createDraftVersion('1', 'PROCEDURE_TYPE_VERSION', 'src1', 'reason', undefined, { role: 'STAFF' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException if log is not APPROVED', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({ id: '1', reviewStatus: 'REVIEWING' });
+      await expect(
+        service.createDraftVersion('1', 'PROCEDURE_TYPE_VERSION', 'src1', 'reason', undefined, { role: 'MANAGER' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create a draft procedure type version successfully when log is APPROVED', async () => {
+      const mockLog = { id: '1', reviewStatus: 'APPROVED', notes: '{}' };
+      const mockSource = { id: 'src1', procedureTypeId: 'p1', version: '1.0', status: 'ACTIVE', procedureName: 'Proc A' };
+      const mockCreated = { id: 'draft1', procedureTypeId: 'p1', version: '1.1-draft', status: 'DRAFT', createdAt: new Date() };
+
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce(mockSource) // source check
+        .mockResolvedValueOnce(null); // collision check
+      mockPrismaService.procedureTypeVersion.create.mockResolvedValue(mockCreated);
+      mockPrismaService.legalUpdateLog.update.mockResolvedValue({ ...mockLog, notes: '...' });
+
+      const res = await service.createDraftVersion('1', 'PROCEDURE_TYPE_VERSION', 'src1', 'Cần cập nhật luật', undefined, { id: 'u1', role: 'ADMIN' });
+      expect(res.success).toBe(true);
+      expect(res.draftVersion).toEqual(mockCreated);
+      expect(mockPrismaService.procedureTypeVersion.create).toHaveBeenCalled();
+      expect(mockPrismaService.legalUpdateLog.update).toHaveBeenCalled();
+    });
+  });
 });
+
 

@@ -35,5 +35,8 @@ export const legalKnowledgeApi = {
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/close`, data || {}),
   workflowAction: (id: string, data: { action: string; note?: string; reason?: string }) =>
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/workflow-action`, data),
+  createDraftVersion: (id: string, data: { draftType: string; sourceVersionId: string; reason: string; draftVersion?: string }) =>
+    apiClient.post<any>(`/legal-knowledge/update-logs/${id}/create-draft-version`, data),
 };
+
 

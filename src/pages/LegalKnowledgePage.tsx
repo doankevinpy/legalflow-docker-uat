@@ -16,6 +16,7 @@ import {
   Camera,
   ExternalLink,
   Database,
+  FileText,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -112,6 +113,68 @@ export default function LegalKnowledgePage() {
       setSubmittingWorkflow(false);
     }
   };
+
+  // Phase 8F-C Draft Version Modal state
+  const [draftModalOpen, setDraftModalOpen] = useState<boolean>(false);
+  const [draftType, setDraftType] = useState<string>('PROCEDURE_TYPE_VERSION');
+  const [draftSourceId, setDraftSourceId] = useState<string>('');
+  const [draftReason, setDraftReason] = useState<string>('');
+  const [draftVerString, setDraftVerString] = useState<string>('');
+  const [submittingDraft, setSubmittingDraft] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (draftModalOpen) {
+      let activeList: any[] = [];
+      if (draftType === 'PROCEDURE_TYPE_VERSION') {
+        activeList = procedureVersions.filter(v => v.status === 'ACTIVE');
+      } else if (draftType === 'AI_PROMPT_VERSION') {
+        activeList = promptVersions.filter(v => v.status === 'ACTIVE');
+      } else if (draftType === 'CHECKLIST_VERSION') {
+        activeList = checklistVersions.filter(v => v.status === 'ACTIVE');
+      }
+      if (activeList.length > 0 && (!draftSourceId || !activeList.some(item => item.id === draftSourceId))) {
+        setDraftSourceId(activeList[0].id);
+      } else if (activeList.length === 0) {
+        setDraftSourceId('');
+      }
+    }
+  }, [draftModalOpen, draftType, procedureVersions, promptVersions, checklistVersions]);
+
+  const handleCreateDraftSubmit = async () => {
+    if (!selectedLogForDetail) return;
+    if (!draftSourceId) {
+      alert('Vui lòng chọn phiên bản nguồn ACTIVE để tạo bản nháp.');
+      return;
+    }
+    if (!draftReason.trim()) {
+      alert('Vui lòng nhập lý do tạo bản nháp version mới.');
+      return;
+    }
+    setSubmittingDraft(true);
+    try {
+      const res = await legalKnowledgeApi.createDraftVersion(selectedLogForDetail.id, {
+        draftType,
+        sourceVersionId: draftSourceId,
+        reason: draftReason,
+        draftVersion: draftVerString.trim() || undefined,
+      });
+      const updatedLog = res?.updateLog || res?.log || res?.data?.updateLog || res?.data?.log;
+      if (updatedLog) {
+        setSelectedLogForDetail(updatedLog);
+      }
+      alert(res?.message || res?.data?.message || 'Đã tạo bản nháp version thành công.');
+      setDraftModalOpen(false);
+      setDraftReason('');
+      setDraftVerString('');
+      await fetchAllData();
+    } catch (err: any) {
+      console.error('Create draft error:', err);
+      alert(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi tạo bản nháp version.');
+    } finally {
+      setSubmittingDraft(false);
+    }
+  };
+
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -1571,6 +1634,36 @@ export default function LegalKnowledgePage() {
                       </div>
                     )}
 
+                    {parsed.draftVersions?.list?.length > 0 && (
+                      <div className="bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-200 dark:border-purple-900 space-y-3">
+                        <h4 className="font-bold text-xs text-purple-900 dark:text-purple-300 uppercase flex items-center gap-1.5">
+                          <FileText className="h-4 w-4 text-purple-600" />
+                          Danh sách bản nháp version đã tạo ({parsed.draftVersions.list.length}):
+                        </h4>
+                        <div className="bg-amber-100 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 p-2.5 rounded-lg text-xs leading-relaxed">
+                          ⚠️ <span className="font-bold">Bản nháp version chưa có hiệu lực</span> và chưa được dùng bởi AI review thật. Cần kiểm thử, phê duyệt và kích hoạt thủ công ở phase sau.
+                        </div>
+                        <div className="space-y-2">
+                          {parsed.draftVersions.list.map((dv: any, idx: number) => (
+                            <div key={idx} className="p-3 bg-white dark:bg-slate-900 rounded-lg border flex flex-wrap items-center justify-between text-xs gap-2">
+                              <div>
+                                <div className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                  <span>{dv.type === 'PROCEDURE_TYPE_VERSION' ? 'Thủ tục hành chính' : dv.type === 'AI_PROMPT_VERSION' ? 'Prompt AI' : 'Checklist'}</span>
+                                  <span className="px-2 py-0.5 bg-amber-500 text-white rounded font-bold text-[10px]">DRAFT</span>
+                                  <span className="text-purple-600 font-mono">{dv.version}</span>
+                                </div>
+                                <div className="text-gray-500 mt-1">Tên/Khóa: <span className="font-semibold text-gray-700 dark:text-gray-300">{dv.name}</span></div>
+                                <div className="text-gray-500 italic mt-0.5">"Lý do: {dv.reason}"</div>
+                              </div>
+                              <div className="text-right text-[11px] text-gray-400">
+                                {new Date(dv.createdAt).toLocaleString('vi-VN')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {parsed.workflowHistory?.length > 0 && (
                       <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border space-y-3">
                         <h4 className="font-bold text-xs text-gray-700 dark:text-gray-300 uppercase flex items-center gap-1.5">
@@ -1586,6 +1679,7 @@ export default function LegalKnowledgePage() {
                               APPROVE_FOR_VERSIONING: 'Phê duyệt hướng xử lý',
                               REJECT: 'Từ chối hướng xử lý',
                               CLOSE: 'Đóng nhật ký',
+                              CREATE_DRAFT_VERSION: 'Tạo bản nháp version',
                             };
                             const actionText = actionMap[item.action] || item.actionLabel || item.action;
                             const timeVal = item.createdAt || item.timestamp;
@@ -1742,13 +1836,23 @@ export default function LegalKnowledgePage() {
                         </button>
                       )}
 
-                      <button
-                        disabled
-                        title="Phase sau mới hỗ trợ tạo draft version mới"
-                        className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed"
-                      >
-                        Tạo version mới (Phase sau)
-                      </button>
+                      {isLeader && status === 'APPROVED' && !isRejected ? (
+                        <button
+                          onClick={() => setDraftModalOpen(true)}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-xs transition shadow-sm flex items-center gap-1"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          Tạo bản nháp version
+                        </button>
+                      ) : isLeader ? (
+                        <button
+                          disabled
+                          title="Chỉ tạo bản nháp sau khi đã phê duyệt hướng xử lý."
+                          className="px-3 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-xl font-semibold text-xs cursor-not-allowed border border-dashed"
+                        >
+                          Tạo bản nháp version
+                        </button>
+                      ) : null}
                     </>
                   );
                 })()}
@@ -1817,6 +1921,120 @@ export default function LegalKnowledgePage() {
           </div>
         </div>
       )}
+
+      {/* MODAL 9: DRAFT VERSION CREATION MODAL (PHASE 8F-C) */}
+      {draftModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 border border-purple-200 dark:border-purple-900 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base text-purple-900 dark:text-purple-300 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-purple-600" />
+                Tạo bản nháp phiên bản mới (Draft Version)
+              </h3>
+              <button onClick={() => setDraftModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs font-medium leading-relaxed">
+              <span className="font-bold block mb-1">CẢNH BÁO HỆ THỐNG:</span>
+              Bản nháp version chưa có hiệu lực và chưa được dùng bởi AI review thật. Cần kiểm thử, phê duyệt và kích hoạt thủ công ở phase sau. Hệ thống không tự động thay đổi version ACTIVE hiện tại.
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  1. Loại đối tượng cần tạo bản nháp version:
+                </label>
+                <select
+                  value={draftType}
+                  onChange={(e) => setDraftType(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm font-semibold focus:ring-2 focus:ring-purple-500 outline-none transition"
+                >
+                  <option value="PROCEDURE_TYPE_VERSION">Thủ tục hành chính (Procedure Type)</option>
+                  <option value="AI_PROMPT_VERSION">Prompt AI (AI Prompt)</option>
+                  <option value="CHECKLIST_VERSION">Checklist (Checklist Version)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  2. Chọn phiên bản nguồn ACTIVE để kế thừa:
+                </label>
+                <select
+                  value={draftSourceId}
+                  onChange={(e) => setDraftSourceId(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition"
+                >
+                  {(() => {
+                    let list: any[] = [];
+                    if (draftType === 'PROCEDURE_TYPE_VERSION') list = procedureVersions.filter(v => v.status === 'ACTIVE');
+                    else if (draftType === 'AI_PROMPT_VERSION') list = promptVersions.filter(v => v.status === 'ACTIVE');
+                    else if (draftType === 'CHECKLIST_VERSION') list = checklistVersions.filter(v => v.status === 'ACTIVE');
+
+                    if (list.length === 0) {
+                      return <option value="">Không có phiên bản ACTIVE nào</option>;
+                    }
+                    return list.map((item: any) => {
+                      const label = item.procedureName || item.procedureCode || item.promptName || item.promptKey || item.checklistName || item.checklistKey || item.id;
+                      return (
+                        <option key={item.id} value={item.id}>
+                          {label} (ver: {item.version})
+                        </option>
+                      );
+                    });
+                  })()}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  3. Số phiên bản mới (Tùy chọn, để trống hệ thống tự tạo X.Y-draft):
+                </label>
+                <input
+                  type="text"
+                  value={draftVerString}
+                  onChange={(e) => setDraftVerString(e.target.value)}
+                  placeholder="Ví dụ: v2.1-draft"
+                  className="w-full px-3.5 py-2 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-700 dark:text-gray-300 mb-1.5">
+                  4. Lý do tạo bản nháp version mới (Bắt buộc):
+                </label>
+                <textarea
+                  rows={3}
+                  value={draftReason}
+                  onChange={(e) => setDraftReason(e.target.value)}
+                  placeholder="Nhập lý do tạo bản nháp căn cứ trên cập nhật pháp lý..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t">
+              <button
+                disabled={submittingDraft}
+                onClick={() => setDraftModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={submittingDraft || !draftSourceId}
+                onClick={handleCreateDraftSubmit}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {submittingDraft && <span className="animate-spin">⌛</span>}
+                Tạo bản nháp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

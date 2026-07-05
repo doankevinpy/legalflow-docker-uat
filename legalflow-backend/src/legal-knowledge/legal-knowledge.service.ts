@@ -586,4 +586,298 @@ export class LegalKnowledgeService {
       updateLog: updatedLog,
     };
   }
+
+  async createDraftVersion(
+    id: string,
+    draftType: string,
+    sourceVersionId: string,
+    reason: string,
+    draftVersion?: string,
+    user?: any,
+  ) {
+    if (!user || (user.role !== 'MANAGER' && user.role !== 'ADMIN')) {
+      throw new ForbiddenException('Chỉ Lãnh đạo (MANAGER/ADMIN) mới có quyền tạo bản nháp version mới.');
+    }
+
+    const log = await this.prisma.legalUpdateLog.findUnique({
+      where: { id },
+      include: {
+        sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
+      },
+    });
+    if (!log) {
+      throw new NotFoundException(`Không tìm thấy nhật ký cập nhật pháp lý với ID "${id}"`);
+    }
+
+    if (log.reviewStatus !== 'APPROVED') {
+      throw new BadRequestException('Chỉ tạo bản nháp sau khi đã phê duyệt hướng xử lý (APPROVED).');
+    }
+
+    let parsedNotes: any = {};
+    try {
+      if (log.notes) {
+        const raw = JSON.parse(log.notes);
+        parsedNotes = raw && typeof raw === 'object' ? raw : { impactAnalysis: raw };
+      }
+    } catch (e) {
+      parsedNotes = { impactAnalysis: { impactSummary: log.notes } };
+    }
+
+    if (parsedNotes.subStatus === 'CLOSED' || parsedNotes.subStatus === 'REJECTED') {
+      throw new BadRequestException('Nhật ký cập nhật này đã đóng hoặc từ chối, không thể tạo bản nháp version.');
+    }
+
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('Vui lòng nhập lý do tạo bản nháp version mới.');
+    }
+
+    if (!sourceVersionId) {
+      throw new BadRequestException('Vui lòng chọn phiên bản nguồn ACTIVE để tạo bản nháp.');
+    }
+
+    let createdDraft: any = null;
+    let draftSummary: any = null;
+
+    if (draftType === 'PROCEDURE_TYPE_VERSION') {
+      const source = await this.prisma.procedureTypeVersion.findUnique({
+        where: { id: sourceVersionId },
+      });
+      if (!source) throw new NotFoundException(`Phiên bản thủ tục nguồn với ID "${sourceVersionId}" không tồn tại.`);
+      if (source.status !== 'ACTIVE') throw new BadRequestException('Phiên bản thủ tục nguồn không ở trạng thái ACTIVE.');
+
+      let newVer = draftVersion ? draftVersion.trim() : '';
+      if (!newVer) {
+        const base = source.version.replace(/-draft.*$/, '');
+        let counter = 1;
+        while (true) {
+          const candidate = `${base}.${counter}-draft`;
+          const collision = await this.prisma.procedureTypeVersion.findUnique({
+            where: { procedureTypeId_version: { procedureTypeId: source.procedureTypeId, version: candidate } },
+          });
+          if (!collision) {
+            newVer = candidate;
+            break;
+          }
+          counter++;
+          if (counter > 50) {
+            newVer = `${base}.${Date.now()}-draft`;
+            break;
+          }
+        }
+      } else {
+        const collision = await this.prisma.procedureTypeVersion.findUnique({
+          where: { procedureTypeId_version: { procedureTypeId: source.procedureTypeId, version: newVer } },
+        });
+        if (collision) throw new BadRequestException(`Phiên bản thủ tục "${newVer}" đã tồn tại.`);
+      }
+
+      createdDraft = await this.prisma.procedureTypeVersion.create({
+        data: {
+          procedureTypeId: source.procedureTypeId,
+          version: newVer,
+          status: 'DRAFT',
+          procedureName: source.procedureName,
+          procedureCode: source.procedureCode,
+          field: source.field,
+          group: source.group,
+          requiredDocuments: source.requiredDocuments ? JSON.parse(JSON.stringify(source.requiredDocuments)) : undefined,
+          processingTimeDays: source.processingTimeDays,
+          receivingAgency: source.receivingAgency,
+          resolvingAgency: source.resolvingAgency,
+          workflowSteps: source.workflowSteps ? JSON.parse(JSON.stringify(source.workflowSteps)) : undefined,
+          legalBasisDocumentIds: source.legalBasisDocumentIds ? JSON.parse(JSON.stringify(source.legalBasisDocumentIds)) : undefined,
+          effectiveFrom: null,
+          effectiveTo: null,
+        },
+      });
+
+      draftSummary = {
+        id: createdDraft.id,
+        type: 'PROCEDURE_TYPE_VERSION',
+        version: newVer,
+        name: source.procedureName,
+        sourceVersionId: source.id,
+        reason: reason.trim(),
+        createdAt: createdDraft.createdAt.toISOString(),
+      };
+    } else if (draftType === 'AI_PROMPT_VERSION') {
+      const source = await this.prisma.aiPromptVersion.findUnique({
+        where: { id: sourceVersionId },
+      });
+      if (!source) throw new NotFoundException(`Phiên bản prompt nguồn với ID "${sourceVersionId}" không tồn tại.`);
+      if (source.status !== 'ACTIVE') throw new BadRequestException('Phiên bản prompt nguồn không ở trạng thái ACTIVE.');
+
+      let newVer = draftVersion ? draftVersion.trim() : '';
+      if (!newVer) {
+        const base = source.version.replace(/-draft.*$/, '');
+        let counter = 1;
+        while (true) {
+          const candidate = `${base}.${counter}-draft`;
+          const collision = await this.prisma.aiPromptVersion.findUnique({
+            where: { promptKey_version: { promptKey: source.promptKey, version: candidate } },
+          });
+          if (!collision) {
+            newVer = candidate;
+            break;
+          }
+          counter++;
+          if (counter > 50) {
+            newVer = `${base}.${Date.now()}-draft`;
+            break;
+          }
+        }
+      } else {
+        const collision = await this.prisma.aiPromptVersion.findUnique({
+          where: { promptKey_version: { promptKey: source.promptKey, version: newVer } },
+        });
+        if (collision) throw new BadRequestException(`Phiên bản prompt "${newVer}" đã tồn tại.`);
+      }
+
+      createdDraft = await this.prisma.aiPromptVersion.create({
+        data: {
+          promptKey: source.promptKey,
+          version: newVer,
+          status: 'DRAFT',
+          procedureTypeCode: source.procedureTypeCode,
+          procedureGroup: source.procedureGroup,
+          analysisType: source.analysisType,
+          systemPrompt: source.systemPrompt,
+          outputSchema: source.outputSchema ? JSON.parse(JSON.stringify(source.outputSchema)) : undefined,
+          legalDocumentIds: source.legalDocumentIds ? JSON.parse(JSON.stringify(source.legalDocumentIds)) : undefined,
+          effectiveFrom: null,
+          effectiveTo: null,
+        },
+      });
+
+      draftSummary = {
+        id: createdDraft.id,
+        type: 'AI_PROMPT_VERSION',
+        version: newVer,
+        name: source.promptKey,
+        sourceVersionId: source.id,
+        reason: reason.trim(),
+        createdAt: createdDraft.createdAt.toISOString(),
+      };
+    } else if (draftType === 'CHECKLIST_VERSION') {
+      const source = await this.prisma.checklistVersion.findUnique({
+        where: { id: sourceVersionId },
+      });
+      if (!source) throw new NotFoundException(`Phiên bản checklist nguồn với ID "${sourceVersionId}" không tồn tại.`);
+      if (source.status !== 'ACTIVE') throw new BadRequestException('Phiên bản checklist nguồn không ở trạng thái ACTIVE.');
+
+      let newVer = draftVersion ? draftVersion.trim() : '';
+      if (!newVer) {
+        const base = source.version.replace(/-draft.*$/, '');
+        let counter = 1;
+        while (true) {
+          const candidate = `${base}.${counter}-draft`;
+          const collision = await this.prisma.checklistVersion.findUnique({
+            where: { checklistKey_version: { checklistKey: source.checklistKey, version: candidate } },
+          });
+          if (!collision) {
+            newVer = candidate;
+            break;
+          }
+          counter++;
+          if (counter > 50) {
+            newVer = `${base}.${Date.now()}-draft`;
+            break;
+          }
+        }
+      } else {
+        const collision = await this.prisma.checklistVersion.findUnique({
+          where: { checklistKey_version: { checklistKey: source.checklistKey, version: newVer } },
+        });
+        if (collision) throw new BadRequestException(`Phiên bản checklist "${newVer}" đã tồn tại.`);
+      }
+
+      createdDraft = await this.prisma.checklistVersion.create({
+        data: {
+          checklistKey: source.checklistKey,
+          version: newVer,
+          status: 'DRAFT',
+          procedureTypeCode: source.procedureTypeCode,
+          procedureGroup: source.procedureGroup,
+          checklistItems: source.checklistItems ? JSON.parse(JSON.stringify(source.checklistItems)) : [],
+          legalDocumentIds: source.legalDocumentIds ? JSON.parse(JSON.stringify(source.legalDocumentIds)) : undefined,
+          effectiveFrom: null,
+          effectiveTo: null,
+        },
+      });
+
+      draftSummary = {
+        id: createdDraft.id,
+        type: 'CHECKLIST_VERSION',
+        version: newVer,
+        name: source.checklistKey,
+        sourceVersionId: source.id,
+        reason: reason.trim(),
+        createdAt: createdDraft.createdAt.toISOString(),
+      };
+    } else {
+      throw new BadRequestException(`Loại bản nháp "${draftType}" không hợp lệ. Chỉ hỗ trợ PROCEDURE_TYPE_VERSION, AI_PROMPT_VERSION, CHECKLIST_VERSION.`);
+    }
+
+    if (!parsedNotes.draftVersions || typeof parsedNotes.draftVersions !== 'object') {
+      parsedNotes.draftVersions = {
+        procedureTypeVersionIds: [],
+        aiPromptVersionIds: [],
+        checklistVersionIds: [],
+        list: [],
+      };
+    }
+    if (!Array.isArray(parsedNotes.draftVersions.procedureTypeVersionIds)) parsedNotes.draftVersions.procedureTypeVersionIds = [];
+    if (!Array.isArray(parsedNotes.draftVersions.aiPromptVersionIds)) parsedNotes.draftVersions.aiPromptVersionIds = [];
+    if (!Array.isArray(parsedNotes.draftVersions.checklistVersionIds)) parsedNotes.draftVersions.checklistVersionIds = [];
+    if (!Array.isArray(parsedNotes.draftVersions.list)) parsedNotes.draftVersions.list = [];
+
+    if (draftType === 'PROCEDURE_TYPE_VERSION') {
+      parsedNotes.draftVersions.procedureTypeVersionIds.push(createdDraft.id);
+    } else if (draftType === 'AI_PROMPT_VERSION') {
+      parsedNotes.draftVersions.aiPromptVersionIds.push(createdDraft.id);
+    } else if (draftType === 'CHECKLIST_VERSION') {
+      parsedNotes.draftVersions.checklistVersionIds.push(createdDraft.id);
+    }
+    parsedNotes.draftVersions.list.push(draftSummary);
+
+    const historyEntry = {
+      action: 'CREATE_DRAFT_VERSION',
+      actionLabel: `Tạo bản nháp ${draftType === 'PROCEDURE_TYPE_VERSION' ? 'Thủ tục' : draftType === 'AI_PROMPT_VERSION' ? 'Prompt AI' : 'Checklist'} (${draftSummary.version})`,
+      userId: user.id || 'SYSTEM',
+      userEmail: user.email || '',
+      userRole: user.role || '',
+      oldStatus: parsedNotes.subStatus || log.reviewStatus,
+      newStatus: parsedNotes.subStatus || log.reviewStatus,
+      note: `Đã tạo bản nháp mới [${draftSummary.version}] từ nguồn ACTIVE [ID: ${sourceVersionId}]. Lý do: ${reason.trim()}`,
+      createdAt: new Date().toISOString(),
+    };
+
+    const workflowHistory = Array.isArray(parsedNotes.workflowHistory) ? parsedNotes.workflowHistory : [];
+    workflowHistory.push(historyEntry);
+    parsedNotes.workflowHistory = workflowHistory;
+
+    const updatedLog = await this.prisma.legalUpdateLog.update({
+      where: { id },
+      data: {
+        notes: JSON.stringify(parsedNotes, null, 2),
+      },
+      include: {
+        sourceDocument: true,
+        reviewedBy: {
+          select: { id: true, email: true, fullName: true, role: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Đã tạo bản nháp phiên bản mới (${draftSummary.version}) thành công.`,
+      draftVersion: createdDraft,
+      updateLog: updatedLog,
+    };
+  }
 }
+
