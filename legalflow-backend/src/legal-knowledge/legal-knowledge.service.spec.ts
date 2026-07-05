@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LegalKnowledgeService } from './legal-knowledge.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('LegalKnowledgeService', () => {
   let service: LegalKnowledgeService;
@@ -16,18 +16,24 @@ describe('LegalKnowledgeService', () => {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn(),
     },
     aiPromptVersion: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn(),
     },
     checklistVersion: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn(),
     },
     legalUpdateLog: {
       findMany: jest.fn(),
@@ -35,6 +41,7 @@ describe('LegalKnowledgeService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    $transaction: jest.fn().mockImplementation((cb) => cb(mockPrismaService)),
     procedureAiAnalysisLegalSnapshot: {
       findMany: jest.fn(),
     },
@@ -411,7 +418,95 @@ describe('LegalKnowledgeService', () => {
       expect(mockPrismaService.legalUpdateLog.update).toHaveBeenCalled();
     });
   });
+
+  describe('activateDraftVersion', () => {
+    const validDto = {
+      draftType: 'PROCEDURE_TYPE_VERSION',
+      draftVersionId: 'v1',
+      reason: 'Cập nhật luật mới',
+      confirmationText: 'KICH HOAT VERSION',
+    };
+    const mockLog = {
+      id: '1',
+      reviewStatus: 'APPROVED',
+      notes: JSON.stringify({
+        simulations: [{ id: 'sim1' }],
+        draftVersions: { list: [{ id: 'v1' }] },
+      }),
+    };
+
+    it('should throw ForbiddenException if user is STAFF or VIEWER', async () => {
+      await expect(service.activateDraftVersion('1', validDto, { role: 'STAFF' })).rejects.toThrow(ForbiddenException);
+      await expect(service.activateDraftVersion('1', validDto, { role: 'VIEWER' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException if confirmationText is wrong', async () => {
+      await expect(
+        service.activateDraftVersion('1', { ...validDto, confirmationText: 'SAI' }, { role: 'MANAGER' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if reason is missing', async () => {
+      await expect(
+        service.activateDraftVersion('1', { ...validDto, reason: '' }, { role: 'MANAGER' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if log is not APPROVED', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({ ...mockLog, reviewStatus: 'REVIEWING' });
+      await expect(service.activateDraftVersion('1', validDto, { role: 'MANAGER' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if no simulation exists', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({
+        ...mockLog,
+        notes: JSON.stringify({ draftVersions: { list: [{ id: 'v1' }] } }),
+      });
+      await expect(service.activateDraftVersion('1', validDto, { role: 'MANAGER' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if draft status is not DRAFT', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      mockPrismaService.procedureTypeVersion.findUnique.mockResolvedValue({ id: 'v1', status: 'ACTIVE' });
+      await expect(service.activateDraftVersion('1', validDto, { role: 'MANAGER' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('should activate draft and replace old active version successfully for MANAGER and ADMIN', async () => {
+      for (const role of ['MANAGER', 'ADMIN']) {
+        jest.clearAllMocks();
+        mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+        mockPrismaService.procedureTypeVersion.findUnique.mockResolvedValue({ id: 'v1', status: 'DRAFT', procedureTypeId: 'pt1' });
+        mockPrismaService.procedureTypeVersion.findFirst.mockResolvedValue({ id: 'v0', status: 'ACTIVE', procedureTypeId: 'pt1' });
+        mockPrismaService.procedureTypeVersion.update.mockResolvedValue({});
+        mockPrismaService.procedureTypeVersion.count.mockResolvedValue(1);
+        mockPrismaService.legalUpdateLog.update.mockImplementation((args) => Promise.resolve(args.data));
+
+        const res = await service.activateDraftVersion('1', validDto, { id: 'u1', role, email: 'admin@test.com' });
+        expect(res.success).toBe(true);
+        expect(res.newActiveVersionId).toBe('v1');
+        expect(res.previousActiveVersionId).toBe('v0');
+        expect(mockPrismaService.procedureTypeVersion.update).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'v0' }, data: expect.objectContaining({ status: 'REPLACED' }) }),
+        );
+        expect(mockPrismaService.procedureTypeVersion.update).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'v1' }, data: expect.objectContaining({ status: 'ACTIVE' }) }),
+        );
+        const updatedNotes = JSON.parse(mockPrismaService.legalUpdateLog.update.mock.calls[0][0].data.notes);
+        expect(updatedNotes.activationHistory.length).toBeGreaterThan(0);
+        expect(updatedNotes.activationHistory[0].newActiveVersionId).toBe('v1');
+        expect(mockPrismaService.administrativeProcedureCase.findMany).not.toHaveBeenCalled();
+        expect(mockPrismaService.administrativeProcedureCase.findUnique).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should throw ConflictException if count > 1 (multiple active versions)', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLog);
+      mockPrismaService.procedureTypeVersion.findUnique.mockResolvedValue({ id: 'v1', status: 'DRAFT', procedureTypeId: 'pt1' });
+      mockPrismaService.procedureTypeVersion.findFirst.mockResolvedValue(null);
+      mockPrismaService.procedureTypeVersion.update.mockResolvedValue({});
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(2);
+
+      await expect(service.activateDraftVersion('1', validDto, { role: 'MANAGER' })).rejects.toThrow(ConflictException);
+    });
+  });
 });
-
-
-

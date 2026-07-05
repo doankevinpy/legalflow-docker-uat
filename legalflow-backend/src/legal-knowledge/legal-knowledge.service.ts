@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LegalUpdateReviewStatus } from '@prisma/client';
 
@@ -1102,6 +1102,264 @@ export class LegalKnowledgeService {
       simulation: simulationResult,
       updateLog: updatedLog,
     };
+  }
+
+  async activateDraftVersion(id: string, dto: any, user?: any) {
+    if (!user || (user.role !== 'MANAGER' && user.role !== 'ADMIN')) {
+      throw new ForbiddenException('Chỉ Lãnh đạo (ADMIN/MANAGER) mới có quyền kích hoạt version.');
+    }
+
+    if (dto?.confirmationText !== 'KICH HOAT VERSION') {
+      throw new BadRequestException('Vui lòng nhập chính xác cụm từ xác nhận: KICH HOAT VERSION');
+    }
+
+    if (!dto?.reason || typeof dto.reason !== 'string' || dto.reason.trim() === '') {
+      throw new BadRequestException('Vui lòng nhập lý do kích hoạt phiên bản.');
+    }
+
+    const { draftType, draftVersionId } = dto;
+    if (!draftType || !['PROCEDURE_TYPE_VERSION', 'AI_PROMPT_VERSION', 'CHECKLIST_VERSION'].includes(draftType)) {
+      throw new BadRequestException('Loại bản nháp draftType không hợp lệ. Chỉ hỗ trợ PROCEDURE_TYPE_VERSION, AI_PROMPT_VERSION, CHECKLIST_VERSION.');
+    }
+    if (!draftVersionId) {
+      throw new BadRequestException('Vui lòng cung cấp draftVersionId.');
+    }
+
+    const effectiveFromDate = dto.effectiveFrom ? new Date(dto.effectiveFrom) : new Date();
+    if (isNaN(effectiveFromDate.getTime())) {
+      throw new BadRequestException('Ngày hiệu lực effectiveFrom không hợp lệ.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const log = await tx.legalUpdateLog.findUnique({
+        where: { id },
+      });
+      if (!log) {
+        throw new NotFoundException(`Không tìm thấy nhật ký cập nhật pháp lý với ID "${id}"`);
+      }
+
+      if (log.reviewStatus !== 'APPROVED') {
+        throw new BadRequestException('Nhật ký cập nhật phải ở trạng thái APPROVED mới được phép kích hoạt version.');
+      }
+
+      let parsedNotes: any = {};
+      try {
+        if (log.notes) {
+          const raw = JSON.parse(log.notes);
+          parsedNotes = raw && typeof raw === 'object' ? raw : {};
+        }
+      } catch (e) {
+        parsedNotes = {};
+      }
+
+      if (!parsedNotes?.simulations || !Array.isArray(parsedNotes.simulations) || parsedNotes.simulations.length === 0) {
+        throw new BadRequestException('Cần chạy ít nhất một kiểm thử simulation trước khi kích hoạt.');
+      }
+
+      const draftsList = parsedNotes?.draftVersions?.list || [];
+      const allDraftIds = [
+        ...(parsedNotes?.draftVersions?.procedureTypeVersionIds || []),
+        ...(parsedNotes?.draftVersions?.aiPromptVersionIds || []),
+        ...(parsedNotes?.draftVersions?.checklistVersionIds || []),
+        ...draftsList.map((d: any) => d.id || d.versionId),
+      ];
+      if (!allDraftIds.includes(draftVersionId)) {
+        throw new BadRequestException(`Phiên bản DRAFT ID "${draftVersionId}" không thuộc danh sách draftVersions của nhật ký cập nhật này.`);
+      }
+
+      let oldActiveVersionId: string | null = null;
+      const newActiveVersionId: string = draftVersionId;
+
+      if (draftType === 'PROCEDURE_TYPE_VERSION') {
+        const draftVer = await tx.procedureTypeVersion.findUnique({ where: { id: draftVersionId } });
+        if (!draftVer) throw new NotFoundException(`Draft ProcedureTypeVersion ID "${draftVersionId}" không tồn tại.`);
+        if (draftVer.status === 'ACTIVE') throw new BadRequestException('Phiên bản được chọn đang ở trạng thái ACTIVE.');
+        if (draftVer.status !== 'DRAFT') throw new BadRequestException(`Chỉ phiên bản DRAFT mới được phép kích hoạt (hiện tại là ${draftVer.status}).`);
+
+        const oldActive = await tx.procedureTypeVersion.findFirst({
+          where: { procedureTypeId: draftVer.procedureTypeId, status: 'ACTIVE', id: { not: draftVersionId } },
+        });
+
+        if (oldActive) {
+          oldActiveVersionId = oldActive.id;
+          await tx.procedureTypeVersion.update({
+            where: { id: oldActive.id },
+            data: {
+              status: 'REPLACED',
+              effectiveTo: effectiveFromDate,
+            },
+          });
+        }
+
+        await tx.procedureTypeVersion.update({
+          where: { id: draftVersionId },
+          data: {
+            status: 'ACTIVE',
+            effectiveFrom: effectiveFromDate,
+            effectiveTo: null,
+          },
+        });
+
+        const activeCount = await tx.procedureTypeVersion.count({
+          where: { procedureTypeId: draftVer.procedureTypeId, status: 'ACTIVE' },
+        });
+        if (activeCount > 1) {
+          throw new ConflictException('Phát hiện nhiều phiên bản ACTIVE trong cùng phạm vi. Giao dịch bị hủy và rollback!');
+        }
+
+      } else if (draftType === 'AI_PROMPT_VERSION') {
+        const draftVer = await tx.aiPromptVersion.findUnique({ where: { id: draftVersionId } });
+        if (!draftVer) throw new NotFoundException(`Draft AiPromptVersion ID "${draftVersionId}" không tồn tại.`);
+        if (draftVer.status === 'ACTIVE') throw new BadRequestException('Phiên bản được chọn đang ở trạng thái ACTIVE.');
+        if (draftVer.status !== 'DRAFT') throw new BadRequestException(`Chỉ phiên bản DRAFT mới được phép kích hoạt (hiện tại là ${draftVer.status}).`);
+
+        const oldActive = await tx.aiPromptVersion.findFirst({
+          where: {
+            promptKey: draftVer.promptKey,
+            analysisType: draftVer.analysisType || undefined,
+            procedureTypeCode: draftVer.procedureTypeCode || undefined,
+            procedureGroup: draftVer.procedureGroup || undefined,
+            status: 'ACTIVE',
+            id: { not: draftVersionId },
+          },
+        });
+
+        if (oldActive) {
+          oldActiveVersionId = oldActive.id;
+          await tx.aiPromptVersion.update({
+            where: { id: oldActive.id },
+            data: {
+              status: 'REPLACED',
+              effectiveTo: effectiveFromDate,
+            },
+          });
+        }
+
+        await tx.aiPromptVersion.update({
+          where: { id: draftVersionId },
+          data: {
+            status: 'ACTIVE',
+            effectiveFrom: effectiveFromDate,
+            effectiveTo: null,
+          },
+        });
+
+        const activeCount = await tx.aiPromptVersion.count({
+          where: {
+            promptKey: draftVer.promptKey,
+            analysisType: draftVer.analysisType || undefined,
+            procedureTypeCode: draftVer.procedureTypeCode || undefined,
+            procedureGroup: draftVer.procedureGroup || undefined,
+            status: 'ACTIVE',
+          },
+        });
+        if (activeCount > 1) {
+          throw new ConflictException('Phát hiện nhiều phiên bản ACTIVE trong cùng phạm vi. Giao dịch bị hủy và rollback!');
+        }
+
+      } else if (draftType === 'CHECKLIST_VERSION') {
+        const draftVer = await tx.checklistVersion.findUnique({ where: { id: draftVersionId } });
+        if (!draftVer) throw new NotFoundException(`Draft ChecklistVersion ID "${draftVersionId}" không tồn tại.`);
+        if (draftVer.status === 'ACTIVE') throw new BadRequestException('Phiên bản được chọn đang ở trạng thái ACTIVE.');
+        if (draftVer.status !== 'DRAFT') throw new BadRequestException(`Chỉ phiên bản DRAFT mới được phép kích hoạt (hiện tại là ${draftVer.status}).`);
+
+        const oldActive = await tx.checklistVersion.findFirst({
+          where: {
+            checklistKey: draftVer.checklistKey,
+            procedureTypeCode: draftVer.procedureTypeCode || undefined,
+            procedureGroup: draftVer.procedureGroup || undefined,
+            status: 'ACTIVE',
+            id: { not: draftVersionId },
+          },
+        });
+
+        if (oldActive) {
+          oldActiveVersionId = oldActive.id;
+          await tx.checklistVersion.update({
+            where: { id: oldActive.id },
+            data: {
+              status: 'REPLACED',
+              effectiveTo: effectiveFromDate,
+            },
+          });
+        }
+
+        await tx.checklistVersion.update({
+          where: { id: draftVersionId },
+          data: {
+            status: 'ACTIVE',
+            effectiveFrom: effectiveFromDate,
+            effectiveTo: null,
+          },
+        });
+
+        const activeCount = await tx.checklistVersion.count({
+          where: {
+            checklistKey: draftVer.checklistKey,
+            procedureTypeCode: draftVer.procedureTypeCode || undefined,
+            procedureGroup: draftVer.procedureGroup || undefined,
+            status: 'ACTIVE',
+          },
+        });
+        if (activeCount > 1) {
+          throw new ConflictException('Phát hiện nhiều phiên bản ACTIVE trong cùng phạm vi. Giao dịch bị hủy và rollback!');
+        }
+      }
+
+      if (!Array.isArray(parsedNotes.activationHistory)) {
+        parsedNotes.activationHistory = [];
+      }
+      const activationRecord = {
+        id: 'act-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+        draftType,
+        draftVersionId,
+        previousActiveVersionId: oldActiveVersionId || '',
+        newActiveVersionId,
+        reason: dto.reason.trim(),
+        effectiveFrom: effectiveFromDate.toISOString(),
+        activatedById: user.id || 'SYSTEM',
+        activatedByEmail: user.email || '',
+        activatedByRole: user.role || '',
+        createdAt: new Date().toISOString(),
+      };
+      parsedNotes.activationHistory.unshift(activationRecord);
+
+      const workflowHistory = Array.isArray(parsedNotes.workflowHistory) ? parsedNotes.workflowHistory : [];
+      workflowHistory.push({
+        action: 'ACTIVATE_DRAFT_VERSION',
+        actionLabel: `Kích hoạt thủ công bản nháp ${draftType} (ID: ${draftVersionId})`,
+        userId: user.id || 'SYSTEM',
+        userEmail: user.email || '',
+        userRole: user.role || '',
+        oldStatus: parsedNotes.subStatus || log.reviewStatus,
+        newStatus: parsedNotes.subStatus || log.reviewStatus,
+        note: `Đã kích hoạt phiên bản DRAFT thành ACTIVE. Lý do: ${dto.reason.trim()}`,
+        createdAt: new Date().toISOString(),
+      });
+      parsedNotes.workflowHistory = workflowHistory;
+
+      const updatedLog = await tx.legalUpdateLog.update({
+        where: { id },
+        data: {
+          notes: JSON.stringify(parsedNotes, null, 2),
+        },
+        include: {
+          sourceDocument: true,
+          reviewedBy: {
+            select: { id: true, email: true, fullName: true, role: true },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Draft version activated successfully',
+        draftType,
+        previousActiveVersionId: oldActiveVersionId || null,
+        newActiveVersionId,
+        updateLog: updatedLog,
+      };
+    });
   }
 }
 

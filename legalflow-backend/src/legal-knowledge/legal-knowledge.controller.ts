@@ -195,6 +195,16 @@ export class LegalKnowledgeController {
   ) {
     return this.service.runDraftVersionSimulation(id, body || {}, req.user);
   }
+
+  @Post('update-logs/:id/activate-draft-version')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  activateDraftVersion(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.service.activateDraftVersion(id, body || {}, req.user);
+  }
 }
 
 

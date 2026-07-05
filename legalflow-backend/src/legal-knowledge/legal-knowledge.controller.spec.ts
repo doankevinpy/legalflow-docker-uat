@@ -19,6 +19,7 @@ describe('LegalKnowledgeController', () => {
     createDraftVersion: jest.fn(),
     getSampleProcedureCases: jest.fn(),
     runDraftVersionSimulation: jest.fn(),
+    activateDraftVersion: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -246,6 +247,16 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.runDraftSimulation('1', body, { user: { id: 'u1' } });
     expect(result).toEqual(mockResult);
     expect(mockService.runDraftVersionSimulation).toHaveBeenCalledWith('1', body, { id: 'u1' });
+  });
+
+  it('activateDraftVersion should call service.activateDraftVersion', async () => {
+    const mockResult = { success: true };
+    mockService.activateDraftVersion.mockResolvedValue(mockResult);
+
+    const body = { draftType: 'PROCEDURE_TYPE_VERSION', draftVersionId: 'v1', reason: 'act', confirmationText: 'KICH HOAT VERSION' };
+    const result = await controller.activateDraftVersion('1', body, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.activateDraftVersion).toHaveBeenCalledWith('1', body, { id: 'u1' });
   });
 });
 
