@@ -3,6 +3,10 @@
 // Backend lưu code, frontend hiển thị label tiếng Việt
 // ============================================================
 
+// ---------- AI Governance Warning Banner (Phase 9B-B) ----------
+export const AI_REVIEW_WARNING = '⚠️ BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA';
+export const AI_REVIEW_WARNING_TEXT = 'BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA';
+
 // ---------- Case Type ----------
 export const CASE_TYPE_CODES = ['KN', 'TC', 'KNG', 'PA', 'TVPL', 'KHAC'] as const;
 export type CaseTypeCode = (typeof CASE_TYPE_CODES)[number];

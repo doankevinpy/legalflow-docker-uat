@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Printer, Download, AlertTriangle } from 'lucide-react';
+import { AI_REVIEW_WARNING } from '../lib/constants';
 
 interface PurposeChangeReviewPrintModalProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ export const PurposeChangeReviewPrintModal: React.FC<PurposeChangeReviewPrintMod
     confidenceLevel = 'MEDIUM',
     outputPayload = {},
     agencyConfig = {},
-    warningBanner = '⚠️ BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA',
+    warningBanner = AI_REVIEW_WARNING,
     warningDisclaimer = 'Phiếu này là tài liệu hỗ trợ rà soát nội bộ, không phải văn bản kết luận, không thay thế ý kiến thẩm tra của cán bộ chuyên môn và không phải văn bản phát hành cho công dân.',
     officerResponsibility = 'Cán bộ chuyên môn có trách nhiệm kiểm tra, đối chiếu hồ sơ gốc, căn cứ pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có, dữ liệu địa chính, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ trước khi tham mưu xử lý.',
   } = previewData;

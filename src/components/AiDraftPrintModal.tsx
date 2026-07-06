@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Printer, Download, AlertTriangle } from 'lucide-react';
+import { AI_REVIEW_WARNING } from '../lib/constants';
 
 interface AiDraftPrintModalProps {
   isOpen: boolean;
@@ -21,8 +22,8 @@ export const AiDraftPrintModal: React.FC<AiDraftPrintModalProps> = ({
     draftTitle = 'VĂN BẢN DỰ THẢO',
     cleanedLines = [],
     agencyConfig = {},
-    warningBanner = '⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH',
-    warningDisclaimer = 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng.',
+    warningBanner = AI_REVIEW_WARNING,
+    warningDisclaimer = 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng hoặc ban hành.',
   } = previewData;
 
   const handlePrint = () => {

@@ -16,6 +16,7 @@ import { UpdateChecklistItemDto } from './dto/update-checklist-item.dto';
 import { ChangeCaseStatusDto } from './dto/change-case-status.dto';
 import { CaseHistoryAction, CaseField, CaseStatus } from './enums/case.enum';
 import { Role } from '../common/role.enum';
+import { AI_REVIEW_WARNING } from '../common/constants';
 import { Prisma, AiActionType, AiLogStatus, AiFeedbackStatus } from '@prisma/client';
 import { Packer } from 'docx';
 import { identifyTemplateGroup, buildDocxDocument, cleanDraftBodyLines } from './docx-templates.helper';
@@ -656,8 +657,8 @@ export class CasesService {
       draftTitle,
       cleanedLines,
       agencyConfig: config,
-      warningBanner: '⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH',
-      warningDisclaimer: 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng.',
+      warningBanner: AI_REVIEW_WARNING,
+      warningDisclaimer: 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng hoặc ban hành.',
     };
   }
 }

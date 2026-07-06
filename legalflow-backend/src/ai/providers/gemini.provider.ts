@@ -230,7 +230,7 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
 
   async draftResponse(petitionContext: Record<string, any>, draftType: string): Promise<AiDraftResponse> {
     const startTime = Date.now();
-    const warningLabel = "--- BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG. ---\n\n";
+    const warningLabel = "--- BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG. ---\n\n";
     const customNote = petitionContext.customInstructions ? `\n\n[Ghi chú / Hướng dẫn thêm: ${petitionContext.customInstructions}]` : '';
 
     const getDraftTitle = (type: string) => {
@@ -283,7 +283,7 @@ Hãy phân tích nội dung và trả về JSON hợp lệ với định dạng:
       };
     }
 
-    const systemPrompt = `Bạn là Trợ lý soạn thảo văn bản hành chính UBND cấp xã. Hãy soạn thảo dự thảo văn bản "${draftType}" (${getDraftTitle(draftType)}) dựa trên thông tin hồ sơ. Bắt buộc thêm dòng chữ nhãn cảnh báo ở đầu: "${warningLabel.trim()}". Nếu thông tin hồ sơ chưa đủ để kết luận thẩm quyền hoặc căn cứ pháp lý cụ thể, bắt buộc ghi các vùng giữ chỗ rõ ràng dưới dạng "[Cán bộ bổ sung...]". Trả về JSON format: { "draftTitle": "...", "draftContent": "...", "legalReferences": ["Luật..."] }`;
+    const systemPrompt = `Bạn là Trợ lý soạn thảo văn bản hành chính UBND cấp xã. Hãy soạn thảo dự thảo văn bản "${draftType}" (${getDraftTitle(draftType)}) dựa trên thông tin hồ sơ. Bắt buộc tuân thủ nguyên tắc an toàn AI: sử dụng ngôn ngữ tư vấn, gợi ý, không dùng từ ngữ khẳng định tuyệt đối hoặc kết luận thay thế thẩm quyền của cán bộ/cơ quan nhà nước. Bắt buộc thêm dòng chữ nhãn cảnh báo ở đầu: "${warningLabel.trim()}". Nếu thông tin hồ sơ chưa đủ để kết luận thẩm quyền hoặc căn cứ pháp lý cụ thể, bắt buộc ghi các vùng giữ chỗ rõ ràng dưới dạng "[Cán bộ bổ sung...]". Trả về JSON format: { "draftTitle": "...", "draftContent": "...", "legalReferences": ["Luật..."] }`;
     const rawResponse = await this.generateText(systemPrompt, JSON.stringify(petitionContext));
     try {
       const jsonStr = rawResponse.content.replace(/```json|```/g, '').trim();

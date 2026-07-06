@@ -4,6 +4,7 @@ import { procedureCasesApi } from '../lib/procedureCasesApi';
 import type { ProcedureCase, ProcedureChecklistItem, ProcedureAiAnalysis } from '../types/procedure';
 import { ApiError } from '../lib/apiClient';
 import { Printer, Download } from 'lucide-react';
+import { AI_REVIEW_WARNING } from '../lib/constants';
 import { ProcedureReviewPrintModal } from '../components/ProcedureReviewPrintModal';
 import { PurposeChangeReviewPrintModal } from '../components/PurposeChangeReviewPrintModal';
 
@@ -422,6 +423,15 @@ export default function ProcedureCaseDetail() {
                           <p className="text-xs text-gray-500 mt-1">
                             Mức độ tin cậy: <span className="font-semibold">{analysis.confidenceLevel || 'MEDIUM'}</span> &bull; Thời gian: {new Date(analysis.createdAt).toLocaleString('vi-VN')}
                           </p>
+                        </div>
+                      </div>
+
+                      {/* Warning Banner */}
+                      <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-3.5 rounded-r text-xs flex items-start gap-2.5">
+                        <span className="text-base">⚠️</span>
+                        <div>
+                          <span className="font-bold">{AI_REVIEW_WARNING}. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI ÁP DỤNG HOẶC BAN HÀNH.</span>
+                          <p className="mt-0.5 text-amber-800">Kết quả phân tích từ AI chỉ mang tính chất gợi ý chuyên môn, không thay thế việc kiểm tra hồ sơ bản gốc và văn bản pháp luật hiện hành.</p>
                         </div>
                       </div>
 

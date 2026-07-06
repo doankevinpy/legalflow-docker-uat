@@ -10,6 +10,7 @@ import {
   BorderStyle,
 } from 'docx';
 import { AgencyConfig, getAgencyConfig } from '../config/agency.config';
+import { AI_REVIEW_WARNING } from '../common/constants';
 
 export type TemplateGroup = 'INTERNAL_NOTE' | 'NAMED_DOC' | 'OFFICIAL_LETTER' | 'DEFAULT';
 
@@ -64,6 +65,7 @@ export function cleanDraftBodyLines(draftTitle: string, draftBody: string): stri
   const rawLines = draftBody.split('\n');
   const ignorePatterns = [
     /BẢN NHÁP AI/i,
+    /BẢN GỢI Ý AI/i,
     /Cán bộ phải kiểm tra/i,
     /^CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM$/i,
     /^Độc lập - Tự do - Hạnh phúc$/i,
@@ -128,7 +130,7 @@ export function buildDocxDocument(
                 alignment: AlignmentType.CENTER,
                 children: [
                   new TextRun({
-                    text: '⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH',
+                    text: AI_REVIEW_WARNING,
                     bold: true,
                     color: 'D97706',
                   }),
@@ -138,7 +140,7 @@ export function buildDocxDocument(
                 alignment: AlignmentType.CENTER,
                 children: [
                   new TextRun({
-                    text: 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng.',
+                    text: 'Cán bộ phải kiểm tra, chỉnh sửa và chịu trách nhiệm trước khi sử dụng hoặc ban hành.',
                     italics: true,
                     color: 'D97706',
                   }),

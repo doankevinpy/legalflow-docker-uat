@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { canDelete, canEdit } from '../lib/rbac';
 import {
   CASE_TYPE_LABELS, CASE_FIELD_LABELS, CASE_STATUS_CODES, CASE_STATUS_LABELS,
-  type CaseTypeCode, type CaseFieldCode, type CaseStatusCode,
+  type CaseTypeCode, type CaseFieldCode, type CaseStatusCode, AI_REVIEW_WARNING,
 } from '../lib/constants';
 import type { ApiCase } from '../lib/api-types';
 import { DocumentUpload } from '../components/documents/DocumentUpload';
@@ -806,7 +806,7 @@ export default function CaseDetail() {
                       <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-3">
                         <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                         <div className="text-sm text-amber-800 dark:text-amber-200">
-                          <p className="font-semibold mb-1">⚠️ AI chỉ hỗ trợ, cán bộ phải kiểm tra trước khi áp dụng</p>
+                          <p className="font-semibold mb-1">{AI_REVIEW_WARNING}</p>
                           <p>Hãy tick chọn từng mục muốn áp dụng vào checklist của hồ sơ. Hệ thống không tự động giao việc cho cán bộ, không gửi văn bản cho công dân và không làm thay đổi trạng thái hồ sơ.</p>
                         </div>
                       </div>
@@ -882,7 +882,7 @@ export default function CaseDetail() {
                   <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg p-3.5 mt-4 flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="text-xs text-amber-900 dark:text-amber-200">
-                      <span className="font-semibold">⚠️ BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG.</span>
+                      <span className="font-semibold">{AI_REVIEW_WARNING}. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG.</span>
                       <br />Hệ thống tuyệt đối không tự đổi trạng thái hồ sơ hay gửi văn bản cho công dân. Bản nháp được duyệt sẽ lưu vào Ghi chú hồ sơ.
                     </div>
                   </div>
@@ -955,7 +955,7 @@ export default function CaseDetail() {
                       </div>
                       <div className="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 text-amber-900 dark:text-amber-200 p-3 mb-3 rounded-r text-xs font-medium flex items-center gap-2">
                         <span>⚠️</span>
-                        <span>BẢN NHÁP AI – CHƯA PHÁT HÀNH. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG.</span>
+                        <span>{AI_REVIEW_WARNING}. CÁN BỘ PHẢI KIỂM TRA, CHỈNH SỬA VÀ CHỊU TRÁCH NHIỆM TRƯỚC KHI SỬ DỤNG.</span>
                       </div>
                       <textarea
                         value={generatedDraftContent}
