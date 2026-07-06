@@ -2,6 +2,12 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { PrismaService } from '../prisma/prisma.service';
 import { LegalUpdateReviewStatus } from '@prisma/client';
 
+export class RollbackVersionDto {
+  rollbackReason!: string;
+  confirmationText!: string;
+  targetVersionId?: string;
+}
+
 @Injectable()
 export class LegalKnowledgeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -1605,6 +1611,276 @@ export class LegalKnowledgeService {
       warnings,
       overallStatus,
     };
+  }
+
+  async rollbackActivatedVersion(id: string, dto: RollbackVersionDto, user?: any) {
+    if (!user || (user.role !== 'MANAGER' && user.role !== 'ADMIN')) {
+      throw new ForbiddenException('Chỉ Lãnh đạo (ADMIN/MANAGER) mới có quyền thực hiện rollback phiên bản.');
+    }
+
+    const confirmText = (dto?.confirmationText || '').trim();
+    if (confirmText !== 'ROLLBACK VERSION' && confirmText !== 'TOI XAC NHAN ROLLBACK VERSION') {
+      throw new BadRequestException('Câu xác nhận không hợp lệ. Vui lòng nhập chính xác: ROLLBACK VERSION hoặc TOI XAC NHAN ROLLBACK VERSION.');
+    }
+
+    const reason = (dto?.rollbackReason || '').trim();
+    if (!reason) {
+      throw new BadRequestException('Lý do rollback (rollbackReason) là bắt buộc và không được để trống.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const log = await tx.legalUpdateLog.findUnique({
+        where: { id },
+        include: { sourceDocument: true, reviewedBy: true },
+      });
+      if (!log) {
+        throw new NotFoundException(`Không tìm thấy nhật ký cập nhật pháp lý với ID "${id}"`);
+      }
+
+      if (log.reviewStatus !== 'APPROVED') {
+        throw new BadRequestException(`Chỉ có thể rollback nhật ký cập nhật đã được phê duyệt (APPROVED). Trạng thái hiện tại: ${log.reviewStatus}.`);
+      }
+
+      let parsedNotes: any = {};
+      try {
+        if (typeof log.notes === 'string') {
+          parsedNotes = JSON.parse(log.notes);
+        } else if (typeof log.notes === 'object') {
+          parsedNotes = log.notes || {};
+        }
+      } catch (e) {}
+
+      const activationHistory = Array.isArray(parsedNotes?.activationHistory) ? parsedNotes.activationHistory : [];
+      if (activationHistory.length === 0) {
+        throw new BadRequestException('Không tìm thấy lịch sử kích hoạt (activationHistory) trong nhật ký này. Không thể thực hiện rollback.');
+      }
+
+      let targetItems = [];
+      if (dto.targetVersionId) {
+        targetItems = activationHistory.filter((item: any) =>
+          item.newActiveVersionId === dto.targetVersionId ||
+          item.draftVersionId === dto.targetVersionId ||
+          item.previousActiveVersionId === dto.targetVersionId
+        );
+        if (targetItems.length === 0) {
+          throw new BadRequestException(`Không tìm thấy lịch sử kích hoạt cho targetVersionId "${dto.targetVersionId}".`);
+        }
+      } else {
+        if (activationHistory.length > 1) {
+          throw new BadRequestException('Nhật ký có nhiều lịch sử kích hoạt. Vui lòng chỉ định rõ targetVersionId để xác định chắc chắn phiên bản cần rollback (không đoán).');
+        }
+        targetItems = [activationHistory[0]];
+      }
+
+      const affectedVersions = [];
+
+      for (const actItem of targetItems) {
+        const draftType = actItem?.draftType;
+        if (!draftType || !['PROCEDURE_TYPE_VERSION', 'AI_PROMPT_VERSION', 'CHECKLIST_VERSION'].includes(draftType)) {
+          throw new BadRequestException(`Loại version "${draftType}" không được hỗ trợ hoặc thiếu metadata để rollback.`);
+        }
+
+        const currentActiveId = actItem.newActiveVersionId || actItem.draftVersionId;
+        const previousReplacedId = actItem.previousActiveVersionId;
+
+        if (!currentActiveId) {
+          throw new BadRequestException('Không xác định được phiên bản hiện tại đang ACTIVE (newActiveVersionId rỗng). Từ chối rollback.');
+        }
+        if (!previousReplacedId) {
+          throw new BadRequestException('Không xác định được phiên bản trước đó đang REPLACED (previousActiveVersionId rỗng hoặc không tồn tại). Từ chối rollback để đảm bảo an toàn (không đoán).');
+        }
+
+        if (draftType === 'PROCEDURE_TYPE_VERSION') {
+          const currentVer = await tx.procedureTypeVersion.findUnique({ where: { id: currentActiveId } });
+          if (!currentVer) {
+            throw new BadRequestException(`Phiên bản hiện tại ID "${currentActiveId}" không tồn tại trong ProcedureTypeVersion.`);
+          }
+          if (currentVer.status !== 'ACTIVE') {
+            throw new BadRequestException(`Phiên bản hiện tại ID "${currentActiveId}" không ở trạng thái ACTIVE (hiện tại là ${currentVer.status}). Không thể rollback.`);
+          }
+
+          const prevVer = await tx.procedureTypeVersion.findUnique({ where: { id: previousReplacedId } });
+          if (!prevVer) {
+            throw new BadRequestException(`Phiên bản trước đó ID "${previousReplacedId}" không tồn tại trong ProcedureTypeVersion.`);
+          }
+          if (prevVer.status !== 'REPLACED') {
+            throw new BadRequestException(`Phiên bản trước đó ID "${previousReplacedId}" không ở trạng thái REPLACED (hiện tại là ${prevVer.status}). Không thể rollback.`);
+          }
+
+          const activeCount = await tx.procedureTypeVersion.count({
+            where: { procedureTypeId: currentVer.procedureTypeId, status: 'ACTIVE' },
+          });
+          if (activeCount > 1) {
+            throw new ConflictException(`Phát hiện duplicate ACTIVE version (${activeCount} phiên bản ACTIVE) cho thủ tục "${currentVer.procedureTypeId}". Từ chối rollback.`);
+          }
+
+          const now = new Date();
+          await tx.procedureTypeVersion.update({
+            where: { id: currentVer.id },
+            data: { status: 'REPLACED', effectiveTo: now },
+          });
+          await tx.procedureTypeVersion.update({
+            where: { id: prevVer.id },
+            data: { status: 'ACTIVE', effectiveTo: null },
+          });
+
+          affectedVersions.push({
+            type: 'PROCEDURE_TYPE',
+            fromVersionId: currentVer.id,
+            fromVersion: currentVer.version,
+            toVersionId: prevVer.id,
+            toVersion: prevVer.version,
+          });
+
+        } else if (draftType === 'AI_PROMPT_VERSION') {
+          const currentVer = await tx.aiPromptVersion.findUnique({ where: { id: currentActiveId } });
+          if (!currentVer) {
+            throw new BadRequestException(`Phiên bản hiện tại ID "${currentActiveId}" không tồn tại trong AiPromptVersion.`);
+          }
+          if (currentVer.status !== 'ACTIVE') {
+            throw new BadRequestException(`Phiên bản hiện tại ID "${currentActiveId}" không ở trạng thái ACTIVE (hiện tại là ${currentVer.status}). Không thể rollback.`);
+          }
+
+          const prevVer = await tx.aiPromptVersion.findUnique({ where: { id: previousReplacedId } });
+          if (!prevVer) {
+            throw new BadRequestException(`Phiên bản trước đó ID "${previousReplacedId}" không tồn tại trong AiPromptVersion.`);
+          }
+          if (prevVer.status !== 'REPLACED') {
+            throw new BadRequestException(`Phiên bản trước đó ID "${previousReplacedId}" không ở trạng thái REPLACED (hiện tại là ${prevVer.status}). Không thể rollback.`);
+          }
+
+          const activeCount = await tx.aiPromptVersion.count({
+            where: {
+              promptKey: currentVer.promptKey,
+              analysisType: currentVer.analysisType || undefined,
+              procedureTypeCode: currentVer.procedureTypeCode || undefined,
+              procedureGroup: currentVer.procedureGroup || undefined,
+              status: 'ACTIVE',
+            },
+          });
+          if (activeCount > 1) {
+            throw new ConflictException(`Phát hiện duplicate ACTIVE version (${activeCount} phiên bản ACTIVE) cho promptKey "${currentVer.promptKey}". Từ chối rollback.`);
+          }
+
+          const now = new Date();
+          await tx.aiPromptVersion.update({
+            where: { id: currentVer.id },
+            data: { status: 'REPLACED', effectiveTo: now },
+          });
+          await tx.aiPromptVersion.update({
+            where: { id: prevVer.id },
+            data: { status: 'ACTIVE', effectiveTo: null },
+          });
+
+          affectedVersions.push({
+            type: 'AI_PROMPT',
+            fromVersionId: currentVer.id,
+            fromVersion: currentVer.version,
+            toVersionId: prevVer.id,
+            toVersion: prevVer.version,
+          });
+
+        } else if (draftType === 'CHECKLIST_VERSION') {
+          const currentVer = await tx.checklistVersion.findUnique({ where: { id: currentActiveId } });
+          if (!currentVer) {
+            throw new BadRequestException(`Phiên bản hiện tại ID "${currentActiveId}" không tồn tại trong ChecklistVersion.`);
+          }
+          if (currentVer.status !== 'ACTIVE') {
+            throw new BadRequestException(`Phiên bản hiện tại ID "${currentActiveId}" không ở trạng thái ACTIVE (hiện tại là ${currentVer.status}). Không thể rollback.`);
+          }
+
+          const prevVer = await tx.checklistVersion.findUnique({ where: { id: previousReplacedId } });
+          if (!prevVer) {
+            throw new BadRequestException(`Phiên bản trước đó ID "${previousReplacedId}" không tồn tại trong ChecklistVersion.`);
+          }
+          if (prevVer.status !== 'REPLACED') {
+            throw new BadRequestException(`Phiên bản trước đó ID "${previousReplacedId}" không ở trạng thái REPLACED (hiện tại là ${prevVer.status}). Không thể rollback.`);
+          }
+
+          const activeCount = await tx.checklistVersion.count({
+            where: {
+              checklistKey: currentVer.checklistKey,
+              procedureTypeCode: currentVer.procedureTypeCode || undefined,
+              procedureGroup: currentVer.procedureGroup || undefined,
+              status: 'ACTIVE',
+            },
+          });
+          if (activeCount > 1) {
+            throw new ConflictException(`Phát hiện duplicate ACTIVE version (${activeCount} phiên bản ACTIVE) cho checklistKey "${currentVer.checklistKey}". Từ chối rollback.`);
+          }
+
+          const now = new Date();
+          await tx.checklistVersion.update({
+            where: { id: currentVer.id },
+            data: { status: 'REPLACED', effectiveTo: now },
+          });
+          await tx.checklistVersion.update({
+            where: { id: prevVer.id },
+            data: { status: 'ACTIVE', effectiveTo: null },
+          });
+
+          affectedVersions.push({
+            type: 'CHECKLIST',
+            fromVersionId: currentVer.id,
+            fromVersion: currentVer.version,
+            toVersionId: prevVer.id,
+            toVersion: prevVer.version,
+          });
+        }
+      }
+
+      if (!Array.isArray(parsedNotes.rollbackHistory)) {
+        parsedNotes.rollbackHistory = [];
+      }
+      const nowIso = new Date().toISOString();
+      const rollbackRecord = {
+        rolledBackAt: nowIso,
+        rolledBackBy: user.id || user.username || 'SYSTEM',
+        reason: reason,
+        confirmationText: confirmText,
+        affectedVersions: affectedVersions,
+        safetyStatement: 'No cases, AI analyses, or legal snapshots were modified.',
+      };
+      parsedNotes.rollbackHistory.unshift(rollbackRecord);
+
+      if (!Array.isArray(parsedNotes.workflowHistory)) {
+        parsedNotes.workflowHistory = [];
+      }
+      parsedNotes.workflowHistory.push({
+        action: 'ROLLBACK_VERSION',
+        actionLabel: 'Rollback thủ công phiên bản về bản trước đó',
+        actorId: user.id || user.username || 'SYSTEM',
+        actor: user.fullName || user.email || user.username || 'SYSTEM',
+        actedAt: nowIso,
+        timestamp: nowIso,
+        note: reason,
+        comment: reason,
+      });
+
+      const updatedLog = await tx.legalUpdateLog.update({
+        where: { id },
+        data: {
+          notes: JSON.stringify(parsedNotes, null, 2),
+        },
+        include: {
+          sourceDocument: true,
+          reviewedBy: {
+            select: { id: true, email: true, fullName: true, role: true },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        updateLogId: id,
+        rolledBackAt: nowIso,
+        rolledBackBy: user.id || user.username || 'SYSTEM',
+        rollbackReason: reason,
+        affectedVersions,
+        message: 'Rollback version completed successfully. No cases, AI analyses, or legal snapshots were modified.',
+        updateLog: await this.hydrateLogNotes(updatedLog, tx),
+      };
+    });
   }
 }
 

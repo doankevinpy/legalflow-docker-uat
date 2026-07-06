@@ -21,6 +21,7 @@ describe('LegalKnowledgeController', () => {
     runDraftVersionSimulation: jest.fn(),
     activateDraftVersion: jest.fn(),
     getActivationVerification: jest.fn(),
+    rollbackActivatedVersion: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -268,6 +269,17 @@ describe('LegalKnowledgeController', () => {
     expect(result).toEqual(mockResult);
     expect(mockService.getActivationVerification).toHaveBeenCalledWith('1', { id: 'u1' });
   });
+
+  it('rollbackActivatedVersion should call service.rollbackActivatedVersion', async () => {
+    const mockResult = { success: true, message: 'Rolled back' };
+    mockService.rollbackActivatedVersion.mockResolvedValue(mockResult);
+
+    const dto = { rollbackReason: 'reason', confirmationText: 'ROLLBACK VERSION' };
+    const result = await controller.rollbackActivatedVersion('1', dto, { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.rollbackActivatedVersion).toHaveBeenCalledWith('1', dto, { id: 'u1' });
+  });
 });
+
 
 

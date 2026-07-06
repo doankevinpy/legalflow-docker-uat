@@ -623,4 +623,154 @@ describe('LegalKnowledgeService', () => {
       expect(mockPrismaService.checklistVersion.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('rollbackActivatedVersion', () => {
+    const validDto = {
+      rollbackReason: 'Phát hiện bất cập trong phiên bản mới',
+      confirmationText: 'ROLLBACK VERSION',
+    };
+    const adminUser = { id: 'admin1', role: 'ADMIN', fullName: 'Admin User' };
+
+    const mockLogApprovedWithActHistory = {
+      id: 'log1',
+      reviewStatus: 'APPROVED',
+      updateTitle: 'Test Log',
+      notes: JSON.stringify({
+        activationHistory: [
+          {
+            id: 'act-1',
+            draftType: 'PROCEDURE_TYPE_VERSION',
+            newActiveVersionId: 'newVer1',
+            previousActiveVersionId: 'oldVer1',
+            activatedAt: '2026-07-05T10:00:00.000Z',
+          },
+        ],
+        workflowHistory: [],
+      }),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.procedureTypeVersion.findUnique.mockReset();
+      mockPrismaService.procedureTypeVersion.count.mockReset();
+      mockPrismaService.procedureTypeVersion.update.mockReset();
+      mockPrismaService.legalUpdateLog.findUnique.mockReset();
+      mockPrismaService.legalUpdateLog.update.mockReset();
+    });
+
+    it('1. ADMIN/MANAGER rollback hợp lệ và 10. có ghi rollbackHistory và 11. có ghi workflow action ROLLBACK_VERSION', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogApprovedWithActHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1', version: 'v2.0' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1', version: 'v1.0' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(1);
+      mockPrismaService.legalUpdateLog.update.mockImplementation(async (args) => ({ ...mockLogApprovedWithActHistory, notes: args.data.notes }));
+
+      const res = await service.rollbackActivatedVersion('log1', validDto, adminUser);
+
+      expect(res.success).toBe(true);
+      expect(res.updateLogId).toBe('log1');
+      expect(res.rollbackReason).toBe(validDto.rollbackReason);
+      expect(res.affectedVersions).toHaveLength(1);
+      expect(res.affectedVersions[0]).toEqual({
+        type: 'PROCEDURE_TYPE',
+        fromVersionId: 'newVer1',
+        fromVersion: 'v2.0',
+        toVersionId: 'oldVer1',
+        toVersion: 'v1.0',
+      });
+
+      expect(mockPrismaService.procedureTypeVersion.update).toHaveBeenCalledWith({
+        where: { id: 'newVer1' },
+        data: expect.objectContaining({ status: 'REPLACED' }),
+      });
+      expect(mockPrismaService.procedureTypeVersion.update).toHaveBeenCalledWith({
+        where: { id: 'oldVer1' },
+        data: expect.objectContaining({ status: 'ACTIVE', effectiveTo: null }),
+      });
+
+      const updateArgs = mockPrismaService.legalUpdateLog.update.mock.calls[0][0];
+      const parsedNotes = JSON.parse(updateArgs.data.notes);
+      expect(parsedNotes.rollbackHistory).toBeDefined();
+      expect(parsedNotes.rollbackHistory[0].reason).toBe(validDto.rollbackReason);
+      expect(parsedNotes.rollbackHistory[0].confirmationText).toBe('ROLLBACK VERSION');
+      expect(parsedNotes.workflowHistory).toBeDefined();
+      expect(parsedNotes.workflowHistory[0].action).toBe('ROLLBACK_VERSION');
+    });
+
+    it('2. STAFF/VIEWER bị từ chối', async () => {
+      await expect(service.rollbackActivatedVersion('log1', validDto, { id: 'u1', role: 'STAFF' })).rejects.toThrow(ForbiddenException);
+      await expect(service.rollbackActivatedVersion('log1', validDto, { id: 'u2', role: 'VIEWER' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('3. Sai confirmationText bị từ chối', async () => {
+      await expect(service.rollbackActivatedVersion('log1', { ...validDto, confirmationText: 'SAI XAC NHAN' }, adminUser)).rejects.toThrow(BadRequestException);
+    });
+
+    it('4. rollbackReason rỗng bị từ chối', async () => {
+      await expect(service.rollbackActivatedVersion('log1', { ...validDto, rollbackReason: '' }, adminUser)).rejects.toThrow(BadRequestException);
+    });
+
+    it('5. LegalUpdateLog không tồn tại', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(null);
+      await expect(service.rollbackActivatedVersion('log-non-existent', validDto, adminUser)).rejects.toThrow(NotFoundException);
+    });
+
+    it('6. LegalUpdateLog chưa APPROVED', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({
+        ...mockLogApprovedWithActHistory,
+        reviewStatus: 'REVIEWING',
+      });
+      await expect(service.rollbackActivatedVersion('log1', validDto, adminUser)).rejects.toThrow(BadRequestException);
+    });
+
+    it('7. Không có activationHistory', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({
+        ...mockLogApprovedWithActHistory,
+        notes: JSON.stringify({ activationHistory: [] }),
+      });
+      await expect(service.rollbackActivatedVersion('log1', validDto, adminUser)).rejects.toThrow(BadRequestException);
+    });
+
+    it('8. Không xác định được previous version thì từ chối (không đoán)', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({
+        ...mockLogApprovedWithActHistory,
+        notes: JSON.stringify({
+          activationHistory: [
+            {
+              id: 'act-1',
+              draftType: 'PROCEDURE_TYPE_VERSION',
+              newActiveVersionId: 'newVer1',
+              previousActiveVersionId: '',
+            },
+          ],
+        }),
+      });
+      await expect(service.rollbackActivatedVersion('log1', validDto, adminUser)).rejects.toThrow(BadRequestException);
+    });
+
+    it('9. Duplicate ACTIVE version thì từ chối', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogApprovedWithActHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1', version: 'v2.0' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1', version: 'v1.0' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(2);
+
+      await expect(service.rollbackActivatedVersion('log1', validDto, adminUser)).rejects.toThrow(ConflictException);
+    });
+
+    it('12. Rollback không sửa case/analysis/snapshot', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogApprovedWithActHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1', version: 'v2.0' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1', version: 'v1.0' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(1);
+      mockPrismaService.legalUpdateLog.update.mockResolvedValue(mockLogApprovedWithActHistory);
+
+      await service.rollbackActivatedVersion('log1', validDto, adminUser);
+
+      expect(mockPrismaService.administrativeProcedureCase?.update).toBeUndefined();
+      expect(mockPrismaService.procedureAiAnalysis?.update).toBeUndefined();
+      expect(mockPrismaService.procedureAiAnalysisLegalSnapshot?.update).toBeUndefined();
+    });
+  });
 });

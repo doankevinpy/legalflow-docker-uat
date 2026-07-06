@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
-import { LegalKnowledgeService } from './legal-knowledge.service';
+import { LegalKnowledgeService, RollbackVersionDto } from './legal-knowledge.service';
+export { RollbackVersionDto };
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
@@ -213,6 +214,16 @@ export class LegalKnowledgeController {
     @Request() req: any,
   ) {
     return this.service.getActivationVerification(id, req.user);
+  }
+
+  @Post('update-logs/:id/rollback-version')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  rollbackActivatedVersion(
+    @Param('id') id: string,
+    @Body() dto: RollbackVersionDto,
+    @Request() req: any,
+  ) {
+    return this.service.rollbackActivatedVersion(id, dto || ({} as RollbackVersionDto), req.user);
   }
 }
 
