@@ -42,6 +42,8 @@ export const legalKnowledgeApi = {
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/run-draft-simulation`, data),
   activateDraftVersion: (id: string, data: { draftType: string; draftVersionId: string; reason: string; effectiveFrom: string; confirmationText: string }) =>
     apiClient.post<any>(`/legal-knowledge/update-logs/${id}/activate-draft-version`, data),
+  getActivationVerification: (id: string) =>
+    apiClient.get<any>(`/legal-knowledge/update-logs/${id}/activation-verification`),
 };
 
 

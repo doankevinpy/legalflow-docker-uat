@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Scale,
   BookOpen,
@@ -19,6 +19,7 @@ import {
   FileText,
   Play,
   CheckCircle2,
+  ShieldCheck,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +33,18 @@ import type {
 } from '../types/legalKnowledge';
 
 type TabType = 'overview' | 'documents' | 'procedures' | 'prompts' | 'checklists' | 'logs' | 'snapshots';
+
+const parseLogNotes = (notes: any): any => {
+  if (!notes) return {};
+  if (typeof notes === 'string') {
+    try {
+      return JSON.parse(notes);
+    } catch {
+      return {};
+    }
+  }
+  return typeof notes === 'object' ? notes : {};
+};
 
 export default function LegalKnowledgePage() {
   const { user } = useAuth();
@@ -145,6 +158,16 @@ export default function LegalKnowledgePage() {
   const [submittingAct, setSubmittingAct] = useState<boolean>(false);
   const [actError, setActError] = useState<string>('');
 
+  // Phase 8F-E-D-A Post-activation Verification state
+  const [verificationData, setVerificationData] = useState<any>(null);
+  const [loadingVerification, setLoadingVerification] = useState<boolean>(false);
+  const [verificationError, setVerificationError] = useState<string>('');
+
+  useEffect(() => {
+    setVerificationData(null);
+    setVerificationError('');
+  }, [selectedLogForDetail?.id]);
+
   useEffect(() => {
     if (simModalOpen) {
       legalKnowledgeApi.getSampleCases()
@@ -161,13 +184,7 @@ export default function LegalKnowledgePage() {
 
   useEffect(() => {
     if (simModalOpen && selectedLogForDetail) {
-      let parsed: any = {};
-      try {
-        if (selectedLogForDetail.notes) {
-          const raw = JSON.parse(selectedLogForDetail.notes);
-          parsed = raw && typeof raw === 'object' ? raw : {};
-        }
-      } catch (e) {}
+      const parsed = parseLogNotes(selectedLogForDetail.notes);
       const drafts = parsed?.draftVersions?.list || [];
       const procDrafts = drafts.filter((d: any) => d.type === 'PROCEDURE_TYPE_VERSION');
       const promptDrafts = drafts.filter((d: any) => d.type === 'AI_PROMPT_VERSION');
@@ -268,13 +285,7 @@ export default function LegalKnowledgePage() {
 
   useEffect(() => {
     if (actModalOpen && selectedLogForDetail) {
-      let parsed: any = {};
-      try {
-        if (selectedLogForDetail.notes) {
-          const raw = JSON.parse(selectedLogForDetail.notes);
-          parsed = raw && typeof raw === 'object' ? raw : {};
-        }
-      } catch (e) {}
+      const parsed = parseLogNotes(selectedLogForDetail.notes);
       const drafts = parsed?.draftVersions?.list || [];
       const filtered = drafts.filter((d: any) => d.type === actDraftType && (d.currentStatus || d.status || 'DRAFT') === 'DRAFT');
       if (filtered.length > 0 && (!actDraftVerId || !filtered.some((item: any) => item.id === actDraftVerId))) {
@@ -344,6 +355,39 @@ export default function LegalKnowledgePage() {
     }
   };
 
+  const handleRunVerification = async () => {
+    if (!selectedLogForDetail?.id) {
+      setVerificationError('Không tìm thấy ID nhật ký cập nhật để kiểm chứng.');
+      return;
+    }
+
+    try {
+      setLoadingVerification(true);
+      setVerificationError('');
+      setVerificationData(null);
+
+      const res = await legalKnowledgeApi.getActivationVerification(selectedLogForDetail.id);
+      const data = res?.data?.data || res?.data || res;
+
+      console.log('LF activation verification result', data);
+
+      if (!data || Object.keys(data).length === 0) {
+        setVerificationError('API kiểm chứng không trả dữ liệu. Vui lòng kiểm tra backend endpoint activation-verification.');
+        return;
+      }
+
+      setVerificationData(data);
+    } catch (err: any) {
+      console.error('Error fetching verification:', err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tải dữ liệu kiểm chứng sau kích hoạt.';
+      setVerificationError(message);
+    } finally {
+      setLoadingVerification(false);
+    }
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -487,6 +531,23 @@ export default function LegalKnowledgePage() {
   const activeDocsCount = documents.filter((d) => d.status === 'ACTIVE').length;
   const draftDocsCount = documents.filter((d) => d.status === 'DRAFT').length;
   const replacedDocsCount = documents.filter((d) => d.status === 'REPLACED' || d.status === 'EXPIRED').length;
+
+  // PHASE 8F-E-D-A: Parsed notes and verification display conditions
+  const isLeader = role === 'ADMIN' || role === 'MANAGER';
+  const parsedNotes = useMemo(() => parseLogNotes(selectedLogForDetail?.notes), [selectedLogForDetail]);
+  const hasActivationHistory = Array.isArray(parsedNotes?.activationHistory) && parsedNotes.activationHistory.length > 0;
+  const hasActivationWorkflow = Array.isArray(parsedNotes?.workflowHistory) && parsedNotes.workflowHistory.some((x: any) => x.action === 'ACTIVATE_DRAFT_VERSION' || x.event === 'ACTIVATE_DRAFT_VERSION');
+  const hasDrafts = !!(parsedNotes?.draftVersions?.list?.length > 0 || parsedNotes?.draftVersions);
+  const hasSimulations = Array.isArray(parsedNotes?.simulations) && parsedNotes.simulations.length > 0;
+  const canShowVerificationBlock =
+    isLeader &&
+    (
+      selectedLogForDetail?.reviewStatus === 'APPROVED' ||
+      hasActivationHistory ||
+      hasActivationWorkflow ||
+      hasDrafts ||
+      hasSimulations
+    );
 
   return (
     <div className="space-y-6 pb-12">
@@ -1070,14 +1131,10 @@ export default function LegalKnowledgePage() {
                             <div className="flex flex-col gap-1 items-start">
                               {formatStatusBadge(log.reviewStatus)}
                               {(() => {
-                                try {
-                                  if (log.notes) {
-                                    const p = JSON.parse(log.notes);
-                                    if (p.subStatus && p.subStatus !== log.reviewStatus) {
-                                      return <span className="text-[10px] text-gray-500 font-mono">({p.subStatus})</span>;
-                                    }
-                                  }
-                                } catch (e) {}
+                                const p = parseLogNotes(log?.notes);
+                                if (p.subStatus && p.subStatus !== log.reviewStatus) {
+                                  return <span className="text-[10px] text-gray-500 font-mono">({p.subStatus})</span>;
+                                }
                                 return null;
                               })()}
                             </div>
@@ -1721,14 +1778,87 @@ export default function LegalKnowledgePage() {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6 text-sm flex-1">
+              {/* PHASE 8F-E-D-A: VERIFICATION PANEL */}
+              {selectedLogForDetail?.reviewStatus === 'APPROVED' && (
+                <div className="my-3 p-4 border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-950 rounded-xl space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRunVerification}
+                      disabled={loadingVerification || !selectedLogForDetail?.id}
+                      className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-sm transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    >
+                      {loadingVerification ? (
+                        <span className="inline-block animate-spin">⌛</span>
+                      ) : (
+                        <ShieldCheck className="h-4 w-4" />
+                      )}
+                      Kiểm tra sau kích hoạt
+                    </button>
+                    <div className="text-[11px] text-emerald-800 dark:text-emerald-200 font-medium">
+                      Chức năng này chỉ đọc dữ liệu để hậu kiểm sau kích hoạt, không tự thay đổi version hoặc hồ sơ.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {loadingVerification && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                  <span className="inline-block animate-spin">⌛</span>
+                  <span>Đang gọi API kiểm chứng sau kích hoạt...</span>
+                </div>
+              )}
+
+              {verificationError && !loadingVerification && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-800 dark:text-red-300 flex items-center gap-2 font-semibold">
+                  <span>❌</span>
+                  <span>{verificationError}</span>
+                </div>
+              )}
+
+              {verificationData && !loadingVerification && (
+                <div className="p-4 bg-gray-50 dark:bg-slate-800 border-2 border-indigo-200 dark:border-indigo-800 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-gray-900 dark:text-white">
+                      Kết quả kiểm chứng: <span className={
+                        verificationData.overallStatus === 'PASS' ? 'text-emerald-600 dark:text-emerald-400' :
+                        verificationData.overallStatus === 'FAIL' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'
+                      }>{verificationData.overallStatus || 'N/A'}</span>
+                    </span>
+                    {verificationData.verifiedAt && (
+                      <span className="text-[11px] text-gray-500">
+                        {new Date(verificationData.verifiedAt).toLocaleString('vi-VN')}
+                      </span>
+                    )}
+                  </div>
+                  {Array.isArray(verificationData.warnings) && verificationData.warnings.length > 0 && (
+                    <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                      <div className="font-semibold">Cảnh báo:</div>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {verificationData.warnings.map((w: string, idx: number) => (
+                          <li key={idx}>{w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {verificationData.checks && (
+                    <div className="text-xs space-y-1 bg-white dark:bg-slate-900 p-3 rounded-lg border">
+                      <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Chi tiết kiểm tra:</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                        <div>Lịch sử kích hoạt: <strong>{verificationData.checks.activationHistoryExists ? 'Có' : 'Không'}</strong></div>
+                        <div>Phiên bản active: <strong>{verificationData.checks.activeVersionExists ? 'Đạt' : 'Lỗi'}</strong></div>
+                        <div>Không trùng active: <strong>{verificationData.checks.noDuplicateActiveVersions ? 'Đạt' : 'Lỗi'}</strong></div>
+                        <div>Hồ sơ TTHC giữ nguyên: <strong>{verificationData.checks.casesUnchanged ? 'Đạt' : 'Lỗi'}</strong></div>
+                        <div>Bản chụp AI bảo toàn: <strong>{verificationData.checks.snapshotsPreserved ? 'Đạt' : 'Lỗi'}</strong></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Parse notes if JSON */}
               {(() => {
-                let parsed: any = null;
-                try {
-                  if (selectedLogForDetail.notes) {
-                    parsed = JSON.parse(selectedLogForDetail.notes);
-                  }
-                } catch (e) {}
+                const parsed = parsedNotes;
 
                 if (!parsed || !parsed.impactSummary) {
                   return (
@@ -2022,6 +2152,143 @@ export default function LegalKnowledgePage() {
                         </div>
                       </div>
                     )}
+
+                    {/* PHASE 8F-E-D-A: POST-ACTIVATION VERIFICATION & READ-ONLY AUDIT DASHBOARD */}
+                    {canShowVerificationBlock && (
+                      <div className="mt-4 p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <h4 className="font-bold text-sm text-emerald-900 dark:text-emerald-300">
+                            Kiểm chứng sau kích hoạt (Read-only Audit Dashboard)
+                          </h4>
+                        </div>
+
+                        <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Bảng kiểm chứng này chỉ phục vụ hậu kiểm sau kích hoạt.</strong> Không tự thay đổi version, không sửa hồ sơ, không thay thế trách nhiệm kiểm tra của cán bộ.
+                          </span>
+                        </div>
+
+                        <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800">
+                          <button
+                            type="button"
+                            onClick={handleRunVerification}
+                            disabled={loadingVerification || !selectedLogForDetail?.id}
+                            className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {loadingVerification ? (
+                              <span className="inline-block animate-spin">⌛</span>
+                            ) : (
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            )}
+                            Kiểm tra sau kích hoạt
+                          </button>
+
+                          <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                            Read-only verification endpoint: activation-verification
+                          </div>
+                        </div>
+
+                        {!hasActivationHistory && !verificationData && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                            <span>ℹ️</span>
+                            <span>
+                              Chưa phát hiện lịch sử kích hoạt trong nhật ký này. Bạn có thể chạy kiểm chứng read-only để xác minh trạng thái version hiện tại.
+                            </span>
+                          </div>
+                        )}
+
+                        {verificationData && (
+                          <div className="space-y-3 pt-2 border-t border-emerald-200 dark:border-emerald-800 text-xs">
+                            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-lg border">
+                              <span className="font-bold text-gray-700 dark:text-gray-300">Trạng thái tổng thể (Overall Status):</span>
+                              <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${
+                                verificationData.overallStatus === 'PASS'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                                  : verificationData.overallStatus === 'WARNING'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              }`}>
+                                {verificationData.overallStatus === 'PASS' && '✔ PASS (Đạt yêu cầu)'}
+                                {verificationData.overallStatus === 'WARNING' && '⚠ WARNING (Có cảnh báo)'}
+                                {verificationData.overallStatus === 'FAIL' && '✖ FAIL (Có lỗi/bất thường)'}
+                              </span>
+                            </div>
+
+                            {verificationData.warnings && verificationData.warnings.length > 0 && (
+                              <div className={`p-2.5 rounded-lg border space-y-1 ${
+                                verificationData.overallStatus === 'WARNING'
+                                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+                                  : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'
+                              }`}>
+                                <div className={`font-bold ${
+                                  verificationData.overallStatus === 'WARNING'
+                                    ? 'text-amber-800 dark:text-amber-300'
+                                    : 'text-red-800 dark:text-red-300'
+                                }`}>Cảnh báo phát hiện:</div>
+                                <ul className={`list-disc list-inside space-y-0.5 ${
+                                  verificationData.overallStatus === 'WARNING'
+                                    ? 'text-amber-700 dark:text-amber-400'
+                                    : 'text-red-700 dark:text-red-400'
+                                }`}>
+                                  {verificationData.warnings.map((w: string, idx: number) => (
+                                    <li key={idx}>{w}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                              <div className="font-semibold text-gray-700 dark:text-gray-300">1. Kiểm chứng trạng thái Version (ACTIVE/REPLACED & Duy nhất):</div>
+                              <div className="space-y-1">
+                                {verificationData.versionChecks?.map((chk: any, idx: number) => (
+                                  <div key={idx} className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                    <div className="flex items-center justify-between font-semibold">
+                                      <span className="text-blue-600">{chk.draftType}</span>
+                                      <span className={`px-2 py-0.5 rounded text-[10px] ${chk.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        {chk.passed ? '✔ Đạt' : '✖ Không đạt'}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-gray-600 dark:text-gray-400">
+                                      <div>
+                                        Version mới ACTIVE: <strong className="text-emerald-600">{chk.newActiveVersionId}</strong> ({chk.newActiveStatus})
+                                        <br />
+                                        Hiệu lực từ: {chk.effectiveFrom ? new Date(chk.effectiveFrom).toLocaleDateString('vi-VN') : 'N/A'}
+                                      </div>
+                                      <div>
+                                        Version cũ REPLACED: <strong className="text-amber-600">{chk.previousActiveVersionId || 'Không có (Lần đầu)'}</strong> ({chk.previousActiveStatus})
+                                        <br />
+                                        Số bản ACTIVE cùng phạm vi: <strong>{chk.activeCountInScope}</strong>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                <div className="font-semibold text-gray-700 dark:text-gray-300">2. An toàn hồ sơ TTHC:</div>
+                                <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                                  Tổng số hồ sơ kiểm tra: <strong>{verificationData.caseSafetyChecks?.totalCases || 0}</strong>
+                                  <br />
+                                  <span className="text-emerald-600 font-medium">✔ {verificationData.caseSafetyChecks?.message}</span>
+                                </div>
+                              </div>
+                              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                <div className="font-semibold text-gray-700 dark:text-gray-300">3. An toàn kết quả AI & Snapshot:</div>
+                                <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                                  Thẩm tra AI / Snapshot: <strong>{verificationData.aiSnapshotSafetyChecks?.totalAnalyses || 0} / {verificationData.aiSnapshotSafetyChecks?.totalSnapshots || 0}</strong>
+                                  <br />
+                                  <span className="text-emerald-600 font-medium">✔ {verificationData.aiSnapshotSafetyChecks?.message}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -2031,17 +2298,7 @@ export default function LegalKnowledgePage() {
               <div className="flex flex-wrap items-center gap-2">
                 {(() => {
                   const status = selectedLogForDetail.reviewStatus;
-                  let isClosed = false;
-                  let hasDrafts = false;
-                  let hasSimulations = false;
-                  try {
-                    if (selectedLogForDetail.notes) {
-                      const p = JSON.parse(selectedLogForDetail.notes);
-                      if (p.subStatus === 'CLOSED' || p.subStatus === 'REJECTED') isClosed = true;
-                      if (p.draftVersions?.list?.length > 0) hasDrafts = true;
-                      if (p.simulations?.length > 0) hasSimulations = true;
-                    }
-                  } catch (e) {}
+                  const isClosed = parsedNotes?.subStatus === 'CLOSED' || parsedNotes?.subStatus === 'REJECTED';
                   const isRejected = status === 'REJECTED' || isClosed;
                   const canAct = role === 'STAFF' || role === 'MANAGER' || role === 'ADMIN';
                   const isLeader = role === 'MANAGER' || role === 'ADMIN';
@@ -2188,11 +2445,7 @@ export default function LegalKnowledgePage() {
                           {hasDrafts && hasSimulations ? (
                             <button
                               onClick={() => {
-                                let parsed: any = {};
-                                try {
-                                  if (selectedLogForDetail?.notes) parsed = JSON.parse(selectedLogForDetail.notes);
-                                } catch (e) {}
-                                const drafts = parsed?.draftVersions?.list || [];
+                                const drafts = parsedNotes?.draftVersions?.list || [];
                                 const firstDraft = drafts.find((d: any) => d.status === 'DRAFT');
                                 if (firstDraft) {
                                   setActDraftType(firstDraft.type);
@@ -2471,11 +2724,7 @@ export default function LegalKnowledgePage() {
                   2. Cấu hình tổ hợp Version DRAFT áp dụng kiểm thử:
                 </label>
                 {(() => {
-                  let parsed: any = {};
-                  try {
-                    if (selectedLogForDetail?.notes) parsed = JSON.parse(selectedLogForDetail.notes);
-                  } catch (e) {}
-                  const drafts = parsed?.draftVersions?.list || [];
+                  const drafts = parsedNotes?.draftVersions?.list || [];
                   const procDrafts = drafts.filter((d: any) => d.type === 'PROCEDURE_TYPE_VERSION');
                   const promptDrafts = drafts.filter((d: any) => d.type === 'AI_PROMPT_VERSION');
                   const chkDrafts = drafts.filter((d: any) => d.type === 'CHECKLIST_VERSION');
@@ -2608,11 +2857,7 @@ export default function LegalKnowledgePage() {
               </div>
 
               {(() => {
-                let parsed: any = {};
-                try {
-                  if (selectedLogForDetail?.notes) parsed = JSON.parse(selectedLogForDetail.notes);
-                } catch (e) {}
-                const drafts = parsed?.draftVersions?.list || [];
+                const drafts = parsedNotes?.draftVersions?.list || [];
                 const filtered = drafts.filter((d: any) => d.type === actDraftType && (d.currentStatus || d.status || 'DRAFT') === 'DRAFT');
 
                 if (filtered.length === 0) {

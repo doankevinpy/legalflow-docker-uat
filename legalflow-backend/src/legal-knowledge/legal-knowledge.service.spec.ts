@@ -18,6 +18,7 @@ describe('LegalKnowledgeService', () => {
       create: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
+      groupBy: jest.fn(),
     },
     aiPromptVersion: {
       findMany: jest.fn(),
@@ -26,6 +27,7 @@ describe('LegalKnowledgeService', () => {
       create: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
+      groupBy: jest.fn(),
     },
     checklistVersion: {
       findMany: jest.fn(),
@@ -34,6 +36,7 @@ describe('LegalKnowledgeService', () => {
       create: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
+      groupBy: jest.fn(),
     },
     legalUpdateLog: {
       findMany: jest.fn(),
@@ -44,10 +47,15 @@ describe('LegalKnowledgeService', () => {
     $transaction: jest.fn().mockImplementation((cb) => cb(mockPrismaService)),
     procedureAiAnalysisLegalSnapshot: {
       findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    procedureAiAnalysis: {
+      count: jest.fn(),
     },
     administrativeProcedureCase: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -507,6 +515,112 @@ describe('LegalKnowledgeService', () => {
       mockPrismaService.procedureTypeVersion.count.mockResolvedValue(2);
 
       await expect(service.activateDraftVersion('1', validDto, { role: 'MANAGER' })).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('getActivationVerification', () => {
+    const mockLogWithHistory = {
+      id: 'log1',
+      updateTitle: 'Test Log',
+      reviewStatus: 'APPROVED',
+      notes: JSON.stringify({
+        activationHistory: [
+          {
+            draftType: 'PROCEDURE_TYPE_VERSION',
+            newActiveVersionId: 'newVer1',
+            previousActiveVersionId: 'oldVer1',
+            activatedAt: '2026-07-05T10:00:00.000Z',
+          },
+        ],
+        workflowHistory: [
+          { action: 'ACTIVATE_DRAFT_VERSION', timestamp: '2026-07-05T10:00:00.000Z' },
+        ],
+      }),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.procedureTypeVersion.groupBy.mockResolvedValue([]);
+      mockPrismaService.aiPromptVersion.groupBy.mockResolvedValue([]);
+      mockPrismaService.checklistVersion.groupBy.mockResolvedValue([]);
+      mockPrismaService.administrativeProcedureCase.count.mockResolvedValue(10);
+      mockPrismaService.procedureAiAnalysis.count.mockResolvedValue(5);
+      mockPrismaService.procedureAiAnalysisLegalSnapshot.count.mockResolvedValue(5);
+    });
+
+    it('should return PASS when activation is valid', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogWithHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1', effectiveFrom: new Date() })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1', effectiveTo: new Date() });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(1);
+
+      const res = await service.getActivationVerification('log1');
+      expect(res.overallStatus).toBe('PASS');
+      expect(res.warnings).toHaveLength(0);
+      expect(res.versionChecks[0].passed).toBe(true);
+      expect(res.caseSafetyChecks.totalCases).toBe(10);
+      expect(mockPrismaService.legalUpdateLog.update).not.toHaveBeenCalled();
+    });
+
+    it('should return WARNING when no activationHistory exists', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({
+        ...mockLogWithHistory,
+        notes: JSON.stringify({}),
+      });
+
+      const res = await service.getActivationVerification('log1');
+      expect(res.overallStatus).toBe('WARNING');
+      expect(res.warnings[0]).toContain('Không tìm thấy lịch sử kích hoạt');
+    });
+
+    it('should return FAIL if newActiveVersionId is not ACTIVE', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogWithHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'DRAFT', procedureTypeId: 'pt1' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(0);
+
+      const res = await service.getActivationVerification('log1');
+      expect(res.overallStatus).toBe('FAIL');
+      expect(res.warnings[0]).toContain('không ở trạng thái ACTIVE');
+    });
+
+    it('should return FAIL if previousActiveVersionId is not REPLACED', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogWithHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'ACTIVE', procedureTypeId: 'pt1' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(2);
+
+      const res = await service.getActivationVerification('log1');
+      expect(res.overallStatus).toBe('FAIL');
+      expect(res.warnings[0]).toContain('không ở trạng thái REPLACED');
+    });
+
+    it('should return FAIL if multiple ACTIVE versions exist in scope', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogWithHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(2);
+
+      const res = await service.getActivationVerification('log1');
+      expect(res.overallStatus).toBe('FAIL');
+      expect(res.warnings[0]).toContain('Phát hiện 2 phiên bản ACTIVE cùng phạm vi');
+    });
+
+    it('should not update database or touch safety tables', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogWithHistory);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'newVer1', status: 'ACTIVE', procedureTypeId: 'pt1' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(1);
+
+      await service.getActivationVerification('log1');
+      expect(mockPrismaService.legalUpdateLog.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.procedureTypeVersion.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.aiPromptVersion.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.checklistVersion.update).not.toHaveBeenCalled();
     });
   });
 });

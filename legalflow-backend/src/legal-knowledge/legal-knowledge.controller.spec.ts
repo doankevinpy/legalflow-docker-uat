@@ -20,6 +20,7 @@ describe('LegalKnowledgeController', () => {
     getSampleProcedureCases: jest.fn(),
     runDraftVersionSimulation: jest.fn(),
     activateDraftVersion: jest.fn(),
+    getActivationVerification: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -257,6 +258,15 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.activateDraftVersion('1', body, { user: { id: 'u1' } });
     expect(result).toEqual(mockResult);
     expect(mockService.activateDraftVersion).toHaveBeenCalledWith('1', body, { id: 'u1' });
+  });
+
+  it('getActivationVerification should call service.getActivationVerification', async () => {
+    const mockResult = { overallStatus: 'PASS' };
+    mockService.getActivationVerification.mockResolvedValue(mockResult);
+
+    const result = await controller.getActivationVerification('1', { user: { id: 'u1' } });
+    expect(result).toEqual(mockResult);
+    expect(mockService.getActivationVerification).toHaveBeenCalledWith('1', { id: 'u1' });
   });
 });
 

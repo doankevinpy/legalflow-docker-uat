@@ -205,6 +205,15 @@ export class LegalKnowledgeController {
   ) {
     return this.service.activateDraftVersion(id, body || {}, req.user);
   }
+
+  @Get('update-logs/:id/activation-verification')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  getActivationVerification(
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    return this.service.getActivationVerification(id, req.user);
+  }
 }
 
 
