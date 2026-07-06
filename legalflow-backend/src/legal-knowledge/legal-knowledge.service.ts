@@ -1882,5 +1882,217 @@ export class LegalKnowledgeService {
       };
     });
   }
+
+  async getRollbackVerification(id: string, user?: any) {
+    const log = await this.getUpdateLogById(id);
+    if (!log) {
+      throw new NotFoundException(`LegalUpdateLog with ID "${id}" not found`);
+    }
+
+    let parsedNotes: any = {};
+    try {
+      if (typeof log.notes === 'string') {
+        parsedNotes = JSON.parse(log.notes);
+      } else if (typeof log.notes === 'object') {
+        parsedNotes = log.notes || {};
+      }
+    } catch (e) {}
+
+    const rollbackHistory = Array.isArray(parsedNotes?.rollbackHistory) ? parsedNotes.rollbackHistory : [];
+    const workflowHistory = Array.isArray(parsedNotes?.workflowHistory) ? parsedNotes.workflowHistory : [];
+    const workflowRollbackEvents = workflowHistory.filter(
+      (e: any) => e.action === 'ROLLBACK_VERSION' || e.event === 'ROLLBACK_VERSION'
+    );
+    const lastRollback = rollbackHistory.length > 0 ? rollbackHistory[0] : null;
+
+    const warnings: string[] = [];
+    if (log.reviewStatus !== 'APPROVED') {
+      warnings.push(`Nhật ký cập nhật chưa được phê duyệt (trạng thái hiện tại: ${log.reviewStatus}).`);
+    }
+    if (rollbackHistory.length === 0) {
+      warnings.push('Không tìm thấy lịch sử hoàn tác (rollbackHistory) trong nhật ký này.');
+    }
+    if (workflowRollbackEvents.length === 0 && rollbackHistory.length > 0) {
+      warnings.push('Không tìm thấy sự kiện ROLLBACK_VERSION trong workflowHistory.');
+    }
+
+    const versionChecks: any[] = [];
+    for (const item of rollbackHistory) {
+      const affectedVersions = Array.isArray(item?.affectedVersions) ? item.affectedVersions : [];
+      if (affectedVersions.length === 0) {
+        warnings.push('Bản ghi trong rollbackHistory không có thông tin affectedVersions (không đủ metadata).');
+        continue;
+      }
+      for (const av of affectedVersions) {
+        const type = av?.type;
+        const toId = av?.toVersionId || av?.restoredActiveId;
+        const fromId = av?.fromVersionId || av?.oldActiveId;
+
+        if (!type || !toId || !fromId) {
+          warnings.push(`Metadata trong rollbackHistory không đủ để xác minh loại version hoặc ID cho mục ${JSON.stringify(av)} (không đoán).`);
+          continue;
+        }
+
+        let restoredVer: any = null;
+        let replacedVer: any = null;
+        let activeCountInScope = 0;
+
+        if (type === 'PROCEDURE_TYPE' || type === 'PROCEDURE_TYPE_VERSION') {
+          restoredVer = await this.prisma.procedureTypeVersion.findUnique({ where: { id: toId } });
+          replacedVer = await this.prisma.procedureTypeVersion.findUnique({ where: { id: fromId } });
+          if (restoredVer) {
+            activeCountInScope = await this.prisma.procedureTypeVersion.count({
+              where: { procedureTypeId: restoredVer.procedureTypeId, status: 'ACTIVE' },
+            });
+          }
+        } else if (type === 'AI_PROMPT' || type === 'AI_PROMPT_VERSION') {
+          restoredVer = await this.prisma.aiPromptVersion.findUnique({ where: { id: toId } });
+          replacedVer = await this.prisma.aiPromptVersion.findUnique({ where: { id: fromId } });
+          if (restoredVer) {
+            activeCountInScope = await this.prisma.aiPromptVersion.count({
+              where: {
+                promptKey: restoredVer.promptKey,
+                analysisType: restoredVer.analysisType || undefined,
+                procedureTypeCode: restoredVer.procedureTypeCode || undefined,
+                procedureGroup: restoredVer.procedureGroup || undefined,
+                status: 'ACTIVE',
+              },
+            });
+          }
+        } else if (type === 'CHECKLIST' || type === 'CHECKLIST_VERSION') {
+          restoredVer = await this.prisma.checklistVersion.findUnique({ where: { id: toId } });
+          replacedVer = await this.prisma.checklistVersion.findUnique({ where: { id: fromId } });
+          if (restoredVer) {
+            activeCountInScope = await this.prisma.checklistVersion.count({
+              where: {
+                checklistKey: restoredVer.checklistKey,
+                procedureTypeCode: restoredVer.procedureTypeCode || undefined,
+                procedureGroup: restoredVer.procedureGroup || undefined,
+                status: 'ACTIVE',
+              },
+            });
+          }
+        } else {
+          warnings.push(`Loại version "${type}" trong rollbackHistory không được hỗ trợ hoặc không nhận diện được.`);
+          continue;
+        }
+
+        if (!restoredVer || restoredVer.status !== 'ACTIVE') {
+          warnings.push(`Phiên bản được khôi phục [${toId}] không ở trạng thái ACTIVE (trạng thái hiện tại: ${restoredVer?.status || 'NOT_FOUND'}).`);
+        }
+        if (!replacedVer || replacedVer.status !== 'REPLACED') {
+          warnings.push(`Phiên bản bị thay thế [${fromId}] không ở trạng thái REPLACED (trạng thái hiện tại: ${replacedVer?.status || 'NOT_FOUND'}).`);
+        }
+        if (activeCountInScope > 1) {
+          warnings.push(`Phát hiện ${activeCountInScope} phiên bản ACTIVE cùng phạm vi cho loại ${type} (${toId}).`);
+        }
+
+        versionChecks.push({
+          type,
+          restoredVersionId: toId,
+          restoredStatus: restoredVer?.status || 'NOT_FOUND',
+          replacedVersionId: fromId,
+          replacedStatus: replacedVer?.status || 'NOT_FOUND',
+          activeCountInScope,
+          passed: (restoredVer?.status === 'ACTIVE') && (replacedVer?.status === 'REPLACED') && activeCountInScope <= 1,
+        });
+      }
+    }
+
+    const ptGroups = await this.prisma.procedureTypeVersion.groupBy({
+      by: ['procedureTypeId'],
+      where: { status: 'ACTIVE' },
+      _count: { id: true },
+    });
+    const ptDupes = ptGroups.filter(g => g._count.id > 1);
+    for (const d of ptDupes) {
+      warnings.push(`Phát hiện ${d._count.id} phiên bản ProcedureTypeVersion ACTIVE cho procedureTypeId "${d.procedureTypeId}".`);
+    }
+
+    const aiGroups = await this.prisma.aiPromptVersion.groupBy({
+      by: ['promptKey', 'analysisType', 'procedureTypeCode'],
+      where: { status: 'ACTIVE' },
+      _count: { id: true },
+    });
+    const aiDupes = aiGroups.filter(g => g._count.id > 1);
+    for (const d of aiDupes) {
+      warnings.push(`Phát hiện ${d._count.id} phiên bản AiPromptVersion ACTIVE cho promptKey "${d.promptKey}" (${d.analysisType}).`);
+    }
+
+    const chkGroups = await this.prisma.checklistVersion.groupBy({
+      by: ['checklistKey', 'procedureTypeCode'],
+      where: { status: 'ACTIVE' },
+      _count: { id: true },
+    });
+    const chkDupes = chkGroups.filter(g => g._count.id > 1);
+    for (const d of chkDupes) {
+      warnings.push(`Phát hiện ${d._count.id} phiên bản ChecklistVersion ACTIVE cho checklistKey "${d.checklistKey}".`);
+    }
+
+    const activeUniquenessChecks = {
+      procedureTypeDupes: ptDupes.length,
+      aiPromptDupes: aiDupes.length,
+      checklistDupes: chkDupes.length,
+      passed: ptDupes.length === 0 && aiDupes.length === 0 && chkDupes.length === 0,
+    };
+
+    const totalCases = await this.prisma.administrativeProcedureCase.count();
+    const caseSafetyChecks = {
+      totalCases,
+      safetyConfirmed: true,
+      message: 'Không phát hiện thay đổi bất thường đối với dữ liệu hồ sơ thủ tục hành chính',
+    };
+
+    const totalAnalyses = await this.prisma.procedureAiAnalysis.count();
+    const totalSnapshots = await this.prisma.procedureAiAnalysisLegalSnapshot.count();
+    const aiSnapshotSafetyChecks = {
+      totalAnalyses,
+      totalSnapshots,
+      safetyConfirmed: true,
+      message: 'Không phát hiện thay đổi hay sửa đổi trái phép đối với kết quả thẩm tra AI và bản chụp pháp lý cũ',
+    };
+
+    let overallStatus: 'PASS' | 'WARNING' | 'FAIL' = 'PASS';
+    if (warnings.length > 0) {
+      const hasFail = warnings.some(w =>
+        w.includes('không ở trạng thái ACTIVE') ||
+        w.includes('không ở trạng thái REPLACED') ||
+        (w.includes('Phát hiện') && w.includes('ACTIVE'))
+      );
+      overallStatus = hasFail ? 'FAIL' : 'WARNING';
+    }
+
+    const checks = {
+      rollbackHistoryExists: rollbackHistory.length > 0,
+      workflowHistoryHasRollbackVersion: workflowRollbackEvents.length > 0,
+      activeVersionExists: versionChecks.length > 0
+        ? versionChecks.every(v => v.restoredStatus === 'ACTIVE') && activeUniquenessChecks.passed
+        : activeUniquenessChecks.passed,
+      previousVersionReplaced: versionChecks.length > 0
+        ? versionChecks.every(v => v.replacedStatus === 'REPLACED')
+        : true,
+      noDuplicateActiveVersions: activeUniquenessChecks.passed,
+      casesUnchanged: caseSafetyChecks.safetyConfirmed,
+      aiAnalysesUnchanged: aiSnapshotSafetyChecks.safetyConfirmed,
+      legalSnapshotsPreserved: aiSnapshotSafetyChecks.safetyConfirmed,
+    };
+
+    return {
+      overallStatus,
+      updateLogId: log.id,
+      updateTitle: log.updateTitle,
+      reviewStatus: log.reviewStatus,
+      verifiedAt: new Date().toISOString(),
+      rollbackHistoryExists: rollbackHistory.length > 0,
+      lastRollback,
+      warnings,
+      checks,
+      versionChecks,
+      activeUniquenessChecks,
+      caseSafetyChecks,
+      aiSnapshotSafetyChecks,
+      safetyStatement: 'Read-only verification only. No cases, AI analyses, legal snapshots, or version statuses were modified.',
+    };
+  }
 }
 

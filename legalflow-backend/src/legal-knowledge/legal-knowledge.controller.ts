@@ -225,6 +225,15 @@ export class LegalKnowledgeController {
   ) {
     return this.service.rollbackActivatedVersion(id, dto || ({} as RollbackVersionDto), req.user);
   }
+
+  @Get('update-logs/:id/rollback-verification')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  getRollbackVerification(
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    return this.service.getRollbackVerification(id, req.user);
+  }
 }
 
 

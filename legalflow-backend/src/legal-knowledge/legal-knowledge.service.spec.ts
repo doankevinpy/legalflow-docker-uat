@@ -773,4 +773,63 @@ describe('LegalKnowledgeService', () => {
       expect(mockPrismaService.procedureAiAnalysisLegalSnapshot?.update).toBeUndefined();
     });
   });
+
+  describe('getRollbackVerification', () => {
+    const mockLogWithRollback = {
+      id: 'log1',
+      updateTitle: 'Test Log',
+      reviewStatus: 'APPROVED',
+      notes: JSON.stringify({
+        rollbackHistory: [
+          {
+            rolledBackAt: '2026-07-06T10:00:00.000Z',
+            affectedVersions: [
+              {
+                type: 'PROCEDURE_TYPE',
+                fromVersionId: 'oldVer1',
+                toVersionId: 'restoredVer1',
+              },
+            ],
+          },
+        ],
+        workflowHistory: [
+          { action: 'ROLLBACK_VERSION', timestamp: '2026-07-06T10:00:00.000Z' },
+        ],
+      }),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.procedureTypeVersion.groupBy.mockResolvedValue([]);
+      mockPrismaService.aiPromptVersion.groupBy.mockResolvedValue([]);
+      mockPrismaService.checklistVersion.groupBy.mockResolvedValue([]);
+      mockPrismaService.administrativeProcedureCase.count.mockResolvedValue(10);
+      mockPrismaService.procedureAiAnalysis.count.mockResolvedValue(5);
+      mockPrismaService.procedureAiAnalysisLegalSnapshot.count.mockResolvedValue(5);
+    });
+
+    it('should return PASS when rollback verification is valid', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue(mockLogWithRollback);
+      mockPrismaService.procedureTypeVersion.findUnique
+        .mockResolvedValueOnce({ id: 'restoredVer1', status: 'ACTIVE', procedureTypeId: 'pt1' })
+        .mockResolvedValueOnce({ id: 'oldVer1', status: 'REPLACED', procedureTypeId: 'pt1' });
+      mockPrismaService.procedureTypeVersion.count.mockResolvedValue(1);
+
+      const res = await service.getRollbackVerification('log1');
+      expect(res.overallStatus).toBe('PASS');
+      expect(res.warnings).toHaveLength(0);
+      expect(res.checks.rollbackHistoryExists).toBe(true);
+      expect(res.checks.workflowHistoryHasRollbackVersion).toBe(true);
+    });
+
+    it('should return WARNING when no rollbackHistory exists', async () => {
+      mockPrismaService.legalUpdateLog.findUnique.mockResolvedValue({
+        ...mockLogWithRollback,
+        notes: JSON.stringify({}),
+      });
+
+      const res = await service.getRollbackVerification('log1');
+      expect(res.overallStatus).toBe('WARNING');
+      expect(res.warnings[0]).toContain('Không tìm thấy lịch sử hoàn tác');
+    });
+  });
 });

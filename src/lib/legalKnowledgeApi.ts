@@ -52,6 +52,8 @@ export const legalKnowledgeApi = {
       targetVersionId?: string;
     },
   ) => apiClient.post<any>(`/legal-knowledge/update-logs/${updateLogId}/rollback-version`, payload),
+  getRollbackVerification: (id: string) =>
+    apiClient.get<any>(`/legal-knowledge/update-logs/${id}/rollback-verification`),
 };
 
 

@@ -164,6 +164,11 @@ export default function LegalKnowledgePage() {
   const [loadingVerification, setLoadingVerification] = useState<boolean>(false);
   const [verificationError, setVerificationError] = useState<string>('');
 
+  // Phase 8F-E-D-E Post-rollback Verification state
+  const [rollbackVerificationData, setRollbackVerificationData] = useState<any>(null);
+  const [loadingRollbackVerification, setLoadingRollbackVerification] = useState<boolean>(false);
+  const [rollbackVerificationError, setRollbackVerificationError] = useState<string>('');
+
   // Phase 8F-E-D-D Manual Version Rollback state
   const [showRollbackModal, setShowRollbackModal] = useState<boolean>(false);
   const [rollbackStep, setRollbackStep] = useState<number>(1);
@@ -176,6 +181,8 @@ export default function LegalKnowledgePage() {
   useEffect(() => {
     setVerificationData(null);
     setVerificationError('');
+    setRollbackVerificationData(null);
+    setRollbackVerificationError('');
     setShowRollbackModal(false);
     setRollbackStep(1);
     setRollbackReason('');
@@ -406,6 +413,40 @@ export default function LegalKnowledgePage() {
     }
   };
 
+  const handleRunRollbackVerification = async () => {
+    if (!selectedLogForDetail?.id) {
+      setRollbackVerificationError('Không tìm thấy ID nhật ký cập nhật để kiểm chứng rollback.');
+      return;
+    }
+
+    try {
+      setLoadingRollbackVerification(true);
+      setRollbackVerificationError('');
+      setRollbackVerificationData(null);
+
+      const res = await legalKnowledgeApi.getRollbackVerification(selectedLogForDetail.id);
+      const data = res?.data?.data || res?.data || res;
+
+      console.log('LF rollback verification result', data);
+
+      if (!data || Object.keys(data).length === 0) {
+        setRollbackVerificationError('API kiểm chứng không trả dữ liệu. Vui lòng kiểm tra backend endpoint rollback-verification.');
+        return;
+      }
+
+      setRollbackVerificationData(data);
+    } catch (err: any) {
+      console.error('Error fetching rollback verification:', err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tải dữ liệu kiểm chứng sau rollback.';
+      setRollbackVerificationError(message);
+    } finally {
+      setLoadingRollbackVerification(false);
+    }
+  };
+
   const handleRunRollback = async () => {
     if (!selectedLogForDetail?.id) return;
     if (!rollbackReason.trim() || rollbackReason.trim().length < 10) {
@@ -615,6 +656,17 @@ export default function LegalKnowledgePage() {
     isLeader &&
     !!selectedLogForDetail &&
     selectedLogForDetail.reviewStatus === 'APPROVED';
+
+  // PHASE 8F-E-D-E: Rollback verification block visibility conditions
+  const hasRollbackHistory = Array.isArray(parsedNotes?.rollbackHistory) && parsedNotes.rollbackHistory.length > 0;
+  const hasRollbackWorkflow = Array.isArray(parsedNotes?.workflowHistory) && parsedNotes.workflowHistory.some((x: any) => x.action === 'ROLLBACK_VERSION' || x.event === 'ROLLBACK_VERSION');
+  const canShowRollbackVerificationBlock =
+    !!selectedLogForDetail &&
+    (
+      selectedLogForDetail.reviewStatus === 'APPROVED' ||
+      hasRollbackHistory ||
+      hasRollbackWorkflow
+    );
 
   return (
     <div className="space-y-6 pb-12">
@@ -1966,6 +2018,208 @@ export default function LegalKnowledgePage() {
                 </div>
               )}
 
+              {/* PHASE 8F-E-D-E: POST-ROLLBACK VERIFICATION & READ-ONLY AUDIT DASHBOARD */}
+              {canShowRollbackVerificationBlock && (
+                <div className="my-3 p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border-2 border-purple-200 dark:border-purple-800 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <h4 className="font-bold text-sm text-purple-900 dark:text-purple-300">
+                        Kiểm chứng sau rollback (Read-only Audit Dashboard)
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRunRollbackVerification}
+                      disabled={loadingRollbackVerification || !selectedLogForDetail?.id}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-xs transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingRollbackVerification ? (
+                        <span className="inline-block animate-spin">⌛</span>
+                      ) : (
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                      )}
+                      Kiểm tra sau rollback
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded-lg text-[11px] text-purple-900 dark:text-purple-200 font-medium flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Chức năng kiểm chứng này hoàn toàn read-only (chỉ đọc).</strong> Không tự thay đổi version, không tự rollback lại, không sửa hồ sơ TTHC cũ hay kết quả thẩm tra AI/legal snapshot cũ.
+                    </span>
+                  </div>
+
+                  {loadingRollbackVerification && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                      <span className="inline-block animate-spin">⌛</span>
+                      <span>Đang gọi API kiểm chứng sau rollback...</span>
+                    </div>
+                  )}
+
+                  {rollbackVerificationError && !loadingRollbackVerification && (
+                    <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-800 dark:text-red-300 flex items-center gap-2 font-semibold">
+                      <span>❌</span>
+                      <span>{rollbackVerificationError}</span>
+                    </div>
+                  )}
+
+                  {!hasRollbackHistory && !rollbackVerificationData && !loadingRollbackVerification && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                      <span>ℹ️</span>
+                      <span>
+                        Chưa phát hiện lịch sử hoàn tác (rollbackHistory) trong nhật ký này. Bạn có thể bấm "Kiểm tra sau rollback" để xác minh chi tiết trạng thái hệ thống.
+                      </span>
+                    </div>
+                  )}
+
+                  {rollbackVerificationData && !loadingRollbackVerification && (
+                    <div className="space-y-3 pt-2 border-t border-purple-200 dark:border-purple-800 text-xs">
+                      <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-lg border">
+                        <span className="font-bold text-gray-700 dark:text-gray-300">Trạng thái tổng quan (Overall Status):</span>
+                        <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${
+                          rollbackVerificationData.overallStatus === 'PASS'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                            : rollbackVerificationData.overallStatus === 'WARNING'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {rollbackVerificationData.overallStatus === 'PASS' && '✔ PASS (An toàn / Đạt yêu cầu)'}
+                          {rollbackVerificationData.overallStatus === 'WARNING' && '⚠ WARNING (Có cảnh báo)'}
+                          {rollbackVerificationData.overallStatus === 'FAIL' && '✖ FAIL (Có lỗi / Bất thường)'}
+                        </span>
+                      </div>
+
+                      {rollbackVerificationData.warnings && rollbackVerificationData.warnings.length > 0 && (
+                        <div className={`p-2.5 rounded-lg border space-y-1 ${
+                          rollbackVerificationData.overallStatus === 'WARNING'
+                            ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+                            : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'
+                        }`}>
+                          <div className={`font-bold ${
+                            rollbackVerificationData.overallStatus === 'WARNING'
+                              ? 'text-amber-800 dark:text-amber-300'
+                              : 'text-red-800 dark:text-red-300'
+                          }`}>Danh sách cảnh báo / thông báo:</div>
+                          <ul className={`list-disc list-inside space-y-0.5 ${
+                            rollbackVerificationData.overallStatus === 'WARNING'
+                              ? 'text-amber-700 dark:text-amber-400'
+                              : 'text-red-700 dark:text-red-400'
+                          }`}>
+                            {rollbackVerificationData.warnings.map((w: string, idx: number) => (
+                              <li key={idx}>{w}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {rollbackVerificationData.checks && (
+                        <div className="space-y-1.5 bg-white dark:bg-slate-900 p-3 rounded-lg border">
+                          <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Chi tiết kiểm chứng các mục:</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                              <span>Tồn tại lịch sử rollback:</span>
+                              <strong className={rollbackVerificationData.checks.rollbackHistoryExists ? 'text-emerald-600' : 'text-amber-600'}>
+                                {rollbackVerificationData.checks.rollbackHistoryExists ? '✔ Có' : '⚠ Không'}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                              <span>Sự kiện rollback trong workflow:</span>
+                              <strong className={rollbackVerificationData.checks.workflowHistoryHasRollbackVersion ? 'text-emerald-600' : 'text-amber-600'}>
+                                {rollbackVerificationData.checks.workflowHistoryHasRollbackVersion ? '✔ Có' : '⚠ Không'}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                              <span>Trạng thái version khôi phục (ACTIVE):</span>
+                              <strong className={rollbackVerificationData.checks.activeVersionExists ? 'text-emerald-600' : 'text-red-600'}>
+                                {rollbackVerificationData.checks.activeVersionExists ? '✔ Đạt' : '✖ Lỗi'}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                              <span>Trạng thái version bị thay thế (REPLACED):</span>
+                              <strong className={rollbackVerificationData.checks.previousVersionReplaced ? 'text-emerald-600' : 'text-red-600'}>
+                                {rollbackVerificationData.checks.previousVersionReplaced ? '✔ Đạt' : '✖ Lỗi'}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                              <span>Không duplicate ACTIVE version:</span>
+                              <strong className={rollbackVerificationData.checks.noDuplicateActiveVersions ? 'text-emerald-600' : 'text-red-600'}>
+                                {rollbackVerificationData.checks.noDuplicateActiveVersions ? '✔ Đạt' : '✖ Lỗi'}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                              <span>Hồ sơ TTHC giữ nguyên:</span>
+                              <strong className={rollbackVerificationData.checks.casesUnchanged ? 'text-emerald-600' : 'text-red-600'}>
+                                {rollbackVerificationData.checks.casesUnchanged ? '✔ Đạt' : '✖ Lỗi'}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded col-span-1 sm:col-span-2">
+                              <span>Kết quả thẩm tra AI / legal snapshot bảo toàn:</span>
+                              <strong className={rollbackVerificationData.checks.aiAnalysesUnchanged && rollbackVerificationData.checks.legalSnapshotsPreserved ? 'text-emerald-600' : 'text-red-600'}>
+                                {rollbackVerificationData.checks.aiAnalysesUnchanged && rollbackVerificationData.checks.legalSnapshotsPreserved ? '✔ Đạt (Bảo toàn)' : '✖ Lỗi'}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {rollbackVerificationData.versionChecks && rollbackVerificationData.versionChecks.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="font-semibold text-gray-700 dark:text-gray-300">Chi tiết phiên bản đã hoàn tác:</div>
+                          <div className="space-y-1">
+                            {rollbackVerificationData.versionChecks.map((chk: any, idx: number) => (
+                              <div key={idx} className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                <div className="flex items-center justify-between font-semibold">
+                                  <span className="text-purple-600">{chk.type}</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] ${chk.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {chk.passed ? '✔ Đạt' : '✖ Không đạt'}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-gray-600 dark:text-gray-400">
+                                  <div>
+                                    Version khôi phục về ACTIVE: <strong className="text-emerald-600">{chk.restoredVersionId}</strong> ({chk.restoredStatus})
+                                  </div>
+                                  <div>
+                                    Version bị thay thế (REPLACED): <strong className="text-amber-600">{chk.replacedVersionId}</strong> ({chk.replacedStatus})
+                                    <br />
+                                    Số bản ACTIVE cùng phạm vi: <strong>{chk.activeCountInScope}</strong>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                          <div className="font-semibold text-gray-700 dark:text-gray-300">An toàn hồ sơ TTHC:</div>
+                          <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                            Tổng số hồ sơ kiểm tra: <strong>{rollbackVerificationData.caseSafetyChecks?.totalCases || 0}</strong>
+                            <br />
+                            <span className="text-emerald-600 font-medium">✔ {rollbackVerificationData.caseSafetyChecks?.message}</span>
+                          </div>
+                        </div>
+                        <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                          <div className="font-semibold text-gray-700 dark:text-gray-300">An toàn AI & Snapshot:</div>
+                          <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                            Thẩm tra AI / Snapshot: <strong>{rollbackVerificationData.aiSnapshotSafetyChecks?.totalAnalyses || 0} / {rollbackVerificationData.aiSnapshotSafetyChecks?.totalSnapshots || 0}</strong>
+                            <br />
+                            <span className="text-emerald-600 font-medium">✔ {rollbackVerificationData.aiSnapshotSafetyChecks?.message}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {rollbackVerificationData.safetyStatement && (
+                        <div className="p-2 bg-gray-100 dark:bg-slate-800 rounded text-[11px] text-gray-700 dark:text-gray-300 italic text-center">
+                          {rollbackVerificationData.safetyStatement}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Parse notes if JSON */}
               {(() => {
                 const parsed = parsedNotes;
@@ -2236,6 +2490,7 @@ export default function LegalKnowledgePage() {
                               CLOSE: 'Đóng nhật ký',
                               CREATE_DRAFT_VERSION: 'Tạo bản nháp version',
                               ACTIVATE_DRAFT_VERSION: 'Kích hoạt version thủ công',
+                              ROLLBACK_VERSION: 'Hoàn tác version thủ công',
                             };
                             const actionText = actionMap[item.action] || item.actionLabel || item.action;
                             const timeVal = item.createdAt || item.timestamp;
@@ -2395,6 +2650,208 @@ export default function LegalKnowledgePage() {
                                 </div>
                               </div>
                             </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* PHASE 8F-E-D-E: POST-ROLLBACK VERIFICATION & READ-ONLY AUDIT DASHBOARD (HISTORY SECTION) */}
+                    {canShowRollbackVerificationBlock && (
+                      <div className="bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-xl border-2 border-purple-200 dark:border-purple-800 space-y-3 mt-4">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0" />
+                            <h4 className="font-bold text-sm text-purple-900 dark:text-purple-300">
+                              Kiểm chứng sau rollback (Read-only Audit Dashboard)
+                            </h4>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRunRollbackVerification}
+                            disabled={loadingRollbackVerification || !selectedLogForDetail?.id}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-xs transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {loadingRollbackVerification ? (
+                              <span className="inline-block animate-spin">⌛</span>
+                            ) : (
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            )}
+                            Kiểm tra sau rollback
+                          </button>
+                        </div>
+
+                        <div className="p-2.5 bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded-lg text-[11px] text-purple-900 dark:text-purple-200 font-medium flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Chức năng kiểm chứng này hoàn toàn read-only (chỉ đọc).</strong> Không tự thay đổi version, không tự rollback lại, không sửa hồ sơ TTHC cũ hay kết quả thẩm tra AI/legal snapshot cũ.
+                          </span>
+                        </div>
+
+                        {loadingRollbackVerification && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                            <span className="inline-block animate-spin">⌛</span>
+                            <span>Đang gọi API kiểm chứng sau rollback...</span>
+                          </div>
+                        )}
+
+                        {rollbackVerificationError && !loadingRollbackVerification && (
+                          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-800 dark:text-red-300 flex items-center gap-2 font-semibold">
+                            <span>❌</span>
+                            <span>{rollbackVerificationError}</span>
+                          </div>
+                        )}
+
+                        {!hasRollbackHistory && !rollbackVerificationData && !loadingRollbackVerification && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                            <span>ℹ️</span>
+                            <span>
+                              Chưa phát hiện lịch sử hoàn tác (rollbackHistory) trong nhật ký này. Bạn có thể bấm "Kiểm tra sau rollback" để xác minh chi tiết trạng thái hệ thống.
+                            </span>
+                          </div>
+                        )}
+
+                        {rollbackVerificationData && !loadingRollbackVerification && (
+                          <div className="space-y-3 pt-2 border-t border-purple-200 dark:border-purple-800 text-xs">
+                            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-lg border">
+                              <span className="font-bold text-gray-700 dark:text-gray-300">Trạng thái tổng quan (Overall Status):</span>
+                              <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${
+                                rollbackVerificationData.overallStatus === 'PASS'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                                  : rollbackVerificationData.overallStatus === 'WARNING'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              }`}>
+                                {rollbackVerificationData.overallStatus === 'PASS' && '✔ PASS (An toàn / Đạt yêu cầu)'}
+                                {rollbackVerificationData.overallStatus === 'WARNING' && '⚠ WARNING (Có cảnh báo)'}
+                                {rollbackVerificationData.overallStatus === 'FAIL' && '✖ FAIL (Có lỗi / Bất thường)'}
+                              </span>
+                            </div>
+
+                            {rollbackVerificationData.warnings && rollbackVerificationData.warnings.length > 0 && (
+                              <div className={`p-2.5 rounded-lg border space-y-1 ${
+                                rollbackVerificationData.overallStatus === 'WARNING'
+                                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+                                  : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'
+                              }`}>
+                                <div className={`font-bold ${
+                                  rollbackVerificationData.overallStatus === 'WARNING'
+                                    ? 'text-amber-800 dark:text-amber-300'
+                                    : 'text-red-800 dark:text-red-300'
+                                }`}>Danh sách cảnh báo / thông báo:</div>
+                                <ul className={`list-disc list-inside space-y-0.5 ${
+                                  rollbackVerificationData.overallStatus === 'WARNING'
+                                    ? 'text-amber-700 dark:text-amber-400'
+                                    : 'text-red-700 dark:text-red-400'
+                                }`}>
+                                  {rollbackVerificationData.warnings.map((w: string, idx: number) => (
+                                    <li key={idx}>{w}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {rollbackVerificationData.checks && (
+                              <div className="space-y-1.5 bg-white dark:bg-slate-900 p-3 rounded-lg border">
+                                <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Chi tiết kiểm chứng các mục:</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                                    <span>Tồn tại lịch sử rollback:</span>
+                                    <strong className={rollbackVerificationData.checks.rollbackHistoryExists ? 'text-emerald-600' : 'text-amber-600'}>
+                                      {rollbackVerificationData.checks.rollbackHistoryExists ? '✔ Có' : '⚠ Không'}
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                                    <span>Sự kiện rollback trong workflow:</span>
+                                    <strong className={rollbackVerificationData.checks.workflowHistoryHasRollbackVersion ? 'text-emerald-600' : 'text-amber-600'}>
+                                      {rollbackVerificationData.checks.workflowHistoryHasRollbackVersion ? '✔ Có' : '⚠ Không'}
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                                    <span>Trạng thái version khôi phục (ACTIVE):</span>
+                                    <strong className={rollbackVerificationData.checks.activeVersionExists ? 'text-emerald-600' : 'text-red-600'}>
+                                      {rollbackVerificationData.checks.activeVersionExists ? '✔ Đạt' : '✖ Lỗi'}
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                                    <span>Trạng thái version bị thay thế (REPLACED):</span>
+                                    <strong className={rollbackVerificationData.checks.previousVersionReplaced ? 'text-emerald-600' : 'text-red-600'}>
+                                      {rollbackVerificationData.checks.previousVersionReplaced ? '✔ Đạt' : '✖ Lỗi'}
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                                    <span>Không duplicate ACTIVE version:</span>
+                                    <strong className={rollbackVerificationData.checks.noDuplicateActiveVersions ? 'text-emerald-600' : 'text-red-600'}>
+                                      {rollbackVerificationData.checks.noDuplicateActiveVersions ? '✔ Đạt' : '✖ Lỗi'}
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded">
+                                    <span>Hồ sơ TTHC giữ nguyên:</span>
+                                    <strong className={rollbackVerificationData.checks.casesUnchanged ? 'text-emerald-600' : 'text-red-600'}>
+                                      {rollbackVerificationData.checks.casesUnchanged ? '✔ Đạt' : '✖ Lỗi'}
+                                    </strong>
+                                  </div>
+                                  <div className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-800 rounded col-span-1 sm:col-span-2">
+                                    <span>Kết quả thẩm tra AI / legal snapshot bảo toàn:</span>
+                                    <strong className={rollbackVerificationData.checks.aiAnalysesUnchanged && rollbackVerificationData.checks.legalSnapshotsPreserved ? 'text-emerald-600' : 'text-red-600'}>
+                                      {rollbackVerificationData.checks.aiAnalysesUnchanged && rollbackVerificationData.checks.legalSnapshotsPreserved ? '✔ Đạt (Bảo toàn)' : '✖ Lỗi'}
+                                    </strong>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {rollbackVerificationData.versionChecks && rollbackVerificationData.versionChecks.length > 0 && (
+                              <div className="space-y-1.5">
+                                <div className="font-semibold text-gray-700 dark:text-gray-300">Chi tiết phiên bản đã hoàn tác:</div>
+                                <div className="space-y-1">
+                                  {rollbackVerificationData.versionChecks.map((chk: any, idx: number) => (
+                                    <div key={idx} className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                      <div className="flex items-center justify-between font-semibold">
+                                        <span className="text-purple-600">{chk.type}</span>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${chk.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                          {chk.passed ? '✔ Đạt' : '✖ Không đạt'}
+                                        </span>
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-gray-600 dark:text-gray-400">
+                                        <div>
+                                          Version khôi phục về ACTIVE: <strong className="text-emerald-600">{chk.restoredVersionId}</strong> ({chk.restoredStatus})
+                                        </div>
+                                        <div>
+                                          Version bị thay thế (REPLACED): <strong className="text-amber-600">{chk.replacedVersionId}</strong> ({chk.replacedStatus})
+                                          <br />
+                                          Số bản ACTIVE cùng phạm vi: <strong>{chk.activeCountInScope}</strong>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                <div className="font-semibold text-gray-700 dark:text-gray-300">An toàn hồ sơ TTHC:</div>
+                                <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                                  Tổng số hồ sơ kiểm tra: <strong>{rollbackVerificationData.caseSafetyChecks?.totalCases || 0}</strong>
+                                  <br />
+                                  <span className="text-emerald-600 font-medium">✔ {rollbackVerificationData.caseSafetyChecks?.message}</span>
+                                </div>
+                              </div>
+                              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border space-y-1">
+                                <div className="font-semibold text-gray-700 dark:text-gray-300">An toàn AI & Snapshot:</div>
+                                <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                                  Thẩm tra AI / Snapshot: <strong>{rollbackVerificationData.aiSnapshotSafetyChecks?.totalAnalyses || 0} / {rollbackVerificationData.aiSnapshotSafetyChecks?.totalSnapshots || 0}</strong>
+                                  <br />
+                                  <span className="text-emerald-600 font-medium">✔ {rollbackVerificationData.aiSnapshotSafetyChecks?.message}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {rollbackVerificationData.safetyStatement && (
+                              <div className="p-2 bg-gray-100 dark:bg-slate-800 rounded text-[11px] text-gray-700 dark:text-gray-300 italic text-center">
+                                {rollbackVerificationData.safetyStatement}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
