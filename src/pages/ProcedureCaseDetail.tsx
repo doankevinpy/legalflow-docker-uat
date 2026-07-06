@@ -7,11 +7,15 @@ import { Printer, Download } from 'lucide-react';
 import { AI_REVIEW_WARNING } from '../lib/constants';
 import { ProcedureReviewPrintModal } from '../components/ProcedureReviewPrintModal';
 import { PurposeChangeReviewPrintModal } from '../components/PurposeChangeReviewPrintModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProcedureCaseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const caseId = id || '';
+  const { user } = useAuth();
+  const role = user?.role ?? 'VIEWER';
+  const canAct = role !== 'VIEWER';
 
   const [data, setData] = useState<ProcedureCase | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -381,17 +385,19 @@ export default function ProcedureCaseDetail() {
                         : 'Phân tích chuyên sâu thông tin chủ sở hữu, thửa đất, lịch sử sử dụng đất và đối chiếu căn cứ pháp lý.'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleRunAiReview}
-                    disabled={runningAi}
-                    className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold text-sm shadow flex items-center gap-2 transition"
-                  >
-                    {runningAi
-                      ? '⏳ Đang phân tích...'
-                      : data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
-                      ? '🤖 AI rà soát chuyển mục đích'
-                      : '🤖 AI rà soát cấp GCN lần đầu'}
-                  </button>
+                  {canAct && (
+                    <button
+                      onClick={handleRunAiReview}
+                      disabled={runningAi}
+                      className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold text-sm shadow flex items-center gap-2 transition"
+                    >
+                      {runningAi
+                        ? '⏳ Đang phân tích...'
+                        : data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                        ? '🤖 AI rà soát chuyển mục đích'
+                        : '🤖 AI rà soát cấp GCN lần đầu'}
+                    </button>
+                  )}
                 </div>
 
                 {aiAnalyses.length === 0 && !runningAi && (
@@ -746,81 +752,83 @@ export default function ProcedureCaseDetail() {
                       </div>
 
                       {/* Export & Review Actions */}
-                      <div className="pt-4 border-t flex flex-wrap items-center justify-between gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
-                        {analysis.analysisType === 'LAND_FIRST_CERTIFICATE_REVIEW' ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              onClick={() => handleExportReviewDocx(analysis.id)}
-                              disabled={exportingAnalysisId === analysis.id}
-                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
-                            >
-                              <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                              {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
-                            </button>
-                            <button
-                              onClick={() => handlePreviewReviewPdf(analysis.id)}
-                              disabled={previewingAnalysisId === analysis.id}
-                              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
-                            >
-                              <Printer className="w-3.5 h-3.5 mr-1.5" />
-                              {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
-                            </button>
-                          </div>
-                        ) : analysis.analysisType === 'LAND_USE_PURPOSE_CHANGE_REVIEW' ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              onClick={() => handleExportPurposeChangeReviewDocx(analysis.id)}
-                              disabled={exportingAnalysisId === analysis.id}
-                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
-                            >
-                              <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                              {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
-                            </button>
-                            <button
-                              onClick={() => handlePreviewPurposeChangeReviewPdf(analysis.id)}
-                              disabled={previewingAnalysisId === analysis.id}
-                              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
-                            >
-                              <Printer className="w-3.5 h-3.5 mr-1.5" />
-                              {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-slate-500 italic flex items-center gap-1.5">
-                            <span>ℹ️</span>
-                            <span>Tính năng xuất Word/PDF sẽ được hỗ trợ trong phase sau.</span>
-                          </div>
-                        )}
+                      {canAct && (
+                        <div className="pt-4 border-t flex flex-wrap items-center justify-between gap-2 bg-gray-50 -mx-6 -mb-6 p-4">
+                          {analysis.analysisType === 'LAND_FIRST_CERTIFICATE_REVIEW' ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => handleExportReviewDocx(analysis.id)}
+                                disabled={exportingAnalysisId === analysis.id}
+                                className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                              >
+                                <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                                {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
+                              </button>
+                              <button
+                                onClick={() => handlePreviewReviewPdf(analysis.id)}
+                                disabled={previewingAnalysisId === analysis.id}
+                                className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
+                              >
+                                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                                {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
+                              </button>
+                            </div>
+                          ) : analysis.analysisType === 'LAND_USE_PURPOSE_CHANGE_REVIEW' ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => handleExportPurposeChangeReviewDocx(analysis.id)}
+                                disabled={exportingAnalysisId === analysis.id}
+                                className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                              >
+                                <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                                {exportingAnalysisId === analysis.id ? 'Đang tải...' : 'Tải phiếu rà soát Word'}
+                              </button>
+                              <button
+                                onClick={() => handlePreviewPurposeChangeReviewPdf(analysis.id)}
+                                disabled={previewingAnalysisId === analysis.id}
+                                className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
+                              >
+                                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                                {previewingAnalysisId === analysis.id ? 'Đang mở...' : 'Xem/In phiếu rà soát PDF'}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-500 italic flex items-center gap-1.5">
+                              <span>ℹ️</span>
+                              <span>Tính năng xuất Word/PDF sẽ được hỗ trợ trong phase sau.</span>
+                            </div>
+                          )}
 
-                        {isPending && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              onClick={() => handleAcceptAiAnalysis(analysis.id, true, false)}
-                              className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-sm transition"
-                            >
-                              ✅ Chấp nhận &amp; Lưu ý kiến vào Ghi chú
-                            </button>
-                            <button
-                              onClick={() => handleAcceptAiAnalysis(analysis.id, false, true)}
-                              className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm transition"
-                            >
-                              📋 Chấp nhận &amp; Tạo checklist gợi ý
-                            </button>
-                            <button
-                              onClick={() => handleAcceptAiAnalysis(analysis.id, true, true)}
-                              className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition"
-                            >
-                              ⚡ Chấp nhận cả hai (Ghi chú + Checklist)
-                            </button>
-                            <button
-                              onClick={() => handleRejectAiAnalysis(analysis.id)}
-                              className="px-3.5 py-2 bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold hover:bg-rose-200 transition ml-2"
-                            >
-                              ❌ Từ chối
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                          {isPending && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => handleAcceptAiAnalysis(analysis.id, true, false)}
+                                className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-sm transition"
+                              >
+                                ✅ Chấp nhận &amp; Lưu ý kiến vào Ghi chú
+                              </button>
+                              <button
+                                onClick={() => handleAcceptAiAnalysis(analysis.id, false, true)}
+                                className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm transition"
+                              >
+                                📋 Chấp nhận &amp; Tạo checklist gợi ý
+                              </button>
+                              <button
+                                onClick={() => handleAcceptAiAnalysis(analysis.id, true, true)}
+                                className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition"
+                              >
+                                ⚡ Chấp nhận cả hai (Ghi chú + Checklist)
+                              </button>
+                              <button
+                                onClick={() => handleRejectAiAnalysis(analysis.id)}
+                                className="px-3.5 py-2 bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold hover:bg-rose-200 transition ml-2"
+                              >
+                                ❌ Từ chối
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -836,26 +844,28 @@ export default function ProcedureCaseDetail() {
               <h3 className="text-base font-bold text-gray-800">Checklist thẩm định thành phần hồ sơ</h3>
             </div>
 
-            <form onSubmit={handleAddChecklist} className="flex gap-2 bg-gray-50 p-3 rounded-xl border">
-              <input
-                type="text"
-                placeholder="Nhóm (VD: Pháp lý)"
-                value={newChecklistGroup}
-                onChange={(e) => setNewChecklistGroup(e.target.value)}
-                className="w-1/4 px-3 py-2 border rounded-lg text-sm bg-white"
-              />
-              <input
-                type="text"
-                required
-                placeholder="Tên mục kiểm tra (VD: Đơn đăng ký cấp GCN Mẫu 04a/ĐK)"
-                value={newChecklistTitle}
-                onChange={(e) => setNewChecklistTitle(e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white"
-              />
-              <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
-                + Thêm mục
-              </button>
-            </form>
+            {canAct && (
+              <form onSubmit={handleAddChecklist} className="flex gap-2 bg-gray-50 p-3 rounded-xl border">
+                <input
+                  type="text"
+                  placeholder="Nhóm (VD: Pháp lý)"
+                  value={newChecklistGroup}
+                  onChange={(e) => setNewChecklistGroup(e.target.value)}
+                  className="w-1/4 px-3 py-2 border rounded-lg text-sm bg-white"
+                />
+                <input
+                  type="text"
+                  required
+                  placeholder="Tên mục kiểm tra (VD: Đơn đăng ký cấp GCN Mẫu 04a/ĐK)"
+                  value={newChecklistTitle}
+                  onChange={(e) => setNewChecklistTitle(e.target.value)}
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white"
+                />
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
+                  + Thêm mục
+                </button>
+              </form>
+            )}
 
             {(!data.checklistItems || data.checklistItems.length === 0) ? (
               <div className="p-8 text-center text-gray-500 border border-dashed rounded-xl">
@@ -866,10 +876,10 @@ export default function ProcedureCaseDetail() {
                 {data.checklistItems.map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => handleToggleChecklist(item)}
-                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition ${
+                    onClick={() => canAct && handleToggleChecklist(item)}
+                    className={`p-3 rounded-xl border flex items-center justify-between transition ${
                       item.isCompleted ? 'bg-green-50/60 border-green-200' : 'bg-white hover:bg-gray-50 border-gray-200'
-                    }`}
+                    } ${canAct ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     <div className="flex items-center gap-3">
                       <input
@@ -918,22 +928,24 @@ export default function ProcedureCaseDetail() {
         {/* TAB 6: NOTES */}
         {activeTab === 'notes' && (
           <div className="space-y-6 text-sm">
-            <form onSubmit={handleAddNote} className="space-y-3 bg-gray-50 p-4 rounded-xl border">
-              <label className="block font-medium text-gray-700">Thêm ý kiến thẩm định / trao đổi nội bộ</label>
-              <textarea
-                rows={3}
-                required
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Nhập nội dung ý kiến..."
-                className="w-full p-3 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <div className="flex justify-end">
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
-                  Gửi ghi chú
-                </button>
-              </div>
-            </form>
+            {canAct && (
+              <form onSubmit={handleAddNote} className="space-y-3 bg-gray-50 p-4 rounded-xl border">
+                <label className="block font-medium text-gray-700">Thêm ý kiến thẩm định / trao đổi nội bộ</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="Nhập nội dung ý kiến..."
+                  className="w-full p-3 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <div className="flex justify-end">
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
+                    Gửi ghi chú
+                  </button>
+                </div>
+              </form>
+            )}
 
             {(!data.procedureNotes || data.procedureNotes.length === 0) ? (
               <div className="p-8 text-center text-gray-500 border border-dashed rounded-xl">Chưa có ý kiến trao đổi nào.</div>

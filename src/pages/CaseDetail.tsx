@@ -627,7 +627,7 @@ export default function CaseDetail() {
                           <p className="text-xs text-muted-foreground">
                             {note.user?.fullName ?? 'Người dùng'} – {format(new Date(note.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })}
                           </p>
-                          {isAiDraft && (
+                          {isAiDraft && role !== 'VIEWER' && (
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="outline"
@@ -733,17 +733,19 @@ export default function CaseDetail() {
                         Phân tích nội dung đơn thư, gợi ý phân loại và tóm tắt hồ sơ.
                       </p>
                     </div>
-                    <Button
-                      onClick={handleAnalyzeAiDetail}
-                      disabled={isAnalyzingAi}
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
-                    >
-                      {isAnalyzingAi ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang phân tích...</>
-                      ) : (
-                        <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Phân tích Lại</>
-                      )}
-                    </Button>
+                    {role !== 'VIEWER' && (
+                      <Button
+                        onClick={handleAnalyzeAiDetail}
+                        disabled={isAnalyzingAi}
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                      >
+                        {isAnalyzingAi ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang phân tích...</>
+                        ) : (
+                          <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Phân tích Lại</>
+                        )}
+                      </Button>
+                    )}
                   </div>
 
                   {aiSuggestion ? (
@@ -788,17 +790,19 @@ export default function CaseDetail() {
                         Gợi ý lộ trình xác minh, tài liệu và mốc thời gian giải quyết theo luật định.
                       </p>
                     </div>
-                    <Button
-                      onClick={handleSuggestChecklist}
-                      disabled={isSuggestingChecklist}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      {isSuggestingChecklist ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang tạo quy trình...</>
-                      ) : (
-                        <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Gợi ý Quy trình Xử lý</>
-                      )}
-                    </Button>
+                    {role !== 'VIEWER' && (
+                      <Button
+                        onClick={handleSuggestChecklist}
+                        disabled={isSuggestingChecklist}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        {isSuggestingChecklist ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang tạo quy trình...</>
+                        ) : (
+                          <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Gợi ý Quy trình Xử lý</>
+                        )}
+                      </Button>
+                    )}
                   </div>
 
                   {aiChecklistGroups ? (
@@ -854,13 +858,15 @@ export default function CaseDetail() {
                       <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
                         Nhấn nút phía trên để Trợ lý AI tự động phân tích đơn thư và đề xuất bộ checklist thụ lý theo 6 nhóm nghiệp vụ chuẩn.
                       </p>
-                      <Button
-                        onClick={handleSuggestChecklist}
-                        disabled={isSuggestingChecklist}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      >
-                        {isSuggestingChecklist ? 'Đang phân tích...' : '✨ Gợi ý ngay'}
-                      </Button>
+                      {role !== 'VIEWER' && (
+                        <Button
+                          onClick={handleSuggestChecklist}
+                          disabled={isSuggestingChecklist}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                          {isSuggestingChecklist ? 'Đang phân tích...' : '✨ Gợi ý ngay'}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -913,17 +919,19 @@ export default function CaseDetail() {
                           onChange={(e) => setCustomDraftInstructions(e.target.value)}
                           className="flex-1 h-10 px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         />
-                        <Button
-                          onClick={handleSuggestDraft}
-                          disabled={isGeneratingDraft}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 h-10 px-4"
-                        >
-                          {isGeneratingDraft ? (
-                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang soạn...</>
-                          ) : (
-                            '✨ Tạo bản nháp AI'
-                          )}
-                        </Button>
+                        {role !== 'VIEWER' && (
+                          <Button
+                            onClick={handleSuggestDraft}
+                            disabled={isGeneratingDraft}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 h-10 px-4"
+                          >
+                            {isGeneratingDraft ? (
+                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang soạn...</>
+                            ) : (
+                              '✨ Tạo bản nháp AI'
+                            )}
+                          </Button>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {[

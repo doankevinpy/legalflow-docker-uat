@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { procedureCasesApi } from '../lib/procedureCasesApi';
 import type { ProcedureCase, ProcedureType, ProcedureField, ProcedureStatus } from '../types/procedure';
+import { useAuth } from '../contexts/AuthContext';
+import { canCreate } from '../lib/rbac';
 
 export default function ProcedureCaseList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role ?? 'VIEWER';
   const [cases, setCases] = useState<ProcedureCase[]>([]);
   const [types, setTypes] = useState<ProcedureType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -138,12 +142,14 @@ export default function ProcedureCaseList() {
           <h1 className="text-2xl font-bold text-gray-800">Hồ sơ Thủ tục Hành chính (TTHC)</h1>
           <p className="text-sm text-gray-500">Quản lý và thẩm tra hồ sơ TTHC Đất đai & Xây dựng</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-sm"
-        >
-          + Tiếp nhận hồ sơ TTHC
-        </button>
+        {canCreate(role) && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-sm"
+          >
+            + Tiếp nhận hồ sơ TTHC
+          </button>
+        )}
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center justify-between">

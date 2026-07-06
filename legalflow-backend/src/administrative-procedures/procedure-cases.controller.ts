@@ -20,6 +20,8 @@ import { AddProcedureChecklistDto } from './dto/add-procedure-checklist.dto';
 import { UpdateProcedureChecklistDto } from './dto/update-procedure-checklist.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
+import { Roles } from '../common/roles.decorator';
+import { Role } from '../common/role.enum';
 import { ProcedureField, ProcedureStatus } from '@prisma/client';
 
 @Controller('procedure-cases')
@@ -31,11 +33,13 @@ export class ProcedureCasesController {
   ) {}
 
   @Post()
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async createCase(@Body() createDto: CreateProcedureCaseDto, @Request() req: any) {
     return this.service.createCase(createDto, req?.user?.id || req?.user?.userId);
   }
 
   @Get()
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   async getCases(
     @Query('field') field?: ProcedureField,
     @Query('procedureTypeId') procedureTypeId?: string,
@@ -48,11 +52,13 @@ export class ProcedureCasesController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   async getCaseById(@Param('id') id: string) {
     return this.service.findCaseById(id);
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async updateCase(
     @Param('id') id: string,
     @Body() updateDto: UpdateProcedureCaseDto,
@@ -62,6 +68,7 @@ export class ProcedureCasesController {
   }
 
   @Post(':id/notes')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async addNote(
     @Param('id') id: string,
     @Body() noteDto: AddProcedureNoteDto,
@@ -71,6 +78,7 @@ export class ProcedureCasesController {
   }
 
   @Post(':id/checklists')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async addChecklist(
     @Param('id') id: string,
     @Body() checklistDto: AddProcedureChecklistDto,
@@ -79,6 +87,7 @@ export class ProcedureCasesController {
   }
 
   @Patch(':id/checklists/:itemId')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async updateChecklist(
     @Param('id') caseId: string,
     @Param('itemId') itemId: string,
@@ -89,21 +98,25 @@ export class ProcedureCasesController {
   }
 
   @Post(':id/ai/land-first-certificate-review')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async runLandFirstCertificateReview(@Param('id') id: string, @Request() req: any) {
     return this.aiService.reviewLandFirstCertificate(id, req?.user?.id || req?.user?.userId);
   }
 
   @Post(':id/ai/land-use-purpose-change-review')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async runLandUsePurposeChangeReview(@Param('id') id: string, @Request() req: any) {
     return this.aiService.reviewLandUsePurposeChange(id, req?.user?.id || req?.user?.userId);
   }
 
   @Get(':id/ai-analyses')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   async getAiAnalyses(@Param('id') id: string) {
     return this.aiService.getAnalysesByCaseId(id);
   }
 
   @Get(':id/ai-analyses/:analysisId/legal-snapshot')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   async getAiAnalysisLegalSnapshot(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,
@@ -112,6 +125,7 @@ export class ProcedureCasesController {
   }
 
   @Post(':id/ai-analyses/:analysisId/accept')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async acceptAiAnalysis(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,
@@ -122,6 +136,7 @@ export class ProcedureCasesController {
   }
 
   @Post(':id/ai-analyses/:analysisId/reject')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async rejectAiAnalysis(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,
@@ -131,6 +146,7 @@ export class ProcedureCasesController {
   }
 
   @Get(':id/ai-analyses/:analysisId/export-review-docx')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async exportReviewDocx(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,
@@ -150,6 +166,7 @@ export class ProcedureCasesController {
   }
 
   @Get(':id/ai-analyses/:analysisId/review-preview-data')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   async getReviewPreviewData(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,
@@ -159,6 +176,7 @@ export class ProcedureCasesController {
   }
 
   @Get(':id/ai-analyses/:analysisId/export-purpose-change-review-docx')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async exportPurposeChangeReviewDocx(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,
@@ -178,6 +196,7 @@ export class ProcedureCasesController {
   }
 
   @Get(':id/ai-analyses/:analysisId/purpose-change-review-preview-data')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   async getPurposeChangeReviewPreviewData(
     @Param('id') caseId: string,
     @Param('analysisId') analysisId: string,

@@ -130,7 +130,7 @@ export class CasesController {
   }
 
   @Get(':id/notes/:noteId/export-docx')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   async exportDocx(
     @Param('id') id: string,
     @Param('noteId') noteId: string,

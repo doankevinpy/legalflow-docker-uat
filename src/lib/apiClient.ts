@@ -110,6 +110,14 @@ export const apiClient = {
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`${BASE_URL}${path}`, { headers });
+    if (res.status === 401) {
+      clearToken();
+      window.dispatchEvent(new CustomEvent('lf:unauthorized'));
+      throw new ApiError(401, 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+    }
+    if (res.status === 403) {
+      throw new ApiError(403, 'Bạn không có quyền thực hiện thao tác này.');
+    }
     if (!res.ok) throw new ApiError(res.status, 'Không thể tải xuống tài liệu.');
 
     const disposition = res.headers.get('Content-Disposition');

@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LegalKnowledgeController } from './legal-knowledge.controller';
 import { LegalKnowledgeService } from './legal-knowledge.service';
+import { ROLES_KEY } from '../common/roles.decorator';
+import { Role } from '../common/role.enum';
 
 describe('LegalKnowledgeController', () => {
   let controller: LegalKnowledgeController;
@@ -42,6 +44,31 @@ describe('LegalKnowledgeController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('Permission Guard Enforcement (RBAC)', () => {
+    it('should enforce ADMIN, MANAGER roles on sensitive legal update actions', () => {
+      expect(Reflect.getMetadata(ROLES_KEY, controller.analyzeImpactFromLog)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.analyzeImpactFromDocument)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.approveForVersioning)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.rejectUpdate)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.closeUpdate)).toEqual([Role.ADMIN, Role.MANAGER]);
+    });
+
+    it('should enforce ADMIN, MANAGER roles on draft version creation and lifecycle endpoints', () => {
+      expect(Reflect.getMetadata(ROLES_KEY, controller.createDraftVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.createProcedureTypeDraft)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.createPromptDraft)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.createChecklistDraft)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.runDraftSimulation)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.activateDraftVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.rollbackActivatedVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
+    });
+
+    it('should allow read-only access (VIEWER, STAFF, MANAGER, ADMIN) on verification endpoints', () => {
+      expect(Reflect.getMetadata(ROLES_KEY, controller.getActivationVerification)).toEqual([Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.getRollbackVerification)).toEqual([Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER]);
+    });
   });
 
   it('getDocuments should call service.getDocuments', async () => {
