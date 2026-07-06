@@ -20,6 +20,7 @@ import {
   Play,
   CheckCircle2,
   ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -163,9 +164,25 @@ export default function LegalKnowledgePage() {
   const [loadingVerification, setLoadingVerification] = useState<boolean>(false);
   const [verificationError, setVerificationError] = useState<string>('');
 
+  // Phase 8F-E-D-D Manual Version Rollback state
+  const [showRollbackModal, setShowRollbackModal] = useState<boolean>(false);
+  const [rollbackStep, setRollbackStep] = useState<number>(1);
+  const [rollbackReason, setRollbackReason] = useState<string>('');
+  const [rollbackConfirmationText, setRollbackConfirmationText] = useState<string>('');
+  const [rollbackSubmitting, setRollbackSubmitting] = useState<boolean>(false);
+  const [rollbackResult, setRollbackResult] = useState<any>(null);
+  const [rollbackError, setRollbackError] = useState<string>('');
+
   useEffect(() => {
     setVerificationData(null);
     setVerificationError('');
+    setShowRollbackModal(false);
+    setRollbackStep(1);
+    setRollbackReason('');
+    setRollbackConfirmationText('');
+    setRollbackSubmitting(false);
+    setRollbackResult(null);
+    setRollbackError('');
   }, [selectedLogForDetail?.id]);
 
   useEffect(() => {
@@ -389,6 +406,50 @@ export default function LegalKnowledgePage() {
     }
   };
 
+  const handleRunRollback = async () => {
+    if (!selectedLogForDetail?.id) return;
+    if (!rollbackReason.trim() || rollbackReason.trim().length < 10) {
+      setRollbackError('Vui lòng nhập lý do rollback tối thiểu 10 ký tự.');
+      return;
+    }
+    const cleanConfirm = rollbackConfirmationText.trim();
+    if (cleanConfirm !== 'ROLLBACK VERSION' && cleanConfirm !== 'TOI XAC NHAN ROLLBACK VERSION') {
+      setRollbackError('Vui lòng nhập chính xác câu xác nhận: "ROLLBACK VERSION" hoặc "TOI XAC NHAN ROLLBACK VERSION".');
+      return;
+    }
+
+    setRollbackSubmitting(true);
+    setRollbackError('');
+    setRollbackResult(null);
+
+    try {
+      const res = await legalKnowledgeApi.rollbackVersion(selectedLogForDetail.id, {
+        rollbackReason: rollbackReason.trim(),
+        confirmationText: cleanConfirm,
+      });
+      const data = res?.data?.data || res?.data || res;
+      setRollbackResult(data);
+      await fetchAllData();
+      if (data?.updateLog) {
+        setSelectedLogForDetail(data.updateLog);
+      } else if (selectedLogForDetail?.id) {
+        try {
+          const logRes: any = await legalKnowledgeApi.getUpdateLogById(selectedLogForDetail.id);
+          const updatedLog = logRes?.data?.data || logRes?.data || logRes;
+          if (updatedLog) setSelectedLogForDetail(updatedLog);
+        } catch (e) {
+          console.error('Error refreshing log detail:', e);
+        }
+      }
+    } catch (err: any) {
+      console.error('Rollback error:', err);
+      const errMsg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi thực hiện rollback version.';
+      setRollbackError(Array.isArray(errMsg) ? errMsg.join('; ') : errMsg);
+    } finally {
+      setRollbackSubmitting(false);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
@@ -548,6 +609,12 @@ export default function LegalKnowledgePage() {
       hasDrafts ||
       hasSimulations
     );
+
+  // PHASE 8F-E-D-D: Rollback button visibility conditions
+  const canShowRollbackButton =
+    isLeader &&
+    !!selectedLogForDetail &&
+    selectedLogForDetail.reviewStatus === 'APPROVED';
 
   return (
     <div className="space-y-6 pb-12">
@@ -1856,6 +1923,49 @@ export default function LegalKnowledgePage() {
                 </div>
               )}
 
+              {/* PHASE 8F-E-D-D: MANUAL VERSION ROLLBACK AREA */}
+              {canShowRollbackButton && (
+                <div className="my-3 p-4 bg-red-50/60 dark:bg-red-950/20 rounded-xl border-2 border-red-300 dark:border-red-800 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+                      <h4 className="font-bold text-sm text-red-900 dark:text-red-300">
+                        Hoàn tác version
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRollbackModal(true);
+                        setRollbackStep(1);
+                        setRollbackReason('');
+                        setRollbackConfirmationText('');
+                        setRollbackError('');
+                        setRollbackResult(null);
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-xs transition shadow-sm flex items-center gap-1.5"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Hoàn tác version
+                    </button>
+                  </div>
+                  <div className="p-2.5 bg-red-100/70 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-lg text-[11px] text-red-900 dark:text-red-200 font-medium flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                    <span>
+                      Chức năng này chỉ hoàn tác trạng thái version pháp lý. Không sửa hồ sơ TTHC, không sửa kết quả AI cũ, không sửa legal snapshot cũ.
+                    </span>
+                  </div>
+                  {(!hasActivationHistory && !hasActivationWorkflow && !verificationData) && (
+                    <div className="p-2.5 bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg text-[11px] text-amber-900 dark:text-amber-200 font-medium flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <span>
+                        Chưa xác định được đầy đủ lịch sử kích hoạt trên giao diện. Backend sẽ kiểm tra lại điều kiện rollback trước khi thực hiện.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Parse notes if JSON */}
               {(() => {
                 const parsed = parsedNotes;
@@ -2985,6 +3095,234 @@ export default function LegalKnowledgePage() {
                 {submittingAct && <span className="animate-spin">⌛</span>}
                 Tôi hiểu rủi ro và kích hoạt version
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 8F-E-D-D: MODAL 12 - MANUAL VERSION ROLLBACK (4 STEPS) */}
+      {showRollbackModal && selectedLogForDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-200 dark:border-slate-800 p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && rollbackStep < 4) {
+                e.preventDefault();
+              }
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-red-100 dark:bg-red-950/60 rounded-xl">
+                  <RotateCcw className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                    Hoàn tác version (Manual Version Rollback)
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Bước {rollbackStep}/4: {
+                      rollbackStep === 1 ? 'Xem version hiện tại' :
+                      rollbackStep === 2 ? 'Xem version dự kiến khôi phục' :
+                      rollbackStep === 3 ? 'Nhập lý do rollback' :
+                      'Xác nhận bắt buộc'
+                    }
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRollbackModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Error & Result Banners */}
+            {rollbackError && (
+              <div className="p-3 bg-red-100 border border-red-300 text-red-800 rounded-xl text-xs font-semibold">
+                ✖ {rollbackError}
+              </div>
+            )}
+
+            {rollbackResult && (
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-xl space-y-2 text-xs">
+                <div className="font-bold text-sm flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Hoàn tác version thành công!
+                </div>
+                <div className="font-semibold text-emerald-800 dark:text-emerald-200">
+                  No cases, AI analyses, or legal snapshots were modified.
+                </div>
+                {rollbackResult.affectedVersions && (
+                  <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800">
+                    <span className="font-semibold">Các phiên bản bị ảnh hưởng:</span>
+                    <pre className="mt-1 p-2 bg-white/60 dark:bg-slate-900/60 rounded border text-[11px] font-mono overflow-x-auto">
+                      {JSON.stringify(rollbackResult.affectedVersions, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 1: Xem version hiện tại */}
+            {rollbackStep === 1 && (
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-xl font-medium flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Cảnh báo nhạy cảm:</strong> Đây là thao tác hoàn tác phiên bản pháp lý đang vận hành. Vui lòng kiểm tra kỹ trạng thái phiên bản trước khi tiếp tục.
+                  </span>
+                </div>
+
+                <div className="space-y-2 bg-gray-50 dark:bg-slate-800/50 p-3.5 rounded-xl border">
+                  <div>
+                    <span className="font-semibold text-gray-500 dark:text-gray-400">Tên nhật ký cập nhật:</span>{' '}
+                    <strong className="text-gray-800 dark:text-gray-200">{selectedLogForDetail.updateTitle}</strong>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-500 dark:text-gray-400">Trạng thái log:</span>{' '}
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">{selectedLogForDetail.reviewStatus}</span>
+                  </div>
+                  {hasActivationHistory && (
+                    <div className="pt-2 border-t border-gray-200 dark:border-slate-700">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300 block mb-1">Lịch sử kích hoạt gần nhất:</span>
+                      <div className="p-2 bg-white dark:bg-slate-900 rounded border font-mono text-[11px] text-gray-600 dark:text-gray-400 overflow-x-auto">
+                        {JSON.stringify(parsedNotes?.activationHistory?.[parsedNotes.activationHistory.length - 1] || parsedNotes?.activationHistory, null, 2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Xem version dự kiến khôi phục */}
+            {rollbackStep === 2 && (
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 rounded-xl font-medium flex items-start gap-2">
+                  <span>ℹ️</span>
+                  <span>
+                    <strong>Backend sẽ kiểm tra lại điều kiện rollback trước khi thực hiện.</strong> Hệ thống sẽ xác minh tính hợp lệ và đảm bảo không có phiên bản ACTIVE trùng lặp trong cùng phạm vi.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-red-200 dark:border-red-900/50 space-y-1">
+                    <div className="font-bold text-red-600 dark:text-red-400">1. Version hiện tại (ACTIVE):</div>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Sẽ bị chuyển trạng thái từ <strong className="text-emerald-600">ACTIVE</strong> sang <strong className="text-amber-600">REPLACED</strong> (đồng thời chấm dứt hiệu lực).
+                    </p>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900/50 space-y-1">
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400">2. Version trước đó (REPLACED):</div>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Sẽ được khôi phục trạng thái từ <strong className="text-amber-600">REPLACED</strong> sang <strong className="text-emerald-600">ACTIVE</strong> (đồng thời mở lại hiệu lực).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Nhập lý do rollback */}
+            {rollbackStep === 3 && (
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    Lý do rollback (Bắt buộc, tối thiểu 10 ký tự):
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={rollbackReason}
+                    onChange={(e) => setRollbackReason(e.target.value)}
+                    placeholder="Nhập lý do nghiệp vụ hoặc chỉ đạo yêu cầu hoàn tác về phiên bản trước..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border bg-gray-50 dark:bg-slate-800 text-xs font-medium focus:ring-2 focus:ring-red-500 outline-none transition"
+                  />
+                  <div className="mt-1 flex justify-between text-[11px] text-gray-500">
+                    <span>Vui lòng ghi rõ nguyên nhân để lưu vết kiểm toán (Audit Trail).</span>
+                    <span className={rollbackReason.trim().length < 10 ? 'text-red-500 font-bold' : 'text-emerald-600 font-bold'}>
+                      {rollbackReason.trim().length}/10 ký tự
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Xác nhận bắt buộc */}
+            {rollbackStep === 4 && (
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-red-100 dark:bg-red-950/80 border-2 border-red-400 dark:border-red-700 text-red-950 dark:text-red-100 rounded-xl text-xs font-bold leading-relaxed shadow-md">
+                  <span className="text-sm block mb-1 text-red-700 dark:text-red-300 uppercase">⚠️ CẢNH BÁO TÁC ĐỘNG PHÁP LÝ NGHIÊM TRỌNG:</span>
+                  Rollback có thể thay đổi version pháp lý ACTIVE đang được hệ thống sử dụng cho các phân tích mới. Thao tác này không sửa hồ sơ cũ và không sửa legal snapshot cũ.
+                </div>
+
+                {!rollbackResult && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                      Nhập chính xác chuỗi <code className="bg-red-100 dark:bg-red-950/60 px-1.5 py-0.5 rounded text-red-600 font-mono font-bold">ROLLBACK VERSION</code> hoặc <code className="bg-red-100 dark:bg-red-950/60 px-1.5 py-0.5 rounded text-red-600 font-mono font-bold">TOI XAC NHAN ROLLBACK VERSION</code> để xác nhận:
+                    </label>
+                    <input
+                      type="text"
+                      value={rollbackConfirmationText}
+                      onChange={(e) => setRollbackConfirmationText(e.target.value)}
+                      placeholder="ROLLBACK VERSION"
+                      disabled={rollbackSubmitting}
+                      className="w-full px-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-900 text-xs font-mono font-bold focus:ring-2 focus:ring-red-500 outline-none transition uppercase"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Footer Navigation */}
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowRollbackModal(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition"
+              >
+                {rollbackResult ? 'Đóng' : 'Hủy bỏ'}
+              </button>
+
+              <div className="flex items-center gap-2">
+                {rollbackStep > 1 && !rollbackResult && (
+                  <button
+                    type="button"
+                    disabled={rollbackSubmitting}
+                    onClick={() => setRollbackStep(prev => prev - 1)}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold transition disabled:opacity-50"
+                  >
+                    Quay lại
+                  </button>
+                )}
+
+                {rollbackStep < 4 && (
+                  <button
+                    type="button"
+                    disabled={rollbackStep === 3 && rollbackReason.trim().length < 10}
+                    onClick={() => setRollbackStep(prev => prev + 1)}
+                    className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Tiếp tục (Bước {rollbackStep + 1}/4)
+                  </button>
+                )}
+
+                {rollbackStep === 4 && !rollbackResult && (
+                  <button
+                    type="button"
+                    disabled={
+                      rollbackSubmitting ||
+                      rollbackReason.trim().length < 10 ||
+                      (rollbackConfirmationText.trim() !== 'ROLLBACK VERSION' && rollbackConfirmationText.trim() !== 'TOI XAC NHAN ROLLBACK VERSION')
+                    }
+                    onClick={handleRunRollback}
+                    className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {rollbackSubmitting && <span className="animate-spin">⌛</span>}
+                    Xác nhận rollback version
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
