@@ -56,7 +56,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     clearToken();
     // Dispatch custom event để AuthContext lắng nghe và redirect
     window.dispatchEvent(new CustomEvent('lf:unauthorized'));
-    throw new ApiError(401, 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+    throw new ApiError(401, 'Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại.');
   }
 
   // 403 → ném lỗi để component hiển thị thông báo
@@ -113,7 +113,7 @@ export const apiClient = {
     if (res.status === 401) {
       clearToken();
       window.dispatchEvent(new CustomEvent('lf:unauthorized'));
-      throw new ApiError(401, 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      throw new ApiError(401, 'Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại.');
     }
     if (res.status === 403) {
       throw new ApiError(403, 'Bạn không có quyền thực hiện thao tác này.');
@@ -130,3 +130,26 @@ export const apiClient = {
     return { blob, filename };
   },
 };
+
+export function getApiErrorMessage(error: any): string {
+  const status = error?.status ?? error?.response?.status;
+  const backendMessage =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message;
+
+  if (status === 401) return 'Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại.';
+  if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+  if (status === 404) return 'Không tìm thấy dữ liệu yêu cầu.';
+  if (status === 409) return 'Dữ liệu đang xung đột trạng thái. Vui lòng tải lại và kiểm tra trước khi thao tác tiếp.';
+  if (status === 422) return backendMessage || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+  if (status >= 500) return 'Hệ thống gặp lỗi khi xử lý yêu cầu. Vui lòng thử lại hoặc liên hệ quản trị.';
+  if (status === 204 || error?.code === 'EMPTY_RESPONSE' || backendMessage?.includes('API không trả dữ liệu')) {
+    return 'API không trả dữ liệu. Vui lòng kiểm tra endpoint hoặc thử lại.';
+  }
+  if (status === 0 || backendMessage?.includes('network') || backendMessage?.includes('kết nối') || backendMessage?.includes('Failed to fetch') || backendMessage?.includes('Network Error') || backendMessage?.includes('Lỗi kết nối')) {
+    return 'Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối hoặc khởi động lại hệ thống.';
+  }
+  return backendMessage || 'Không thể thực hiện yêu cầu. Vui lòng thử lại.';
+}
+

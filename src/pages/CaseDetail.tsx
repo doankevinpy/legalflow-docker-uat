@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { getDeadlineStatus } from '../utils/deadline';
 import { casesApi } from '../lib/casesApi';
-import { ApiError } from '../lib/apiClient';
+import { ApiError, getApiErrorMessage } from '../lib/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { canDelete, canEdit } from '../lib/rbac';
 import {
@@ -86,8 +86,8 @@ export default function CaseDetail() {
         legalRationale: clsRes.legalRationale,
         isApplied: false,
       });
-    } catch (err) {
-      alert('Không thể phân tích AI cho hồ sơ này.');
+    } catch (err: any) {
+      alert(getApiErrorMessage(err));
     } finally {
       setIsAnalyzingAi(false);
     }
@@ -745,6 +745,51 @@ export default function CaseDetail() {
                           <><Sparkles className="mr-2 h-4 w-4" /> ✨ AI Phân tích Lại</>
                         )}
                       </Button>
+                    )}
+                  </div>
+
+                  {/* Always-visible Legal Snapshot Section (Phase 9B-E) */}
+                  <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
+                      <h5 className="font-bold text-amber-900 text-sm flex items-center gap-2">
+                        <span className="text-lg">🏛️</span> Căn cứ pháp lý đã sử dụng
+                      </h5>
+                    </div>
+
+                    {!aiSuggestion ? (
+                      <div className="bg-white p-4 rounded-xl border border-amber-100 text-gray-600 text-xs flex items-center gap-2.5 shadow-2xs">
+                        <span className="text-base">ℹ️</span>
+                        <span>Chưa có kết quả AI để xác định legal snapshot. Sau khi chạy AI review, hệ thống sẽ hiển thị căn cứ pháp lý đã sử dụng nếu có.</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xs">
+                          <span className="text-base">⚠️</span>
+                          <span>Chưa tìm thấy legal snapshot gắn với kết quả AI này. Cán bộ cần kiểm tra căn cứ pháp lý thủ công.</span>
+                        </div>
+
+                        {aiSuggestion.legalRationale && (
+                          <div className="bg-amber-100/60 border border-amber-300 p-3.5 rounded-xl text-xs space-y-2.5 text-amber-950">
+                            <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                              <span>⚠️</span> Căn cứ gợi ý từ metadata AI, chưa xác nhận là legal snapshot đã lưu.
+                            </div>
+                            <div className="p-2.5 bg-white/80 rounded-lg border border-amber-200 text-gray-700">
+                              <span className="font-semibold block mb-1">Căn cứ gợi ý:</span>
+                              <p className="italic">{aiSuggestion.legalRationale}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="bg-amber-100/60 border border-amber-300/80 p-3 rounded-xl text-amber-900 flex items-start gap-2.5">
+                          <span className="text-base leading-none mt-0.5">⚠️</span>
+                          <div className="space-y-0.5">
+                            <span className="font-bold block">BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA</span>
+                            <p className="text-amber-950 italic">
+                              Căn cứ pháp lý hiển thị là phiên bản dữ liệu hệ thống ghi nhận tại thời điểm AI rà soát; cán bộ phải kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ địa phương tại thời điểm xử lý hồ sơ.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 

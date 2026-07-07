@@ -1386,6 +1386,14 @@ export class LegalKnowledgeService {
         activatedById: user.id || 'SYSTEM',
         activatedByEmail: user.email || '',
         activatedByRole: user.role || '',
+        affectedVersions: [
+          {
+            type: draftType,
+            oldVersionId: oldActiveVersionId || null,
+            newVersionId: newActiveVersionId,
+          },
+        ],
+        safetyStatement: 'Kích hoạt phiên bản mới không làm thay đổi hoặc xóa bỏ dữ liệu legal snapshot của các hồ sơ rà soát trước đó.',
         createdAt: new Date().toISOString(),
       };
       parsedNotes.activationHistory.unshift(activationRecord);
