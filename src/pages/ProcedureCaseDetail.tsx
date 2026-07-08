@@ -553,12 +553,11 @@ export default function ProcedureCaseDetail() {
                 </div>
 
                 {/* Always-visible Export Safety Section (Phase 9B-F) */}
-                <div className="border border-indigo-200 bg-indigo-50/40 rounded-2xl p-5 space-y-4 shadow-sm" data-marker="LF-EXPORT-SAFETY-SECTION-20260705">
+                <div className="border border-indigo-200 bg-indigo-50/40 rounded-2xl p-5 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3">
                     <h5 className="font-bold text-indigo-950 text-sm flex items-center gap-2">
                       <span className="text-lg">🖨️</span> Dự thảo / In / Xuất văn bản
                     </h5>
-                    <span className="text-[10px] font-mono text-indigo-700/60 select-all">LF-EXPORT-SAFETY-SECTION-20260705</span>
                   </div>
 
                   {/* Mandatory AI Safety Warnings */}
