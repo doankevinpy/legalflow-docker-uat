@@ -4,6 +4,7 @@ import { procedureCasesApi } from '../lib/procedureCasesApi';
 import type { ProcedureCase, ProcedureType, ProcedureField, ProcedureStatus } from '../types/procedure';
 import { useAuth } from '../contexts/AuthContext';
 import { canCreate } from '../lib/rbac';
+import { getApiErrorMessage } from '../lib/apiClient';
 
 export default function ProcedureCaseList() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function ProcedureCaseList() {
   const [cases, setCases] = useState<ProcedureCase[]>([]);
   const [types, setTypes] = useState<ProcedureType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [fieldFilter, setFieldFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [keyword, setKeyword] = useState<string>('');
@@ -32,6 +34,7 @@ export default function ProcedureCaseList() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [typesRes, casesRes] = await Promise.all([
         procedureCasesApi.getProcedureTypes(),
@@ -43,8 +46,9 @@ export default function ProcedureCaseList() {
       ]);
       setTypes(typesRes);
       setCases(casesRes.data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching procedure cases:', err);
+      setError(getApiErrorMessage(err) || 'Không thể tải danh sách hồ sơ thủ tục hành chính.');
     } finally {
       setLoading(false);
     }
@@ -195,6 +199,18 @@ export default function ProcedureCaseList() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Đang tải danh sách hồ sơ...</div>
+        ) : error ? (
+          <div className="p-8 text-center space-y-4">
+            <div className="text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200 max-w-md mx-auto">
+              {error}
+            </div>
+            <button
+              onClick={fetchData}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+            >
+              Thử lại
+            </button>
+          </div>
         ) : cases.length === 0 ? (
           <div className="p-12 text-center text-gray-500">Chưa có hồ sơ thủ tục hành chính nào phù hợp.</div>
         ) : (

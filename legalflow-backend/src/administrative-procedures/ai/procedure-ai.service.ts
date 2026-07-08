@@ -735,7 +735,7 @@ export class ProcedureAiService {
     const doc = buildLandFirstCertReviewDocx(analysis.procedureCase, analysis, getAgencyConfig());
     const buffer = await Packer.toBuffer(doc);
 
-    const filename = `phieu-ra-soat-cap-gcn-lan-dau-${analysis.procedureCase.caseCode || caseId}.docx`;
+    const filename = `DU_THAO_GOI_Y_AI_phieu-ra-soat-cap-gcn-lan-dau-${analysis.procedureCase.caseCode || caseId}.docx`;
 
     await this.prisma.procedureAuditLog.create({
       data: {
@@ -872,7 +872,7 @@ export class ProcedureAiService {
     const doc = buildLandUsePurposeChangeReviewDocx(analysis.procedureCase, analysis, getAgencyConfig());
     const buffer = await Packer.toBuffer(doc);
 
-    const filename = `phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${analysis.procedureCase.caseCode || caseId}.docx`;
+    const filename = `DU_THAO_GOI_Y_AI_phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${analysis.procedureCase.caseCode || caseId}.docx`;
 
     await this.prisma.procedureAuditLog.create({
       data: {

@@ -19,6 +19,7 @@ export default function ProcedureCaseDetail() {
 
   const [data, setData] = useState<ProcedureCase | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     'overview' | 'documents' | 'ai_review' | 'checklist' | 'financial' | 'notes' | 'audit_log'
   >('overview');
@@ -46,6 +47,7 @@ export default function ProcedureCaseDetail() {
   const fetchDetail = async () => {
     if (!caseId) return;
     setLoading(true);
+    setError(null);
     setSnapshotError(null);
     try {
       const res = await procedureCasesApi.getCase(caseId);
@@ -57,8 +59,9 @@ export default function ProcedureCaseDetail() {
         console.error('Error fetching AI analyses:', aiErr);
         setSnapshotError(getApiErrorMessage(aiErr));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching procedure case detail:', err);
+      setError(getApiErrorMessage(err) || 'Không thể tải chi tiết hồ sơ thủ tục hành chính.');
     } finally {
       setLoading(false);
     }
@@ -116,7 +119,10 @@ export default function ProcedureCaseDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', filename || `DU_THAO_GOI_Y_AI_phieu-ra-soat-cap-gcn-lan-dau-${data.caseCode || data.id}.docx`);
+      const downloadName = (filename && filename.startsWith('DU_THAO_GOI_Y_AI_'))
+        ? filename
+        : (filename ? 'DU_THAO_GOI_Y_AI_' + filename : `DU_THAO_GOI_Y_AI_phieu-ra-soat-cap-gcn-lan-dau-${data.caseCode || data.id}.docx`);
+      link.setAttribute('download', downloadName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
@@ -152,7 +158,10 @@ export default function ProcedureCaseDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', filename || `DU_THAO_GOI_Y_AI_phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${data.caseCode || data.id}.docx`);
+      const downloadName = (filename && filename.startsWith('DU_THAO_GOI_Y_AI_'))
+        ? filename
+        : (filename ? 'DU_THAO_GOI_Y_AI_' + filename : `DU_THAO_GOI_Y_AI_phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${data.caseCode || data.id}.docx`);
+      link.setAttribute('download', downloadName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
@@ -222,11 +231,18 @@ export default function ProcedureCaseDetail() {
 
   if (!data) {
     return (
-      <div className="p-8 text-center space-y-4">
-        <div className="text-red-500 font-medium">Không tìm thấy thông tin hồ sơ thủ tục hành chính.</div>
-        <button onClick={() => navigate('/procedure-cases')} className="px-4 py-2 bg-gray-200 rounded-lg text-sm font-medium">
-          &larr; Quay lại danh sách
-        </button>
+      <div className="p-8 text-center space-y-4 max-w-md mx-auto">
+        <div className="text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200">
+          {error || 'Không tìm thấy thông tin hồ sơ thủ tục hành chính.'}
+        </div>
+        <div className="flex justify-center gap-3">
+          <button onClick={fetchDetail} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+            Thử lại
+          </button>
+          <button onClick={() => navigate('/procedure-cases')} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">
+            &larr; Quay lại danh sách
+          </button>
+        </div>
       </div>
     );
   }
