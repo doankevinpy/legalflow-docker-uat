@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { procedureCasesApi } from '../lib/procedureCasesApi';
 import type { ProcedureCase, ProcedureChecklistItem, ProcedureAiAnalysis } from '../types/procedure';
-import { ApiError, getApiErrorMessage } from '../lib/apiClient';
+import { getApiErrorMessage } from '../lib/apiClient';
 import { Printer, Download } from 'lucide-react';
 import { AI_REVIEW_WARNING } from '../lib/constants';
 import { ProcedureReviewPrintModal } from '../components/ProcedureReviewPrintModal';
@@ -116,14 +116,14 @@ export default function ProcedureCaseDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', filename || `phieu-ra-soat-cap-gcn-lan-dau-${data.caseCode || data.id}.docx`);
+      link.setAttribute('download', filename || `DU_THAO_GOI_Y_AI_phieu-ra-soat-cap-gcn-lan-dau-${data.caseCode || data.id}.docx`);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
       alert('Đã xuất Word (.docx) phiếu rà soát thành công!');
     } catch (err: any) {
-      alert(err instanceof ApiError ? err.message : 'Không thể xuất file Word phiếu rà soát');
+      alert(getApiErrorMessage(err) || 'Không thể xuất file Word phiếu rà soát');
     } finally {
       setExportingAnalysisId(null);
     }
@@ -138,7 +138,7 @@ export default function ProcedureCaseDetail() {
       setReviewPreviewData(resData);
       setReviewPreviewModalOpen(true);
     } catch (err: any) {
-      alert(err instanceof ApiError ? err.message : 'Không thể xem trước phiếu rà soát PDF');
+      alert(getApiErrorMessage(err) || 'Không thể xem trước phiếu rà soát PDF');
     } finally {
       setPreviewingAnalysisId(null);
     }
@@ -152,14 +152,14 @@ export default function ProcedureCaseDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', filename || `phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${data.caseCode || data.id}.docx`);
+      link.setAttribute('download', filename || `DU_THAO_GOI_Y_AI_phieu-ra-soat-chuyen-muc-dich-su-dung-dat-${data.caseCode || data.id}.docx`);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
       alert('Đã xuất Word (.docx) phiếu rà soát chuyển mục đích sử dụng đất thành công!');
     } catch (err: any) {
-      alert(err instanceof ApiError ? err.message : 'Không thể xuất file Word phiếu rà soát');
+      alert(getApiErrorMessage(err) || 'Không thể xuất file Word phiếu rà soát');
     } finally {
       setExportingAnalysisId(null);
     }
@@ -174,7 +174,7 @@ export default function ProcedureCaseDetail() {
       setReviewPreviewData(resData);
       setPurposeChangeReviewModalOpen(true);
     } catch (err: any) {
-      alert(err instanceof ApiError ? err.message : 'Không thể xem trước phiếu rà soát PDF');
+      alert(getApiErrorMessage(err) || 'Không thể xem trước phiếu rà soát PDF');
     } finally {
       setPreviewingAnalysisId(null);
     }
@@ -552,6 +552,123 @@ export default function ProcedureCaseDetail() {
                   })()}
                 </div>
 
+                {/* Always-visible Export Safety Section (Phase 9B-F) */}
+                <div className="border border-indigo-200 bg-indigo-50/40 rounded-2xl p-5 space-y-4 shadow-sm" data-marker="LF-EXPORT-SAFETY-SECTION-20260705">
+                  <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3">
+                    <h5 className="font-bold text-indigo-950 text-sm flex items-center gap-2">
+                      <span className="text-lg">🖨️</span> Dự thảo / In / Xuất văn bản
+                    </h5>
+                    <span className="text-[10px] font-mono text-indigo-700/60 select-all">LF-EXPORT-SAFETY-SECTION-20260705</span>
+                  </div>
+
+                  {/* Mandatory AI Safety Warnings */}
+                  <div className="bg-amber-100/60 border border-amber-300/80 p-3.5 rounded-xl text-amber-900 space-y-1.5 shadow-2xs">
+                    <div className="font-bold text-xs flex items-center gap-1.5 text-amber-950">
+                      <span>⚠️</span> BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA
+                    </div>
+                    <p className="text-xs text-amber-950 leading-relaxed italic">
+                      Văn bản này là bản dự thảo/gợi ý do hệ thống hỗ trợ tạo. Cán bộ có thẩm quyền phải kiểm tra, chỉnh sửa, ký số/ký tay và ban hành theo đúng quy định trước khi sử dụng chính thức.
+                    </p>
+                  </div>
+
+                  {/* Conditional Content based on Permission and AI Results */}
+                  {!canAct ? (
+                    <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xs">
+                      <span className="text-base">🚫</span>
+                      <span>Bạn không có quyền preview/in/xuất văn bản này. Vui lòng liên hệ lãnh đạo hoặc quản trị hệ thống.</span>
+                    </div>
+                  ) : aiAnalyses.length === 0 ? (
+                    <div className="bg-white p-4 rounded-xl border border-indigo-100 text-gray-600 text-xs flex items-center gap-2.5 shadow-2xs">
+                      <span className="text-base">ℹ️</span>
+                      <span>Chưa có kết quả AI để tạo bản dự thảo/in/xuất văn bản. Vui lòng chạy AI review trước.</span>
+                    </div>
+                  ) : (
+                    <div className="bg-white p-4 rounded-xl border border-indigo-100 space-y-3 shadow-2xs">
+                      <div className="text-xs text-slate-600 font-medium">
+                        Chọn hành động cho bản rà soát mới nhất (<span className="font-semibold text-slate-800">#{aiAnalyses[0].id.slice(0, 8)}</span>):
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {aiAnalyses[0].analysisType === 'LAND_FIRST_CERTIFICATE_REVIEW' ? (
+                          <>
+                            <button
+                              onClick={() => handlePreviewReviewPdf(aiAnalyses[0].id)}
+                              disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5" />
+                              {previewingAnalysisId === aiAnalyses[0].id ? 'Đang mở...' : 'Xem bản dự thảo'}
+                            </button>
+                            <button
+                              onClick={() => handlePreviewReviewPdf(aiAnalyses[0].id)}
+                              disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-semibold hover:bg-indigo-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5" />
+                              {previewingAnalysisId === aiAnalyses[0].id ? 'Đang mở...' : 'In bản gợi ý AI'}
+                            </button>
+                            <button
+                              onClick={() => handleExportReviewDocx(aiAnalyses[0].id)}
+                              disabled={exportingAnalysisId === aiAnalyses[0].id || previewingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                              {exportingAnalysisId === aiAnalyses[0].id ? 'Đang tải...' : 'Xuất Word'}
+                            </button>
+                            <button
+                              onClick={() => handlePreviewReviewPdf(aiAnalyses[0].id)}
+                              disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5 text-red-600" />
+                              {previewingAnalysisId === aiAnalyses[0].id ? 'Đang mở...' : 'Xuất PDF'}
+                            </button>
+                          </>
+                        ) : aiAnalyses[0].analysisType === 'LAND_USE_PURPOSE_CHANGE_REVIEW' ? (
+                          <>
+                            <button
+                              onClick={() => handlePreviewPurposeChangeReviewPdf(aiAnalyses[0].id)}
+                              disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5" />
+                              {previewingAnalysisId === aiAnalyses[0].id ? 'Đang mở...' : 'Xem bản dự thảo'}
+                            </button>
+                            <button
+                              onClick={() => handlePreviewPurposeChangeReviewPdf(aiAnalyses[0].id)}
+                              disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-semibold hover:bg-indigo-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5" />
+                              {previewingAnalysisId === aiAnalyses[0].id ? 'Đang mở...' : 'In bản gợi ý AI'}
+                            </button>
+                            <button
+                              onClick={() => handleExportPurposeChangeReviewDocx(aiAnalyses[0].id)}
+                              disabled={exportingAnalysisId === aiAnalyses[0].id || previewingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                              {exportingAnalysisId === aiAnalyses[0].id ? 'Đang tải...' : 'Xuất Word'}
+                            </button>
+                            <button
+                              onClick={() => handlePreviewPurposeChangeReviewPdf(aiAnalyses[0].id)}
+                              disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1.5 text-red-600" />
+                              {previewingAnalysisId === aiAnalyses[0].id ? 'Đang mở...' : 'Xuất PDF'}
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-xs text-slate-500 italic flex items-center gap-1.5">
+                            <span>ℹ️</span>
+                            <span>Loại phân tích này hiện hỗ trợ Xem bản dự thảo và Xuất Word trong các tính năng chuyên sâu.</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {aiAnalyses.length === 0 && !runningAi && (
                   <div className="p-12 text-center bg-gray-50 rounded-xl border border-dashed space-y-2">
                     <div className="text-3xl text-gray-400">📄</div>
@@ -845,7 +962,7 @@ export default function ProcedureCaseDetail() {
                             <div className="flex flex-wrap items-center gap-2">
                               <button
                                 onClick={() => handleExportReviewDocx(analysis.id)}
-                                disabled={exportingAnalysisId === analysis.id}
+                                disabled={exportingAnalysisId === analysis.id || previewingAnalysisId === analysis.id}
                                 className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                               >
                                 <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
@@ -853,7 +970,7 @@ export default function ProcedureCaseDetail() {
                               </button>
                               <button
                                 onClick={() => handlePreviewReviewPdf(analysis.id)}
-                                disabled={previewingAnalysisId === analysis.id}
+                                disabled={previewingAnalysisId === analysis.id || exportingAnalysisId === analysis.id}
                                 className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
                               >
                                 <Printer className="w-3.5 h-3.5 mr-1.5" />
@@ -864,7 +981,7 @@ export default function ProcedureCaseDetail() {
                             <div className="flex flex-wrap items-center gap-2">
                               <button
                                 onClick={() => handleExportPurposeChangeReviewDocx(analysis.id)}
-                                disabled={exportingAnalysisId === analysis.id}
+                                disabled={exportingAnalysisId === analysis.id || previewingAnalysisId === analysis.id}
                                 className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                               >
                                 <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
@@ -872,7 +989,7 @@ export default function ProcedureCaseDetail() {
                               </button>
                               <button
                                 onClick={() => handlePreviewPurposeChangeReviewPdf(analysis.id)}
-                                disabled={previewingAnalysisId === analysis.id}
+                                disabled={previewingAnalysisId === analysis.id || exportingAnalysisId === analysis.id}
                                 className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
                               >
                                 <Printer className="w-3.5 h-3.5 mr-1.5" />
