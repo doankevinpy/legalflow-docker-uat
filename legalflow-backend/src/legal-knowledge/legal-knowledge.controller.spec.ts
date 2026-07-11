@@ -25,6 +25,7 @@ describe('LegalKnowledgeController', () => {
     getActivationVerification: jest.fn(),
     rollbackActivatedVersion: jest.fn(),
     getRollbackVerification: jest.fn(),
+    validateCsvImport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -63,6 +64,7 @@ describe('LegalKnowledgeController', () => {
       expect(Reflect.getMetadata(ROLES_KEY, controller.runDraftSimulation)).toEqual([Role.ADMIN, Role.MANAGER]);
       expect(Reflect.getMetadata(ROLES_KEY, controller.activateDraftVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
       expect(Reflect.getMetadata(ROLES_KEY, controller.rollbackActivatedVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.validateCsvImport)).toEqual([Role.ADMIN, Role.MANAGER]);
     });
 
     it('should allow read-only access (VIEWER, STAFF, MANAGER, ADMIN) on verification endpoints', () => {
@@ -315,6 +317,16 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.getRollbackVerification('1', { user: { id: 'u1' } });
     expect(result).toEqual(mockResult);
     expect(mockService.getRollbackVerification).toHaveBeenCalledWith('1', { id: 'u1' });
+  });
+
+  it('validateCsvImport should call service.validateCsvImport with dryRun true', async () => {
+    const mockReport = { dryRun: true, noDatabaseWrite: true, summary: { totalRecords: 1 } };
+    mockService.validateCsvImport.mockResolvedValue(mockReport);
+
+    const body = { csvText: 'header\nrow', dryRun: true };
+    const result = await controller.validateCsvImport(body);
+    expect(result).toEqual(mockReport);
+    expect(mockService.validateCsvImport).toHaveBeenCalledWith(body.csvText, true);
   });
 });
 

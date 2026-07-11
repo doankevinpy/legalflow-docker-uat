@@ -11,6 +11,12 @@ import { Role } from '../common/role.enum';
 export class LegalKnowledgeController {
   constructor(private readonly service: LegalKnowledgeService) {}
 
+  @Post('import/validate')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  validateCsvImport(@Body() body: { csvText?: string; dryRun?: boolean }) {
+    return this.service.validateCsvImport(body?.csvText, body?.dryRun !== false);
+  }
+
   @Get('documents')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF, Role.VIEWER)
   getDocuments() {

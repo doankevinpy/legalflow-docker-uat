@@ -2102,5 +2102,301 @@ export class LegalKnowledgeService {
       safetyStatement: 'Read-only verification only. No cases, AI analyses, legal snapshots, or version statuses were modified.',
     };
   }
+
+  private parseCsvLines(csvText: string): string[][] {
+    const lines: string[][] = [];
+    let currentRecord: string[] = [];
+    let currentField = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < csvText.length; i++) {
+      const char = csvText[i];
+      const nextChar = csvText[i + 1];
+
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          currentField += '"';
+          i++;
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          currentField += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          currentRecord.push(currentField);
+          currentField = '';
+        } else if (char === '\r' && nextChar === '\n') {
+          currentRecord.push(currentField);
+          currentField = '';
+          if (currentRecord.length > 1 || currentRecord[0] !== '') {
+            lines.push(currentRecord);
+          }
+          currentRecord = [];
+          i++;
+        } else if (char === '\n' || char === '\r') {
+          currentRecord.push(currentField);
+          currentField = '';
+          if (currentRecord.length > 1 || currentRecord[0] !== '') {
+            lines.push(currentRecord);
+          }
+          currentRecord = [];
+        } else {
+          currentField += char;
+        }
+      }
+    }
+
+    if (currentField !== '' || currentRecord.length > 0) {
+      currentRecord.push(currentField);
+      if (currentRecord.length > 1 || currentRecord[0] !== '') {
+        lines.push(currentRecord);
+      }
+    }
+
+    return lines;
+  }
+
+  async validateCsvImport(csvText?: string, dryRun: boolean = true) {
+    if (!csvText || typeof csvText !== 'string' || csvText.trim() === '') {
+      return {
+        dryRun: true,
+        noDatabaseWrite: true,
+        summary: {
+          totalRecords: 0,
+          validRecords: 0,
+          warningRecords: 0,
+          rejectedRecords: 0,
+          duplicateRecords: 0,
+        },
+        records: [],
+        errors: ['CSV text is missing or empty'],
+        warnings: [
+          'Validation only. No database write performed.',
+          'Import does not mean active version.',
+          'AI does not automatically determine if legal documents are the latest or complete. Human officers must verify legal grounds.',
+        ],
+      };
+    }
+
+    const lines = this.parseCsvLines(csvText);
+    if (lines.length === 0) {
+      return {
+        dryRun: true,
+        noDatabaseWrite: true,
+        summary: {
+          totalRecords: 0,
+          validRecords: 0,
+          warningRecords: 0,
+          rejectedRecords: 0,
+          duplicateRecords: 0,
+        },
+        records: [],
+        errors: ['CSV file contains no valid lines'],
+        warnings: [
+          'Validation only. No database write performed.',
+          'Import does not mean active version.',
+          'AI does not automatically determine if legal documents are the latest or complete. Human officers must verify legal grounds.',
+        ],
+      };
+    }
+
+    const headerRow = lines[0].map(h => h.trim().toLowerCase());
+    const requiredHeaders = [
+      'source_id',
+      'document_title',
+      'document_number',
+      'issuing_authority',
+      'document_type',
+      'issue_date',
+      'effective_date',
+      'legal_status',
+      'local_scope',
+      'legal_topic',
+      'summary',
+      'reviewer',
+      'approval_status',
+      'risk_note',
+    ];
+
+    const missingHeaders = requiredHeaders.filter(h => !headerRow.includes(h));
+    const hasSourceUrl = headerRow.includes('source_url') || headerRow.includes('full_text_location');
+    if (!hasSourceUrl) {
+      missingHeaders.push('source_url/full_text_location');
+    }
+
+    if (missingHeaders.length > 0) {
+      return {
+        dryRun: true,
+        noDatabaseWrite: true,
+        summary: {
+          totalRecords: Math.max(0, lines.length - 1),
+          validRecords: 0,
+          warningRecords: 0,
+          rejectedRecords: Math.max(0, lines.length - 1),
+          duplicateRecords: 0,
+        },
+        records: [],
+        errors: [`Missing required CSV header columns: ${missingHeaders.join(', ')}`],
+        warnings: [
+          'Validation only. No database write performed.',
+          'Import does not mean active version.',
+          'AI does not automatically determine if legal documents are the latest or complete. Human officers must verify legal grounds.',
+        ],
+      };
+    }
+
+    const dataRows = lines.slice(1);
+    const reportRecords: any[] = [];
+    const seenSourceIds = new Set<string>();
+    let validRecordsCount = 0;
+    let warningRecordsCount = 0;
+    let rejectedRecordsCount = 0;
+    let duplicateRecordsCount = 0;
+
+    for (let idx = 0; idx < dataRows.length; idx++) {
+      const rowNum = idx + 2;
+      const rowData = dataRows[idx];
+      const rowObj: Record<string, string> = {};
+
+      for (let c = 0; c < headerRow.length; c++) {
+        const colName = headerRow[c];
+        rowObj[colName] = (rowData[c] || '').trim();
+      }
+
+      const rowErrors: string[] = [];
+      const rowWarnings: string[] = [];
+
+      const sourceId = rowObj['source_id'] || '';
+      const documentTitle = rowObj['document_title'] || '';
+      const documentNumber = rowObj['document_number'] || '';
+      const issuingAuthority = rowObj['issuing_authority'] || '';
+      const documentType = rowObj['document_type'] || '';
+      const issueDate = rowObj['issue_date'] || '';
+      const effectiveDate = rowObj['effective_date'] || '';
+      const legalStatus = rowObj['legal_status'] || '';
+      const localScope = rowObj['local_scope'] || '';
+      const legalTopic = rowObj['legal_topic'] || '';
+      const summary = rowObj['summary'] || '';
+      const reviewer = rowObj['reviewer'] || '';
+      const approvalStatus = rowObj['approval_status'] || '';
+      const riskNote = rowObj['risk_note'] || '';
+      const sourceUrl = rowObj['source_url'] || rowObj['full_text_location'] || '';
+      const activeCandidate = rowObj['active_candidate'] || '';
+
+      if (!sourceId) rowErrors.push('VAL-01: Missing mandatory field "source_id"');
+      if (!documentTitle) rowErrors.push('VAL-01: Missing mandatory field "document_title"');
+      if (!documentNumber) rowErrors.push('VAL-01: Missing mandatory field "document_number"');
+      if (!issuingAuthority) rowErrors.push('VAL-01: Missing mandatory field "issuing_authority"');
+      if (!documentType) rowErrors.push('VAL-01: Missing mandatory field "document_type"');
+      if (!effectiveDate) {
+        rowErrors.push('VAL-01: Missing mandatory field "effective_date"');
+      } else if (isNaN(Date.parse(effectiveDate))) {
+        rowErrors.push(`VAL-02: Invalid ISO date format for effective_date "${effectiveDate}"`);
+      }
+      if (issueDate && isNaN(Date.parse(issueDate))) {
+        rowErrors.push(`VAL-02: Invalid ISO date format for issue_date "${issueDate}"`);
+      }
+      if (!legalStatus) rowErrors.push('VAL-01: Missing mandatory field "legal_status"');
+      if (!legalTopic) rowErrors.push('VAL-01: Missing mandatory field "legal_topic"');
+      if (!summary) rowErrors.push('VAL-01: Missing mandatory field "summary"');
+      if (!sourceUrl) rowErrors.push('VAL-14: Missing both source_url and full_text_location');
+      if (!reviewer) rowErrors.push('VAL-01: Missing mandatory field "reviewer"');
+      if (!approvalStatus) rowErrors.push('VAL-01: Missing mandatory field "approval_status"');
+      if (!riskNote) rowErrors.push('VAL-10: Missing mandatory risk_note');
+
+      if (sourceId) {
+        if (seenSourceIds.has(sourceId)) {
+          rowErrors.push(`VAL-05: Duplicate source_id "${sourceId}" within CSV file`);
+        } else {
+          seenSourceIds.add(sourceId);
+          const dbDupe = await this.prisma.legalDocument.findFirst({
+            where: { documentCode: sourceId },
+            select: { id: true, documentCode: true },
+          });
+          if (dbDupe) {
+            rowErrors.push(`VAL-05: Duplicate source_id "${sourceId}" already exists in active database (id: ${dbDupe.id})`);
+          }
+        }
+      }
+
+      if (approvalStatus && approvalStatus !== 'Approved') {
+        rowErrors.push(`VAL-03: approval_status is "${approvalStatus}". Only "Approved" records are eligible for real import consideration.`);
+      }
+
+      if (legalStatus && (legalStatus.toLowerCase() === 'unknown' || legalStatus.toLowerCase() === 'needs review' || legalStatus.toLowerCase() === 'draft')) {
+        rowErrors.push(`VAL-08: legal_status is "${legalStatus}". Cannot import documents with ambiguous or draft legal status into active candidates.`);
+      }
+
+      if (
+        documentType.toLowerCase() === 'plan' ||
+        localScope.toLowerCase() === 'local' ||
+        legalTopic.toLowerCase().includes('plan') ||
+        legalTopic.toLowerCase().includes('land use') ||
+        legalTopic.toLowerCase().includes('quy hoạch')
+      ) {
+        if (!localScope) {
+          rowErrors.push('VAL-09: Missing mandatory local_scope for local regulation or planning document');
+        }
+      }
+
+      if (activeCandidate.toLowerCase() === 'true') {
+        rowWarnings.push('Active candidate requires separate human approval and must not auto-activate.');
+      }
+
+      if (sourceId && !sourceId.startsWith('SAMPLE')) {
+        rowWarnings.push('Warning: Non-SAMPLE prefix detected. Real legal documents must undergo strict human verification and approval before production import.');
+      } else if (sourceId && sourceId.startsWith('SAMPLE')) {
+        rowWarnings.push('Sample dataset only. Not approved for real import.');
+      }
+
+      let status: 'VALID' | 'VALID_WITH_WARNINGS' | 'REJECTED' | 'DUPLICATE' = 'VALID';
+      if (rowErrors.length > 0) {
+        if (rowErrors.some(e => e.includes('VAL-05'))) {
+          status = 'DUPLICATE';
+          duplicateRecordsCount++;
+        } else {
+          status = 'REJECTED';
+          rejectedRecordsCount++;
+        }
+      } else if (rowWarnings.length > 0) {
+        status = 'VALID_WITH_WARNINGS';
+        validRecordsCount++;
+        warningRecordsCount++;
+      } else {
+        status = 'VALID';
+        validRecordsCount++;
+      }
+
+      reportRecords.push({
+        rowNumber: rowNum,
+        sourceId: sourceId || `ROW-${rowNum}`,
+        status,
+        errors: rowErrors,
+        warnings: rowWarnings,
+      });
+    }
+
+    return {
+      dryRun: true,
+      noDatabaseWrite: true,
+      summary: {
+        totalRecords: dataRows.length,
+        validRecords: validRecordsCount,
+        warningRecords: warningRecordsCount,
+        rejectedRecords: rejectedRecordsCount,
+        duplicateRecords: duplicateRecordsCount,
+      },
+      records: reportRecords,
+      errors: [],
+      warnings: [
+        'Validation only. No database write performed.',
+        'Import does not mean active version.',
+        'AI does not automatically determine if legal documents are the latest or complete. Human officers must verify legal grounds.',
+      ],
+    };
+  }
 }
 

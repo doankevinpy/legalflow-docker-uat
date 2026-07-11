@@ -10,6 +10,9 @@ describe('LegalKnowledgeService', () => {
     legalDocument: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
     },
     procedureTypeVersion: {
       findMany: jest.fn(),
@@ -830,6 +833,117 @@ describe('LegalKnowledgeService', () => {
       const res = await service.getRollbackVerification('log1');
       expect(res.overallStatus).toBe('WARNING');
       expect(res.warnings[0]).toContain('Không tìm thấy lịch sử hoàn tác');
+    });
+  });
+
+  describe('Phase 11H: validateCsvImport (Dry-Run Validation)', () => {
+    const validHeader =
+      'source_id,document_title,document_number,issuing_authority,document_type,issue_date,effective_date,legal_status,local_scope,legal_topic,summary,source_url,reviewer,approval_status,risk_note,active_candidate';
+
+    beforeEach(() => {
+      mockPrismaService.legalDocument.findFirst.mockResolvedValue(null);
+    });
+
+    it('1. should validate valid sample CSV and return dryRun true with no database write', async () => {
+      const validRow =
+        'SAMPLE-001,"Luật Đất đai sample","43/2024/QH15","Quốc hội","Law","2024-01-18","2024-08-01","Effective","National","Land Use Planning","Summary of land law","http://example.com/law","Admin","Approved","Low risk","false"';
+      const csvText = `${validHeader}\n${validRow}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.dryRun).toBe(true);
+      expect(report.noDatabaseWrite).toBe(true);
+      expect(report.summary.totalRecords).toBe(1);
+      expect(report.summary.validRecords).toBe(1);
+      expect(report.summary.rejectedRecords).toBe(0);
+      expect(report.records[0].status).toBe('VALID_WITH_WARNINGS');
+      expect(report.records[0].warnings).toContain('Sample dataset only. Not approved for real import.');
+      expect(report.warnings).toContain('Validation only. No database write performed.');
+    });
+
+    it('2. should return errors when mandatory fields are missing', async () => {
+      const invalidRow =
+        'SAMPLE-002,"","","","Law","2024-01-18","invalid-date","Effective","National","Land Use Planning","Summary","http://example.com/law","Admin","Approved","Low risk","false"';
+      const csvText = `${validHeader}\n${invalidRow}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.summary.rejectedRecords).toBe(1);
+      expect(report.records[0].status).toBe('REJECTED');
+      expect(report.records[0].errors).toContain('VAL-01: Missing mandatory field "document_title"');
+      expect(report.records[0].errors).toContain('VAL-01: Missing mandatory field "document_number"');
+      expect(report.records[0].errors).toContain('VAL-01: Missing mandatory field "issuing_authority"');
+      expect(report.records[0].errors).toContain('VAL-02: Invalid ISO date format for effective_date "invalid-date"');
+    });
+
+    it('3. should identify duplicate source_id within CSV file and mark status DUPLICATE', async () => {
+      const row1 =
+        'SAMPLE-003,"Luật 1","10/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Approved","Risk","false"';
+      const row2 =
+        'SAMPLE-003,"Luật 2 duplicate","11/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Approved","Risk","false"';
+      const csvText = `${validHeader}\n${row1}\n${row2}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.summary.totalRecords).toBe(2);
+      expect(report.summary.duplicateRecords).toBe(1);
+      expect(report.records[1].status).toBe('DUPLICATE');
+      expect(report.records[1].errors[0]).toContain('VAL-05: Duplicate source_id "SAMPLE-003" within CSV file');
+    });
+
+    it('4. should return error when approval_status is invalid or not Approved', async () => {
+      const row =
+        'SAMPLE-004,"Luật Đất đai","12/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Pending Review","Risk","false"';
+      const csvText = `${validHeader}\n${row}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.records[0].status).toBe('REJECTED');
+      expect(report.records[0].errors[0]).toContain('VAL-03: approval_status is "Pending Review". Only "Approved" records are eligible for real import consideration.');
+    });
+
+    it('5. should return error when legal_status is Unknown / Needs Review', async () => {
+      const row =
+        'SAMPLE-005,"Luật Đất đai","13/2024","QH","Law","2024-01-01","2024-06-01","Unknown","National","Topic","Summary","http://url","Admin","Approved","Risk","false"';
+      const csvText = `${validHeader}\n${row}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.records[0].status).toBe('REJECTED');
+      expect(report.records[0].errors[0]).toContain('VAL-08: legal_status is "Unknown". Cannot import documents with ambiguous or draft legal status into active candidates.');
+    });
+
+    it('6. should return error when local_scope is missing for local or planning document', async () => {
+      const row =
+        'SAMPLE-006,"Quy hoạch đất","14/2024","UBND","Plan","2024-01-01","2024-06-01","Effective","","Land Use Planning","Summary","http://url","Admin","Approved","Risk","false"';
+      const csvText = `${validHeader}\n${row}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.records[0].status).toBe('REJECTED');
+      expect(report.records[0].errors).toContain('VAL-09: Missing mandatory local_scope for local regulation or planning document');
+    });
+
+    it('7. should return strong warning when active_candidate is true confirming no auto-activation', async () => {
+      const row =
+        'SAMPLE-007,"Luật Đất đai","15/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Approved","Risk","true"';
+      const csvText = `${validHeader}\n${row}`;
+
+      const report = await service.validateCsvImport(csvText, true);
+
+      expect(report.records[0].warnings).toContain('Active candidate requires separate human approval and must not auto-activate.');
+    });
+
+    it('8. should never call prisma.legalDocument.create, update, or any mutation during validation', async () => {
+      const row =
+        'SAMPLE-008,"Luật Đất đai","16/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Approved","Risk","false"';
+      const csvText = `${validHeader}\n${row}`;
+
+      await service.validateCsvImport(csvText, true);
+
+      expect(mockPrismaService.legalDocument.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.legalDocument.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
     });
   });
 });
