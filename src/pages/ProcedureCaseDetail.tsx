@@ -225,21 +225,47 @@ export default function ProcedureCaseDetail() {
     }
   };
 
+  const formatStatusInfo = (status: string) => {
+    switch (status) {
+      case 'SUBMITTED':
+        return { label: 'Mới tiếp nhận', className: 'bg-sky-50 text-sky-700 border-sky-200' };
+      case 'IN_REVIEW':
+        return { label: 'Đang thẩm tra', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'SUPPLEMENT_REQUIRED':
+        return { label: 'Cần bổ sung', className: 'bg-orange-50 text-orange-700 border-orange-200' };
+      case 'PENDING_APPROVAL':
+        return { label: 'Chờ phê duyệt', className: 'bg-purple-50 text-purple-700 border-purple-200' };
+      case 'COMPLETED':
+        return { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'REJECTED':
+        return { label: 'Từ chối', className: 'bg-rose-50 text-rose-700 border-rose-200' };
+      default:
+        return { label: status, className: 'bg-gray-50 text-gray-700 border-gray-200' };
+    }
+  };
+
   if (loading) {
-    return <div className="p-8 text-center text-gray-500">Đang tải chi tiết hồ sơ...</div>;
+    return (
+      <div className="p-16 text-center text-gray-500 flex flex-col items-center justify-center space-y-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span>Đang tải chi tiết hồ sơ TTHC...</span>
+      </div>
+    );
   }
 
   if (!data) {
     return (
-      <div className="p-8 text-center space-y-4 max-w-md mx-auto">
-        <div className="text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200">
-          {error || 'Không tìm thấy thông tin hồ sơ thủ tục hành chính.'}
+      <div className="p-10 text-center bg-rose-50/50 space-y-4 max-w-xl mx-auto my-10 rounded-2xl border border-rose-200 shadow-sm">
+        <div className="text-3xl">⚠️</div>
+        <div className="space-y-1">
+          <h3 className="font-bold text-rose-900 text-base">Không tìm thấy hoặc không thể tải chi tiết hồ sơ TTHC</h3>
+          <p className="text-xs text-rose-800 leading-relaxed">{error || 'Hồ sơ không tồn tại, đã bị xóa hoặc máy chủ đang phản hồi chậm.'}</p>
         </div>
-        <div className="flex justify-center gap-3">
-          <button onClick={fetchDetail} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-            Thử lại
+        <div className="flex justify-center gap-3 pt-2">
+          <button onClick={fetchDetail} className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition shadow-sm">
+            <span>🔄</span> Thử lại / Refresh
           </button>
-          <button onClick={() => navigate('/procedure-cases')} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">
+          <button onClick={() => navigate('/procedure-cases')} className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 transition shadow-sm">
             &larr; Quay lại danh sách
           </button>
         </div>
@@ -247,36 +273,38 @@ export default function ProcedureCaseDetail() {
     );
   }
 
+  const statusInfo = formatStatusInfo(data.status);
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start border-b pb-4">
         <div>
-          <button onClick={() => navigate('/procedure-cases')} className="text-sm text-blue-600 hover:underline mb-2 flex items-center gap-1 font-medium">
-            &larr; Quay lại danh sách TTHC
+          <button onClick={() => navigate('/procedure-cases')} className="text-sm text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-1.5 font-semibold transition">
+            <span>&larr;</span> Quay lại danh sách hồ sơ TTHC
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-bold font-mono text-gray-800">{data.caseCode}</h1>
-            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-              {data.status}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.className}`}>
+              {statusInfo.label}
             </span>
           </div>
-          <p className="text-sm font-medium text-gray-700 mt-1">
-            {data.procedureType?.name} &bull; Lĩnh vực: <span className="font-semibold">{data.field}</span>
+          <p className="text-sm font-medium text-gray-700 mt-1.5">
+            {data.procedureType?.name} &bull; Lĩnh vực: <span className="font-semibold text-blue-700">{data.field === 'DAT_DAI' ? 'Đất đai' : data.field === 'XAY_DUNG' ? 'Xây dựng' : data.field}</span>
           </p>
         </div>
       </div>
 
-      {/* 7 Tabs Navigation */}
+      {/* 7 Tabs Navigation ordered according to UX-05 */}
       <div className="flex border-b gap-1 bg-gray-50 p-1 rounded-t-xl overflow-x-auto text-sm font-medium">
         {[
-          { key: 'overview', label: '1. Tổng quan' },
-          { key: 'documents', label: '2. Tài liệu' },
-          { key: 'ai_review', label: '3. AI rà soát' },
-          { key: 'checklist', label: '4. Checklist' },
+          { key: 'overview', label: '1. Thông tin hồ sơ' },
+          { key: 'checklist', label: '2. Checklist & Dữ liệu' },
+          { key: 'ai_review', label: '3. AI Rà soát & Căn cứ' },
+          { key: 'documents', label: '4. Tài liệu đính kèm' },
           { key: 'financial', label: '5. Nghĩa vụ tài chính' },
-          { key: 'notes', label: '6. Ghi chú' },
-          { key: 'audit_log', label: '7. Audit log' },
+          { key: 'notes', label: '6. Ghi chú thẩm định' },
+          { key: 'audit_log', label: '7. Lịch sử Audit Log' },
         ].map((t) => (
           <button
             key={t.key}
@@ -344,13 +372,17 @@ export default function ProcedureCaseDetail() {
           </div>
         )}
 
-        {/* TAB 2: DOCUMENTS */}
+        {/* TAB 4: DOCUMENTS */}
         {activeTab === 'documents' && (
           <div className="space-y-4">
             <h3 className="text-base font-bold text-gray-800">Danh sách tài liệu hồ sơ TTHC</h3>
             {(!data.documents || data.documents.length === 0) ? (
-              <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed text-gray-500 text-sm">
-                Chưa có tài liệu đính kèm cho hồ sơ này. (Nghiệp vụ upload/OCR tài liệu chuyên sâu sẽ triển khai ở phase tiếp theo).
+              <div className="p-12 text-center bg-slate-50/60 rounded-xl border border-dashed border-slate-200 my-4 space-y-2">
+                <div className="text-3xl">📁</div>
+                <h4 className="font-bold text-slate-800 text-sm">Chưa có tài liệu đính kèm cho hồ sơ này</h4>
+                <p className="text-xs text-slate-600 max-w-md mx-auto">
+                  Hiện tại hồ sơ chưa có file scan/OCR tài liệu số hóa nào được tải lên. (Nghiệp vụ tải lên tài liệu đính kèm và kiểm tra OCR tự động sẽ được kích hoạt ở các phase tiếp theo).
+                </p>
               </div>
             ) : (
               <ul className="divide-y border rounded-xl">
@@ -361,7 +393,7 @@ export default function ProcedureCaseDetail() {
                       <span className="text-xs text-gray-500">Loại: {doc.documentType} &bull; Trạng thái: {doc.reviewStatus}</span>
                     </div>
                     {doc.fileUrl && (
-                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
+                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs font-semibold">
                         Xem file &rarr;
                       </a>
                     )}
@@ -393,41 +425,70 @@ export default function ProcedureCaseDetail() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <div>
-                    <h4 className="font-bold text-blue-900 text-base">
-                      {data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
-                        ? 'Trợ lý AI rà soát chuyển mục đích sử dụng đất'
-                        : 'Trợ lý AI rà soát cấp GCN lần đầu'}
-                    </h4>
-                    <p className="text-xs text-blue-700 mt-0.5">
-                      {data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
-                        ? 'Phân tích chuyên sâu thông tin người sử dụng đất, thửa đất, loại đất hiện tại và mục đích xin chuyển, đối chiếu quy hoạch/kế hoạch sử dụng đất.'
-                        : 'Phân tích chuyên sâu thông tin chủ sở hữu, thửa đất, lịch sử sử dụng đất và đối chiếu căn cứ pháp lý.'}
-                    </p>
+              <div className="space-y-8">
+                {/* KHỐI 3.1: AI REVIEW - PHÂN TÍCH VÀ ĐÁNH GIÁ CHUYÊN MÔN */}
+                <div className="border border-blue-200 bg-white rounded-2xl p-5 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-blue-100 pb-3">
+                    <h5 className="font-bold text-blue-950 text-base flex items-center gap-2">
+                      <span className="text-xl">Khối 3.1:</span> AI REVIEW – PHÂN TÍCH VÀ ĐÁNH GIÁ CHUYÊN MÔN
+                    </h5>
+                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                      Nguyên tắc Human-in-the-Loop
+                    </span>
                   </div>
-                  {canAct && (
-                    <button
-                      onClick={handleRunAiReview}
-                      disabled={runningAi}
-                      className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold text-sm shadow flex items-center gap-2 transition"
-                    >
-                      {runningAi
-                        ? '⏳ Đang phân tích...'
-                        : data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
-                        ? '🤖 AI rà soát chuyển mục đích'
-                        : '🤖 AI rà soát cấp GCN lần đầu'}
-                    </button>
-                  )}
+
+                  <div className="flex justify-between items-center bg-blue-50/70 p-4 rounded-xl border border-blue-100">
+                    <div>
+                      <h4 className="font-bold text-blue-900 text-sm">
+                        {data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                          ? 'Trợ lý AI rà soát chuyển mục đích sử dụng đất'
+                          : 'Trợ lý AI rà soát cấp GCN lần đầu'}
+                      </h4>
+                      <p className="text-xs text-blue-700 mt-0.5">
+                        {data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                          ? 'Phân tích thông tin chủ sử dụng đất, thửa đất, loại đất hiện tại và mục đích xin chuyển, đối chiếu quy hoạch/kế hoạch sử dụng đất.'
+                          : 'Phân tích thông tin chủ sở hữu, thửa đất, nguồn gốc sử dụng đất và đối chiếu căn cứ pháp lý áp dụng.'}
+                      </p>
+                    </div>
+                    {canAct && (
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          onClick={handleRunAiReview}
+                          disabled={runningAi}
+                          title="Kích hoạt trợ lý AI phân tích hồ sơ và đưa ra gợi ý rà soát chuyên môn (UX-03)"
+                          className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-bold text-xs shadow flex items-center gap-2 transition"
+                        >
+                          {runningAi
+                            ? '⏳ Đang phân tích...'
+                            : data?.procedureType?.code === 'LAND_USE_PURPOSE_CHANGE' || data?.procedureType?.group === 'CHUYEN_MUC_DICH_SDD'
+                            ? '🤖 Chạy AI rà soát chuyển mục đích'
+                            : '🤖 Chạy AI rà soát cấp GCN lần đầu'}
+                        </button>
+                        <span className="text-[11px] text-gray-500 italic">Bấm để rà soát/cập nhật phiên bản mới</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Always-visible Legal Snapshot Section (Phase 9B-E) */}
-                <div className="border border-amber-200 bg-amber-50/40 rounded-2xl p-5 space-y-4 shadow-sm">
-                  <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
-                    <h5 className="font-bold text-amber-900 text-sm flex items-center gap-2">
-                      <span className="text-lg">🏛️</span> Căn cứ pháp lý đã sử dụng
+                {/* KHỐI 3.2: CĂN CỨ PHÁP LÝ ĐÃ SỬ DỤNG - LEGAL SNAPSHOT */}
+                <div className="border border-amber-300 bg-amber-50/50 rounded-2xl p-5 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-amber-200 pb-3">
+                    <h5 className="font-bold text-amber-950 text-base flex items-center gap-2">
+                      <span className="text-xl">Khối 3.2:</span> CĂN CỨ PHÁP LÝ ĐÃ SỬ DỤNG (LEGAL SNAPSHOT &amp; ACTIVE VERSION)
                     </h5>
+                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1 rounded-full border border-amber-300">
+                      Active Version: v2.0-2024-LAND-LAW
+                    </span>
+                  </div>
+
+                  {/* Mandatory Local Planning & Regulations Warning (LAW-02) */}
+                  <div className="bg-amber-100 border-l-4 border-amber-600 p-4 rounded-r-xl text-amber-950 space-y-1.5 shadow-2xs">
+                    <div className="font-bold text-xs uppercase tracking-wide flex items-center gap-1.5 text-amber-950">
+                      <span>⚠️</span> CẢNH BÁO BẮT BUỘC VỀ CĂN CỨ ĐỊA PHƯƠNG &amp; QUY HOẠCH/KẾ HOẠCH SỬ DỤNG ĐẤT (LAW-02):
+                    </div>
+                    <p className="text-xs leading-relaxed text-amber-950">
+                      Căn cứ pháp lý hiển thị bên dưới là phiên bản dữ liệu văn bản trung ương và quy định chung tại thời điểm hệ thống ghi nhận. <strong>Cán bộ thụ lý có trách nhiệm kiểm tra, đối chiếu bắt buộc với:</strong> (1) Quy trình nội bộ giải quyết TTHC và các Quyết định/Quy định riêng do UBND tỉnh/thành phố ban hành đang có hiệu lực tại địa phương; (2) Quy hoạch sử dụng đất cấp huyện, Kế hoạch sử dụng đất hàng năm đã được cơ quan có thẩm quyền phê duyệt; (3) Quy hoạch chi tiết xây dựng (nếu có) tại vị trí thửa đất trước khi tham mưu, trình ký hoặc ban hành kết quả chính thức.
+                    </p>
                   </div>
 
                   {snapshotError && (
@@ -445,14 +506,13 @@ export default function ProcedureCaseDetail() {
                   {(() => {
                     if (aiAnalyses.length === 0) {
                       return (
-                        <div className="bg-white p-4 rounded-xl border border-amber-100 text-gray-600 text-xs flex items-center gap-2.5 shadow-2xs">
+                        <div className="bg-white p-4 rounded-xl border border-amber-200 text-gray-700 text-xs flex items-center gap-2.5 shadow-2xs">
                           <span className="text-base">ℹ️</span>
-                          <span>Chưa có kết quả AI để xác định legal snapshot. Sau khi chạy AI review, hệ thống sẽ hiển thị căn cứ pháp lý đã sử dụng nếu có.</span>
+                          <span>Chưa có kết quả AI để xác định legal snapshot. Sau khi chạy AI review ở Khối 3.1, hệ thống sẽ hiển thị chính xác bộ phiên bản căn cứ pháp lý đã áp dụng.</span>
                         </div>
                       );
                     }
 
-                    // Get latest analysis or first analysis that has legalSnapshot
                     const analysisWithSnapshot = aiAnalyses.find(a => a.legalSnapshot) || aiAnalyses[0];
                     const snapshot = analysisWithSnapshot?.legalSnapshot;
                     const payload = (analysisWithSnapshot?.outputPayload || {}) as any;
@@ -463,13 +523,13 @@ export default function ProcedureCaseDetail() {
                         <div className="space-y-3">
                           <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xs">
                             <span className="text-base">⚠️</span>
-                            <span>Chưa tìm thấy legal snapshot gắn với kết quả AI này. Cán bộ cần kiểm tra căn cứ pháp lý thủ công.</span>
+                            <span>Chưa tìm thấy legal snapshot gắn với kết quả AI này. Cán bộ cần rà soát căn cứ pháp lý thủ công theo quy định hiện hành.</span>
                           </div>
 
                           {meta && (
                             <div className="bg-amber-100/60 border border-amber-300 p-3.5 rounded-xl text-xs space-y-2.5 text-amber-950">
                               <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                                <span>⚠️</span> Căn cứ gợi ý từ metadata AI, chưa xác nhận là legal snapshot đã lưu.
+                                <span>⚠️</span> Căn cứ gợi ý từ metadata AI (chưa lưu thành snapshot chính thức):
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-white/80 p-2.5 rounded-lg border border-amber-200">
                                 <div>
@@ -507,7 +567,6 @@ export default function ProcedureCaseDetail() {
                       );
                     }
 
-                    // Has snapshot
                     const kbVer = snapshot.knowledgeBaseVersion || 'N/A';
                     const procVer = snapshot.procedureTypeVersion?.version || snapshot.procedureTypeVersion?.code || 'N/A';
                     const promptVer = snapshot.promptVersion?.version || snapshot.promptVersion?.key || 'N/A';
@@ -520,69 +579,62 @@ export default function ProcedureCaseDetail() {
 
                     return (
                       <div className="space-y-3.5 text-xs text-gray-800">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 bg-white p-3.5 rounded-xl border border-amber-200 shadow-2xs">
                           <div>
                             <span className="text-gray-500 block text-[11px]">Knowledge Base</span>
-                            <span className="font-bold text-amber-900">{kbVer}</span>
+                            <span className="font-bold text-amber-900 text-sm">{kbVer}</span>
                           </div>
                           <div>
                             <span className="text-gray-500 block text-[11px]">Procedure Version</span>
-                            <span className="font-bold text-amber-900">{procVer}</span>
+                            <span className="font-bold text-amber-900 text-sm">{procVer}</span>
                           </div>
                           <div>
                             <span className="text-gray-500 block text-[11px]">Prompt Version</span>
-                            <span className="font-bold text-amber-900">{promptVer}</span>
+                            <span className="font-bold text-amber-900 text-sm">{promptVer}</span>
                           </div>
                           <div>
                             <span className="text-gray-500 block text-[11px]">Checklist Version</span>
-                            <span className="font-bold text-amber-900">{chkVer}</span>
+                            <span className="font-bold text-amber-900 text-sm">{chkVer}</span>
                           </div>
                         </div>
 
                         {docList.length > 0 ? (
                           <div>
-                            <span className="font-semibold text-gray-700 block mb-1">Văn bản pháp luật áp dụng trong phiên bản này:</span>
+                            <span className="font-bold text-gray-800 block mb-1.5">Danh mục văn bản pháp luật áp dụng trong phiên bản Legal Snapshot này:</span>
                             <div className="flex flex-wrap gap-1.5">
                               {docList.map((doc: string, idx: number) => (
-                                <span key={idx} className="bg-amber-100/80 border border-amber-300 text-amber-950 px-2.5 py-1 rounded-lg font-semibold text-xs shadow-2xs">
-                                  {doc}
+                                <span key={idx} className="bg-amber-100/90 border border-amber-400 text-amber-950 px-3 py-1 rounded-lg font-bold text-xs shadow-2xs">
+                                  ⚖️ {doc}
                                 </span>
                               ))}
                             </div>
                           </div>
                         ) : (
-                          <div className="text-gray-500 italic">Không có danh sách văn bản cụ thể trong snapshot này.</div>
+                          <div className="text-gray-500 italic">Không có danh mục văn bản cụ thể trong snapshot này.</div>
                         )}
-
-                        <div className="bg-amber-100/60 border border-amber-300/80 p-3 rounded-xl text-amber-900 flex items-start gap-2.5">
-                          <span className="text-base leading-none mt-0.5">⚠️</span>
-                          <div className="space-y-0.5">
-                            <span className="font-bold block">BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA</span>
-                            <p className="text-amber-950 italic">
-                              Căn cứ pháp lý hiển thị là phiên bản dữ liệu hệ thống ghi nhận tại thời điểm AI rà soát; cán bộ phải kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung/thay thế nếu có, quy hoạch/kế hoạch sử dụng đất và quy trình nội bộ địa phương tại thời điểm xử lý hồ sơ.
-                            </p>
-                          </div>
-                        </div>
                       </div>
                     );
                   })()}
                 </div>
 
-                {/* Always-visible Export Safety Section (Phase 9B-F) */}
+                {/* KHỐI 3.3: DỰ THẢO / IN / XUẤT VĂN BẢN - EXPORT SAFETY */}
                 <div className="border border-indigo-200 bg-indigo-50/40 rounded-2xl p-5 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3">
-                    <h5 className="font-bold text-indigo-950 text-sm flex items-center gap-2">
-                      <span className="text-lg">🖨️</span> Dự thảo / In / Xuất văn bản
+                    <h5 className="font-bold text-indigo-950 text-base flex items-center gap-2">
+                      <span className="text-xl">Khối 3.3:</span> DỰ THẢO / IN / XUẤT VĂN BẢN (EXPORT SAFETY)
                     </h5>
+                    <span className="text-xs font-semibold text-indigo-700 bg-indigo-100 px-3 py-1 rounded-full border border-indigo-300">
+                      Chuẩn văn phong hành chính
+                    </span>
                   </div>
 
-                  {/* Mandatory AI Safety Warnings */}
-                  <div className="bg-amber-100/60 border border-amber-300/80 p-3.5 rounded-xl text-amber-900 space-y-1.5 shadow-2xs">
-                    <div className="font-bold text-xs flex items-center gap-1.5 text-amber-950">
-                      <span>⚠️</span> BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA
+                  {/* Mandatory AI Safety Warnings (AI-01 / AI-04) */}
+                  <div className="bg-amber-100/80 border border-amber-400 p-3.5 rounded-xl text-amber-950 space-y-1.5 shadow-2xs">
+                    <div className="font-bold text-xs uppercase tracking-wide flex items-center gap-1.5 text-amber-950">
+                      <span>⚠️</span> BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA &amp; CHỊU TRÁCH NHIỆM TRƯỚC KHI BAN HÀNH:
                     </div>
-                    <p className="text-xs text-amber-950 leading-relaxed italic">
-                      Văn bản này là bản dự thảo/gợi ý do hệ thống hỗ trợ tạo. Cán bộ có thẩm quyền phải kiểm tra, chỉnh sửa, ký số/ký tay và ban hành theo đúng quy định trước khi sử dụng chính thức.
+                    <p className="text-xs text-amber-950 leading-relaxed">
+                      Văn bản dự thảo, phiếu rà soát, và các tài liệu xuất Word/PDF do hệ thống tạo tự động dựa trên kết quả phân tích AI chỉ mang tính chất tham mưu chuyên môn sơ bộ. <strong>Cán bộ có thẩm quyền phải kiểm tra, đối chiếu thực tế hồ sơ, chỉnh sửa văn phong, ký số/ký tay và ban hành theo đúng thẩm quyền quy định của pháp luật.</strong>
                     </p>
                   </div>
 
@@ -590,12 +642,12 @@ export default function ProcedureCaseDetail() {
                   {!canAct ? (
                     <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 shadow-2xs">
                       <span className="text-base">🚫</span>
-                      <span>Bạn không có quyền preview/in/xuất văn bản này. Vui lòng liên hệ lãnh đạo hoặc quản trị hệ thống.</span>
+                      <span>Bạn không có quyền xem trước/in/xuất văn bản này. Vui lòng liên hệ lãnh đạo hoặc quản trị hệ thống.</span>
                     </div>
                   ) : aiAnalyses.length === 0 ? (
                     <div className="bg-white p-4 rounded-xl border border-indigo-100 text-gray-600 text-xs flex items-center gap-2.5 shadow-2xs">
                       <span className="text-base">ℹ️</span>
-                      <span>Chưa có kết quả AI để tạo bản dự thảo/in/xuất văn bản. Vui lòng chạy AI review trước.</span>
+                      <span>Chưa có kết quả rà soát AI để tạo bản dự thảo hoặc xuất văn bản. Vui lòng chạy rà soát AI ở Khối 3.1 trước.</span>
                     </div>
                   ) : (
                     <div className="bg-white p-4 rounded-xl border border-indigo-100 space-y-3 shadow-2xs">
@@ -608,6 +660,7 @@ export default function ProcedureCaseDetail() {
                             <button
                               onClick={() => handlePreviewReviewPdf(aiAnalyses[0].id)}
                               disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              title="Xem trước bản dự thảo phiếu rà soát trên màn hình (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
                             >
                               <Printer className="w-3.5 h-3.5 mr-1.5" />
@@ -616,6 +669,7 @@ export default function ProcedureCaseDetail() {
                             <button
                               onClick={() => handlePreviewReviewPdf(aiAnalyses[0].id)}
                               disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              title="In phiếu gợi ý AI để tham khảo trong cuộc họp hoặc lưu hồ sơ giấy (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-semibold hover:bg-indigo-100 shadow-sm transition disabled:opacity-50"
                             >
                               <Printer className="w-3.5 h-3.5 mr-1.5" />
@@ -624,14 +678,16 @@ export default function ProcedureCaseDetail() {
                             <button
                               onClick={() => handleExportReviewDocx(aiAnalyses[0].id)}
                               disabled={exportingAnalysisId === aiAnalyses[0].id || previewingAnalysisId === aiAnalyses[0].id}
+                              title="Tải về file Microsoft Word (.docx) để cán bộ trực tiếp chỉnh sửa văn bản trước khi ký trình (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                             >
                               <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                              {exportingAnalysisId === aiAnalyses[0].id ? 'Đang tải...' : 'Xuất Word'}
+                              {exportingAnalysisId === aiAnalyses[0].id ? 'Đang tải...' : 'Xuất Word (.docx)'}
                             </button>
                             <button
                               onClick={() => handlePreviewReviewPdf(aiAnalyses[0].id)}
                               disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              title="Tải về file PDF định dạng chuẩn để in ấn hoặc lưu trữ (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                             >
                               <Printer className="w-3.5 h-3.5 mr-1.5 text-red-600" />
@@ -643,6 +699,7 @@ export default function ProcedureCaseDetail() {
                             <button
                               onClick={() => handlePreviewPurposeChangeReviewPdf(aiAnalyses[0].id)}
                               disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              title="Xem trước bản dự thảo rà soát chuyển mục đích trên màn hình (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 shadow-sm transition disabled:opacity-50"
                             >
                               <Printer className="w-3.5 h-3.5 mr-1.5" />
@@ -651,6 +708,7 @@ export default function ProcedureCaseDetail() {
                             <button
                               onClick={() => handlePreviewPurposeChangeReviewPdf(aiAnalyses[0].id)}
                               disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              title="In phiếu rà soát chuyển mục đích sử dụng đất (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-semibold hover:bg-indigo-100 shadow-sm transition disabled:opacity-50"
                             >
                               <Printer className="w-3.5 h-3.5 mr-1.5" />
@@ -659,14 +717,16 @@ export default function ProcedureCaseDetail() {
                             <button
                               onClick={() => handleExportPurposeChangeReviewDocx(aiAnalyses[0].id)}
                               disabled={exportingAnalysisId === aiAnalyses[0].id || previewingAnalysisId === aiAnalyses[0].id}
+                              title="Tải về file Microsoft Word (.docx) rà soát chuyển mục đích để chỉnh sửa (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                             >
                               <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                              {exportingAnalysisId === aiAnalyses[0].id ? 'Đang tải...' : 'Xuất Word'}
+                              {exportingAnalysisId === aiAnalyses[0].id ? 'Đang tải...' : 'Xuất Word (.docx)'}
                             </button>
                             <button
                               onClick={() => handlePreviewPurposeChangeReviewPdf(aiAnalyses[0].id)}
                               disabled={previewingAnalysisId === aiAnalyses[0].id || exportingAnalysisId === aiAnalyses[0].id}
+                              title="Tải về file PDF định dạng chuẩn (UX-03)"
                               className="inline-flex items-center px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 shadow-sm transition disabled:opacity-50"
                             >
                               <Printer className="w-3.5 h-3.5 mr-1.5 text-red-600" />
@@ -684,12 +744,19 @@ export default function ProcedureCaseDetail() {
                   )}
                 </div>
 
-                {aiAnalyses.length === 0 && !runningAi && (
-                  <div className="p-12 text-center bg-gray-50 rounded-xl border border-dashed space-y-2">
-                    <div className="text-3xl text-gray-400">📄</div>
-                    <p className="text-sm text-gray-600">Chưa có bản rà soát AI nào cho hồ sơ này. Bấm nút phía trên để bắt đầu rà soát.</p>
-                  </div>
-                )}
+                {/* KHỐI 3.1 (Tiếp theo): CHI TIẾT CÁC BẢN RÀ SOÁT AI */}
+                <div className="space-y-4 pt-2">
+                  <h4 className="font-bold text-gray-800 text-base border-b pb-2">Lịch sử &amp; Chi tiết kết quả rà soát AI ({aiAnalyses.length})</h4>
+                  {aiAnalyses.length === 0 && !runningAi && (
+                    <div className="p-12 text-center bg-slate-50/60 rounded-xl border border-dashed border-slate-200 space-y-2">
+                      <div className="text-3xl text-slate-400">📄</div>
+                      <h5 className="font-bold text-slate-800 text-sm">Chưa có kết quả rà soát AI nào cho hồ sơ này</h5>
+                      <p className="text-xs text-slate-600 max-w-md mx-auto">
+                        Bấm nút &quot;Chạy AI rà soát&quot; ở Khối 3.1 phía trên để trợ lý chuyên môn bắt đầu phân tích dữ liệu thửa đất và đối chiếu quy định pháp lý.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {aiAnalyses.map((analysis) => {
                   const payload = (analysis.outputPayload || {}) as any;
@@ -1087,8 +1154,12 @@ export default function ProcedureCaseDetail() {
             )}
 
             {(!data.checklistItems || data.checklistItems.length === 0) ? (
-              <div className="p-8 text-center text-gray-500 border border-dashed rounded-xl">
-                Chưa có mục checklist nào. Hãy thêm tiêu chí kiểm tra ở trên.
+              <div className="p-12 text-center bg-slate-50/60 rounded-xl border border-dashed border-slate-200 my-4 space-y-2">
+                <div className="text-3xl">📋</div>
+                <h4 className="font-bold text-slate-800 text-sm">Chưa có mục checklist kiểm tra nào</h4>
+                <p className="text-xs text-slate-600 max-w-md mx-auto">
+                  Danh sách kiểm tra thành phần hồ sơ và điều kiện thẩm định hiện đang trống. Cán bộ có thể nhập tên nhóm và tiêu chí vào ô phía trên hoặc bấm nút bên tab AI Rà soát để tự động tạo checklist gợi ý.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1167,7 +1238,13 @@ export default function ProcedureCaseDetail() {
             )}
 
             {(!data.procedureNotes || data.procedureNotes.length === 0) ? (
-              <div className="p-8 text-center text-gray-500 border border-dashed rounded-xl">Chưa có ý kiến trao đổi nào.</div>
+              <div className="p-12 text-center bg-slate-50/60 rounded-xl border border-dashed border-slate-200 my-4 space-y-2">
+                <div className="text-3xl">💬</div>
+                <h4 className="font-bold text-slate-800 text-sm">Chưa có ý kiến trao đổi hay ghi chú thẩm định nào</h4>
+                <p className="text-xs text-slate-600 max-w-md mx-auto">
+                  Nhật ký trao đổi nội bộ giữa cán bộ tiếp nhận và cán bộ thẩm định hiện đang trống. Sử dụng khung nhập phía trên để ghi chép các ý kiến hoặc lưu ý xử lý hồ sơ.
+                </p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {data.procedureNotes.map((note) => (
@@ -1189,7 +1266,13 @@ export default function ProcedureCaseDetail() {
           <div className="space-y-4 text-sm">
             <h3 className="text-base font-bold text-gray-800">Nhật ký truy vết thao tác hồ sơ TTHC</h3>
             {(!data.auditLogs || data.auditLogs.length === 0) ? (
-              <div className="p-8 text-center text-gray-500 border border-dashed rounded-xl">Chưa có nhật ký nào.</div>
+              <div className="p-12 text-center bg-slate-50/60 rounded-xl border border-dashed border-slate-200 my-4 space-y-2">
+                <div className="text-3xl">🔍</div>
+                <h4 className="font-bold text-slate-800 text-sm">Chưa có bản ghi nhật ký kiểm toán (Audit Log)</h4>
+                <p className="text-xs text-slate-600 max-w-md mx-auto">
+                  Hệ thống sẽ tự động lưu lại lịch sử mọi thao tác thay đổi trạng thái, rà soát AI, bổ sung tài liệu và phê duyệt của từng cán bộ để đảm bảo minh bạch, truy vết.
+                </p>
+              </div>
             ) : (
               <table className="w-full text-left border-collapse border rounded-xl overflow-hidden text-xs">
                 <thead>

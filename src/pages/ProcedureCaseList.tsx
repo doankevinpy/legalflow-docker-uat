@@ -16,6 +16,7 @@ export default function ProcedureCaseList() {
   const [error, setError] = useState<string | null>(null);
   const [fieldFilter, setFieldFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [keyword, setKeyword] = useState<string>('');
 
   // Modal create state
@@ -48,7 +49,7 @@ export default function ProcedureCaseList() {
       setCases(casesRes.data || []);
     } catch (err: any) {
       console.error('Error fetching procedure cases:', err);
-      setError(getApiErrorMessage(err) || 'Không thể tải danh sách hồ sơ thủ tục hành chính.');
+      setError(getApiErrorMessage(err) || 'Không tải được danh sách hồ sơ từ máy chủ (lỗi kết nối hoặc API phản hồi lỗi).');
     } finally {
       setLoading(false);
     }
@@ -120,24 +121,30 @@ export default function ProcedureCaseList() {
     }
   };
 
-  const formatStatus = (status: string) => {
+  const formatStatusInfo = (status: string) => {
     switch (status) {
       case 'SUBMITTED':
-        return 'Mới tiếp nhận';
+        return { label: 'Mới tiếp nhận', className: 'bg-sky-50 text-sky-700 border-sky-200' };
       case 'IN_REVIEW':
-        return 'Đang thẩm tra';
+        return { label: 'Đang thẩm tra', className: 'bg-amber-50 text-amber-700 border-amber-200' };
       case 'SUPPLEMENT_REQUIRED':
-        return 'Cần bổ sung';
+        return { label: 'Cần bổ sung', className: 'bg-orange-50 text-orange-700 border-orange-200' };
       case 'PENDING_APPROVAL':
-        return 'Chờ phê duyệt';
+        return { label: 'Chờ phê duyệt', className: 'bg-purple-50 text-purple-700 border-purple-200' };
       case 'COMPLETED':
-        return 'Hoàn thành';
+        return { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'REJECTED':
-        return 'Từ chối';
+        return { label: 'Từ chối', className: 'bg-rose-50 text-rose-700 border-rose-200' };
       default:
-        return status;
+        return { label: status, className: 'bg-gray-50 text-gray-700 border-gray-200' };
     }
   };
+
+  const sortedCases = cases.slice().sort((a, b) => {
+    const dateA = new Date(a.receivedAt || a.createdAt).getTime();
+    const dateB = new Date(b.receivedAt || b.createdAt).getTime();
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -170,7 +177,7 @@ export default function ProcedureCaseList() {
           </button>
         </form>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
           <select
             value={fieldFilter}
             onChange={(e) => setFieldFilter(e.target.value)}
@@ -193,26 +200,60 @@ export default function ProcedureCaseList() {
             <option value="PENDING_APPROVAL">Chờ phê duyệt</option>
             <option value="COMPLETED">Hoàn thành</option>
           </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+            className="px-3 py-2 border rounded-lg text-sm bg-white font-medium text-slate-700"
+          >
+            <option value="newest">📅 Mới nhất trước</option>
+            <option value="oldest">📅 Cũ nhất trước</option>
+          </select>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Đang tải danh sách hồ sơ...</div>
+          <div className="p-12 text-center text-gray-500 flex flex-col items-center justify-center space-y-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span>Đang tải danh sách hồ sơ...</span>
+          </div>
         ) : error ? (
-          <div className="p-8 text-center space-y-4">
-            <div className="text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200 max-w-md mx-auto">
-              {error}
+          <div className="p-10 text-center bg-rose-50/50 space-y-4 max-w-xl mx-auto my-6 rounded-2xl border border-rose-200">
+            <div className="text-3xl">⚠️</div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-rose-900 text-base">Không tải được danh sách hồ sơ</h3>
+              <p className="text-xs text-rose-800 leading-relaxed">{error}</p>
             </div>
             <button
               onClick={fetchData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 shadow-sm transition"
             >
-              Thử lại
+              <span>🔄</span> Thử lại / Refresh
             </button>
           </div>
-        ) : cases.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">Chưa có hồ sơ thủ tục hành chính nào phù hợp.</div>
+        ) : sortedCases.length === 0 ? (
+          <div className="p-12 text-center bg-slate-50/60 rounded-xl border border-dashed border-slate-200 my-6 mx-6 space-y-3">
+            <div className="text-3xl">📭</div>
+            <div className="space-y-1">
+              <h3 className="font-bold text-slate-800 text-sm">Chưa có hồ sơ thủ tục hành chính phù hợp</h3>
+              <p className="text-xs text-slate-600 max-w-md mx-auto">
+                Không tìm thấy hồ sơ nào khớp với từ khóa tìm kiếm hoặc bộ lọc hiện tại. Vui lòng thử xóa từ khóa tìm kiếm hoặc bấm nút "Tiếp nhận hồ sơ TTHC" để tạo mới.
+              </p>
+            </div>
+            {(keyword || fieldFilter || statusFilter) && (
+              <button
+                onClick={() => {
+                  setKeyword('');
+                  setFieldFilter('');
+                  setStatusFilter('');
+                }}
+                className="px-3.5 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-100 transition shadow-2xs"
+              >
+                Xóa bộ lọc tìm kiếm
+              </button>
+            )}
+          </div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead>
@@ -227,27 +268,29 @@ export default function ProcedureCaseList() {
               </tr>
             </thead>
             <tbody className="divide-y text-sm">
-              {cases.map((c) => (
-                <tr
-                  key={c.id}
-                  className="hover:bg-gray-50 transition cursor-pointer"
-                  onClick={() => navigate(`/procedure-cases/${c.id}`)}
-                >
-                  <td className="p-4 font-mono font-bold text-blue-600">{c.caseCode}</td>
-                  <td className="p-4 font-medium text-gray-700">{formatField(c.field)}</td>
-                  <td className="p-4 text-gray-600 max-w-[220px] truncate">{c.procedureType?.name || '---'}</td>
-                  <td className="p-4 font-medium text-gray-800">
-                    <div>{c.applicantName}</div>
-                    {c.applicantPhone && <div className="text-xs text-gray-500">{c.applicantPhone}</div>}
-                  </td>
-                  <td className="p-4 text-gray-600">{new Date(c.receivedAt).toLocaleDateString('vi-VN')}</td>
-                  <td className="p-4">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                      {formatStatus(c.status)}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <button
+              {sortedCases.map((c) => {
+                const statusInfo = formatStatusInfo(c.status);
+                return (
+                  <tr
+                    key={c.id}
+                    className="hover:bg-gray-50 transition cursor-pointer"
+                    onClick={() => navigate(`/procedure-cases/${c.id}`)}
+                  >
+                    <td className="p-4 font-mono font-bold text-blue-600">{c.caseCode}</td>
+                    <td className="p-4 font-medium text-gray-700">{formatField(c.field)}</td>
+                    <td className="p-4 text-gray-600 max-w-[220px] truncate">{c.procedureType?.name || '---'}</td>
+                    <td className="p-4 font-medium text-gray-800">
+                      <div>{c.applicantName}</div>
+                      {c.applicantPhone && <div className="text-xs text-gray-500">{c.applicantPhone}</div>}
+                    </td>
+                    <td className="p-4 text-gray-600">{new Date(c.receivedAt).toLocaleDateString('vi-VN')}</td>
+                    <td className="p-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${statusInfo.className}`}>
+                        {statusInfo.label}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/procedure-cases/${c.id}`);
@@ -258,7 +301,8 @@ export default function ProcedureCaseList() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         )}

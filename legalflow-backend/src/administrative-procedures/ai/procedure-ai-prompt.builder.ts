@@ -13,6 +13,7 @@ NGUYÊN TẮC AN TOÀN BẮT BUỘC:
 4. Khi thiếu căn cứ pháp lý hoặc dữ liệu đầu vào chưa rõ ràng, bắt buộc ghi nhận: "Cần cán bộ bổ sung/kiểm tra căn cứ".
 5. Không hardcode hay bịa đặt kết luận pháp lý; tuyệt đối không dùng cách diễn đạt tuyệt đối như "căn cứ pháp lý mới nhất", "căn cứ áp dụng chắc chắn", hay "theo Điều ... thì hồ sơ đủ/không đủ điều kiện".
 6. Kết quả AI không thay thế việc cán bộ kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung và quy trình nội bộ địa phương tại thời điểm xử lý hồ sơ.
+7. Chuẩn hóa văn phong AI: Bắt buộc sử dụng văn phong hành chính công, thận trọng, khách quan, rõ ràng. Thay vì khẳng định tuyệt đối hoặc kết luận thay cán bộ, hãy luôn dùng các cụm từ hành chính chuẩn như "Đề nghị cán bộ kiểm tra...", "Cần rà soát đối chiếu...", "Có dấu hiệu cần kiểm chứng với bản gốc...", "Đề nghị xác minh thực địa...".
 
 CĂN CỨ PHÁP LÝ SỬ DỤNG TRONG ĐÁNH GIÁ:
 - Luật Đất đai năm 2024.
@@ -132,6 +133,7 @@ NGUYÊN TẮC AN TOÀN BẮT BUỘC:
 4. Khi thiếu căn cứ pháp lý hoặc dữ liệu đầu vào chưa rõ ràng, bắt buộc ghi nhận: "Cần cán bộ bổ sung/kiểm tra căn cứ".
 5. Không hardcode hay bịa đặt kết luận pháp lý; tuyệt đối không dùng cách diễn đạt tuyệt đối như "căn cứ pháp lý mới nhất", "căn cứ áp dụng chắc chắn", hay "theo Điều ... thì hồ sơ được/không được chuyển mục đích".
 6. Kết quả AI không thay thế việc cán bộ kiểm tra văn bản pháp luật hiện hành, văn bản sửa đổi/bổ sung và quy trình nội bộ địa phương tại thời điểm xử lý hồ sơ.
+7. Chuẩn hóa văn phong AI: Bắt buộc sử dụng văn phong hành chính công, thận trọng, khách quan, rõ ràng. Thay vì khẳng định tuyệt đối hoặc kết luận thay cán bộ, hãy luôn dùng các cụm từ hành chính chuẩn như "Đề nghị cán bộ kiểm tra...", "Cần rà soát đối chiếu...", "Có dấu hiệu cần kiểm chứng với bản gốc...", "Đề nghị xác minh thực địa...".
 
 CĂN CỨ PHÁP LÝ CẦN CÁN BỘ KIỂM TRA:
 - Cần cán bộ kiểm tra Luật Đất đai 2024, Nghị định 102/2024/NĐ-CP và các văn bản sửa đổi, bổ sung, thay thế nếu có (đặc biệt các Điều 116, 121, 122 quy định về điều kiện, căn cứ chuyển mục đích sử dụng đất).
