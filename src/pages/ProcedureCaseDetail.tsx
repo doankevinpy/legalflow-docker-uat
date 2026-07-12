@@ -7,6 +7,7 @@ import { Printer, Download } from 'lucide-react';
 import { AI_REVIEW_WARNING } from '../lib/constants';
 import { ProcedureReviewPrintModal } from '../components/ProcedureReviewPrintModal';
 import { PurposeChangeReviewPrintModal } from '../components/PurposeChangeReviewPrintModal';
+import { FinancialObligationPanel } from '../components/financial-obligations/FinancialObligationPanel';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProcedureCaseDetail() {
@@ -1199,20 +1200,9 @@ export default function ProcedureCaseDetail() {
           </div>
         )}
 
-        {/* TAB 5: FINANCIAL REVIEW (Placeholder for Phase 7E) */}
+        {/* TAB 5: FINANCIAL OBLIGATIONS (Phase 12D UI Implementation) */}
         {activeTab === 'financial' && (
-          <div className="space-y-6">
-            <div className="p-12 text-center bg-gray-50 rounded-xl border border-dashed space-y-3">
-              <div className="text-3xl">💰</div>
-              <h4 className="font-bold text-gray-700 text-base">Hỗ trợ tính nghĩa vụ tài chính dự kiến (Chưa triển khai)</h4>
-              <p className="text-sm text-gray-600 max-w-lg mx-auto font-medium">
-                AI hỗ trợ lập bảng tính dự kiến nghĩa vụ tài chính/tiền sử dụng đất theo dữ liệu đầu vào và căn cứ đã được cấu hình; cán bộ/cơ quan có thẩm quyền kiểm tra, xác nhận trước khi sử dụng.
-              </p>
-              <p className="text-xs text-gray-400">
-                Tính năng phân tích 3 mức (Tối thiểu / Trung bình / Tối đa) sẽ được xây dựng và nghiệm thu riêng tại Phase 7E.
-              </p>
-            </div>
-          </div>
+          <FinancialObligationPanel caseId={caseId} canAct={canAct} userRole={role} />
         )}
 
         {/* TAB 6: NOTES */}
