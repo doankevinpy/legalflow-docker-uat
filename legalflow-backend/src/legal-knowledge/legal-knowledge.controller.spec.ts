@@ -26,6 +26,7 @@ describe('LegalKnowledgeController', () => {
     rollbackActivatedVersion: jest.fn(),
     getRollbackVerification: jest.fn(),
     validateCsvImport: jest.fn(),
+    executeCsvImport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -65,6 +66,7 @@ describe('LegalKnowledgeController', () => {
       expect(Reflect.getMetadata(ROLES_KEY, controller.activateDraftVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
       expect(Reflect.getMetadata(ROLES_KEY, controller.rollbackActivatedVersion)).toEqual([Role.ADMIN, Role.MANAGER]);
       expect(Reflect.getMetadata(ROLES_KEY, controller.validateCsvImport)).toEqual([Role.ADMIN, Role.MANAGER]);
+      expect(Reflect.getMetadata(ROLES_KEY, controller.executeCsvImport)).toEqual([Role.ADMIN, Role.MANAGER]);
     });
 
     it('should allow read-only access (VIEWER, STAFF, MANAGER, ADMIN) on verification endpoints', () => {
@@ -327,6 +329,16 @@ describe('LegalKnowledgeController', () => {
     const result = await controller.validateCsvImport(body);
     expect(result).toEqual(mockReport);
     expect(mockService.validateCsvImport).toHaveBeenCalledWith(body.csvText, true);
+  });
+
+  it('executeCsvImport should call service.executeCsvImport with body and user', async () => {
+    const mockResponse = { success: false, status: 'EXECUTE_BLOCKED_SCHEMA_SUPPORT_REQUIRED', importedRecords: 0 };
+    mockService.executeCsvImport.mockResolvedValue(mockResponse);
+
+    const body = { csvText: 'header\nrow', backupConfirmed: true, reason: 'test', confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION' };
+    const result = await controller.executeCsvImport(body, { user: { id: 'u1', role: 'ADMIN' } });
+    expect(result).toEqual(mockResponse);
+    expect(mockService.executeCsvImport).toHaveBeenCalledWith(body, { id: 'u1', role: 'ADMIN' });
   });
 });
 

@@ -946,4 +946,150 @@ describe('LegalKnowledgeService', () => {
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
     });
   });
+
+  describe('executeCsvImport', () => {
+    const validHeader =
+      'source_id,document_title,document_number,issuing_authority,document_type,issue_date,effective_date,legal_status,local_scope,legal_topic,summary,source_url,reviewer,approval_status,risk_note,active_candidate';
+    const validRow =
+      'SAMPLE-101,"Luật Đất đai","01/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Approved","Risk note","false"';
+    const validCsv = `${validHeader}\n${validRow}`;
+    const adminUser = { id: 'admin-1', role: 'ADMIN', fullName: 'Admin User' };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockPrismaService.legalDocument.findMany.mockResolvedValue([]);
+    });
+
+    it('1. should block execution if backupConfirmed is missing or not true', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: false,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await expect(service.executeCsvImport(dto, adminUser)).rejects.toThrow(/backupConfirmed must be true/);
+    });
+
+    it('2. should block execution if reason is missing or empty', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: '   ',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await expect(service.executeCsvImport(dto, adminUser)).rejects.toThrow(/reason is mandatory and cannot be empty/);
+    });
+
+    it('3. should block execution if confirmationText is invalid', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'WRONG CONFIRMATION TEXT',
+      };
+      await expect(service.executeCsvImport(dto, adminUser)).rejects.toThrow(/confirmationText must exactly match/);
+    });
+
+    it('4. should block execution if CSV has validation errors', async () => {
+      const invalidCsv = 'invalid_header_only';
+      const dto = {
+        csvText: invalidCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await expect(service.executeCsvImport(dto, adminUser)).rejects.toThrow(/EXECUTE_BLOCKED_VALIDATION_ERRORS/);
+    });
+
+    it('5. should block execution if approval_status is not Approved', async () => {
+      const unapprovedRow =
+        'SAMPLE-102,"Luật Đất đai","02/2024","QH","Law","2024-01-01","2024-06-01","Effective","National","Topic","Summary","http://url","Admin","Pending Review","Risk note","false"';
+      const dto = {
+        csvText: `${validHeader}\n${unapprovedRow}`,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await expect(service.executeCsvImport(dto, adminUser)).rejects.toThrow(/EXECUTE_BLOCKED_VALIDATION_ERRORS/);
+    });
+
+    it('6. should block execution if legal_status is Unknown / Needs Review', async () => {
+      const unknownRow =
+        'SAMPLE-103,"Luật Đất đai","03/2024","QH","Law","2024-01-01","2024-06-01","Unknown / Needs Review","National","Topic","Summary","http://url","Admin","Approved","Risk note","false"';
+      const dto = {
+        csvText: `${validHeader}\n${unknownRow}`,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await expect(service.executeCsvImport(dto, adminUser)).rejects.toThrow(/EXECUTE_BLOCKED_VALIDATION_ERRORS/);
+    });
+
+    it('7. should guarantee noAutoActive is true on execution response', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      const result = await service.executeCsvImport(dto, adminUser);
+      expect(result.noAutoActive).toBe(true);
+      expect(result.audit.noAutoActive).toBe(true);
+    });
+
+    it('8. should block execution if user is STAFF or VIEWER', async () => {
+      const staffUser = { id: 'staff-1', role: 'STAFF', fullName: 'Staff User' };
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await expect(service.executeCsvImport(dto, staffUser)).rejects.toThrow(/Chỉ Lãnh đạo \(ADMIN\/MANAGER\) mới có quyền/);
+    });
+
+    it('9. should return safe execution response for valid sample CSV without real DB writes', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      const result = await service.executeCsvImport(dto, adminUser);
+      expect(result.status).toBe('EXECUTE_BLOCKED_SCHEMA_SUPPORT_REQUIRED');
+      expect(result.importedRecords).toBe(0);
+      expect(result.skippedRecords).toBe(1);
+      expect(result.rejectedRecords).toBe(0);
+      expect(result.auditRequired).toBe(true);
+      expect(result.audit.actor).toBe('Admin User');
+      expect(result.audit.reason).toBe('Approved controlled import');
+    });
+
+    it('10. should not modify database or create schema/migration artifacts during execution', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      await service.executeCsvImport(dto, adminUser);
+      expect(mockPrismaService.legalDocument.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.legalDocument.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('11. should not activate or rollback any legal versions during execution', async () => {
+      const dto = {
+        csvText: validCsv,
+        backupConfirmed: true,
+        reason: 'Approved controlled import',
+        confirmationText: 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION',
+      };
+      const result = await service.executeCsvImport(dto, adminUser);
+      expect(result.noAutoActive).toBe(true);
+      expect(mockPrismaService.procedureTypeVersion.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.aiPromptVersion.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.checklistVersion.update).not.toHaveBeenCalled();
+    });
+  });
 });

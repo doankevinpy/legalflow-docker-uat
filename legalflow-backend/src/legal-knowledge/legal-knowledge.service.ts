@@ -8,6 +8,14 @@ export class RollbackVersionDto {
   targetVersionId?: string;
 }
 
+export class ExecuteImportDto {
+  csvText?: string;
+  dryRun?: boolean;
+  reason?: string;
+  confirmationText?: string;
+  backupConfirmed?: boolean;
+}
+
 @Injectable()
 export class LegalKnowledgeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -2326,7 +2334,7 @@ export class LegalKnowledgeService {
         rowErrors.push(`VAL-03: approval_status is "${approvalStatus}". Only "Approved" records are eligible for real import consideration.`);
       }
 
-      if (legalStatus && (legalStatus.toLowerCase() === 'unknown' || legalStatus.toLowerCase() === 'needs review' || legalStatus.toLowerCase() === 'draft')) {
+      if (legalStatus && (legalStatus.toLowerCase().includes('unknown') || legalStatus.toLowerCase().includes('needs review') || legalStatus.toLowerCase() === 'draft')) {
         rowErrors.push(`VAL-08: legal_status is "${legalStatus}". Cannot import documents with ambiguous or draft legal status into active candidates.`);
       }
 
@@ -2396,6 +2404,75 @@ export class LegalKnowledgeService {
         'Import does not mean active version.',
         'AI does not automatically determine if legal documents are the latest or complete. Human officers must verify legal grounds.',
       ],
+    };
+  }
+
+  async executeCsvImport(dto: ExecuteImportDto, user?: any) {
+    if (!user || (user.role !== 'MANAGER' && user.role !== 'ADMIN' && user.role !== 'Role.ADMIN' && user.role !== 'Role.MANAGER')) {
+      throw new ForbiddenException('Chỉ Lãnh đạo (ADMIN/MANAGER) mới có quyền thực hiện nạp tri thức pháp lý (execute import).');
+    }
+
+    if (dto?.backupConfirmed !== true) {
+      throw new BadRequestException('EXECUTE_BLOCKED_BACKUP_CONFIRMATION_REQUIRED: backupConfirmed must be true to execute import.');
+    }
+
+    const reason = (dto?.reason || '').trim();
+    if (!reason) {
+      throw new BadRequestException('EXECUTE_BLOCKED_REASON_REQUIRED: reason is mandatory and cannot be empty.');
+    }
+
+    const confirmText = (dto?.confirmationText || '').trim();
+    if (confirmText !== 'I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION') {
+      throw new BadRequestException('EXECUTE_BLOCKED_INVALID_CONFIRMATION: confirmationText must exactly match "I UNDERSTAND IMPORT DOES NOT ACTIVE LEGAL VERSION".');
+    }
+
+    const validationReport = await this.validateCsvImport(dto?.csvText || '', true);
+
+    if (validationReport.errors && validationReport.errors.length > 0) {
+      throw new BadRequestException(`EXECUTE_BLOCKED_VALIDATION_ERRORS: ${validationReport.errors.join('; ')}`);
+    }
+
+    if (
+      validationReport.summary.rejectedRecords > 0 ||
+      validationReport.summary.duplicateRecords > 0 ||
+      validationReport.records.some((r: any) => r.status === 'REJECTED' || r.status === 'DUPLICATE')
+    ) {
+      throw new BadRequestException('EXECUTE_BLOCKED_VALIDATION_ERRORS: Cannot execute import when CSV has validation errors, duplicates, rejected rows, or unapproved status.');
+    }
+
+    return {
+      success: false,
+      status: 'EXECUTE_BLOCKED_SCHEMA_SUPPORT_REQUIRED',
+      importedRecords: 0,
+      skippedRecords: validationReport.summary.totalRecords,
+      rejectedRecords: validationReport.summary.rejectedRecords,
+      warnings: [
+        ...validationReport.warnings,
+        'EXECUTE_BLOCKED_SCHEMA_SUPPORT_REQUIRED: Schema currently lacks dedicated LegalKnowledgeImportAuditLog or staging model for safe controlled import execution.',
+        'Persistent audit trail requires schema-supported implementation in a later phase.',
+        'No legal version activation performed (noAutoActive: true).',
+      ],
+      errors: [],
+      noAutoActive: true,
+      auditRequired: true,
+      backupConfirmed: dto.backupConfirmed,
+      reason: dto.reason,
+      audit: {
+        actor: user.fullName || user.email || user.username || user.id || 'SYSTEM',
+        role: user.role || 'ADMIN',
+        action: 'IMPORT_EXECUTE_ATTEMPT',
+        timestamp: new Date().toISOString(),
+        reason: dto.reason,
+        confirmationText: dto.confirmationText,
+        totalRecords: validationReport.summary.totalRecords,
+        imported: 0,
+        skipped: validationReport.summary.totalRecords,
+        rejected: validationReport.summary.rejectedRecords,
+        warnings: validationReport.warnings,
+        errors: [],
+        noAutoActive: true,
+        limitationNote: 'Persistent audit trail requires schema-supported implementation in a later phase.',
+      },
     };
   }
 }

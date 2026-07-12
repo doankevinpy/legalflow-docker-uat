@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
-import { LegalKnowledgeService, RollbackVersionDto } from './legal-knowledge.service';
-export { RollbackVersionDto };
+import { LegalKnowledgeService, RollbackVersionDto, ExecuteImportDto } from './legal-knowledge.service';
+export { RollbackVersionDto, ExecuteImportDto };
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
@@ -15,6 +15,12 @@ export class LegalKnowledgeController {
   @Roles(Role.ADMIN, Role.MANAGER)
   validateCsvImport(@Body() body: { csvText?: string; dryRun?: boolean }) {
     return this.service.validateCsvImport(body?.csvText, body?.dryRun !== false);
+  }
+
+  @Post('import/execute')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  executeCsvImport(@Body() body: ExecuteImportDto, @Request() req: any) {
+    return this.service.executeCsvImport(body || {}, req.user);
   }
 
   @Get('documents')
