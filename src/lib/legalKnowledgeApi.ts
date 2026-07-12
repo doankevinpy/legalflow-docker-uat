@@ -54,6 +54,15 @@ export const legalKnowledgeApi = {
   ) => apiClient.post<any>(`/legal-knowledge/update-logs/${updateLogId}/rollback-version`, payload),
   getRollbackVerification: (id: string) =>
     apiClient.get<any>(`/legal-knowledge/update-logs/${id}/rollback-verification`),
+  validateCsvImport: (data: { csvText?: string; dryRun?: boolean }) =>
+    apiClient.post<any>('/legal-knowledge/import/validate', data),
+  executeCsvImport: (data: {
+    csvText?: string;
+    dryRun?: boolean;
+    reason?: string;
+    confirmationText?: string;
+    backupConfirmed?: boolean;
+  }) => apiClient.post<any>('/legal-knowledge/import/execute', data),
 };
 
 

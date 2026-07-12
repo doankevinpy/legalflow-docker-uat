@@ -21,9 +21,11 @@ import {
   CheckCircle2,
   ShieldCheck,
   RotateCcw,
+  Upload,
 } from 'lucide-react';
 import { legalKnowledgeApi } from '../lib/legalKnowledgeApi';
 import { useAuth } from '../contexts/AuthContext';
+import { LegalKnowledgeImportTab } from '../components/legal-knowledge/LegalKnowledgeImportTab';
 import type {
   LegalDocument,
   ProcedureTypeVersion,
@@ -33,7 +35,7 @@ import type {
   ProcedureAiAnalysisLegalSnapshot,
 } from '../types/legalKnowledge';
 
-type TabType = 'overview' | 'documents' | 'procedures' | 'prompts' | 'checklists' | 'logs' | 'snapshots';
+type TabType = 'overview' | 'documents' | 'procedures' | 'prompts' | 'checklists' | 'logs' | 'snapshots' | 'import';
 
 const parseLogNotes = (notes: any): any => {
   if (!notes) return {};
@@ -776,6 +778,19 @@ export default function LegalKnowledgePage() {
           <Camera className="h-4 w-4" />
           Snapshot AI ({snapshots.length})
         </button>
+        {role !== 'VIEWER' && (
+          <button
+            onClick={() => setActiveTab('import')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg transition-all whitespace-nowrap ${
+              activeTab === 'import'
+                ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                : 'text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 font-medium'
+            }`}
+          >
+            <Upload className="h-4 w-4" />
+            Nhập dữ liệu CSV (Import)
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -1328,6 +1343,11 @@ export default function LegalKnowledgePage() {
                 )}
               </div>
             </div>
+          )}
+
+          {/* TAB 8: IMPORT STUDIO (PHASE 11J) */}
+          {activeTab === 'import' && role !== 'VIEWER' && (
+            <LegalKnowledgeImportTab role={role} />
           )}
         </div>
       )}
