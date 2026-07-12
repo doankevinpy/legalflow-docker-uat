@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -83,6 +83,13 @@ model User {
   approvedAiPromptVersions         AiPromptVersion[]             @relation("AiPromptVersionApprovedBy")
   approvedChecklistVersions        ChecklistVersion[]            @relation("ChecklistVersionApprovedBy")
   reviewedLegalUpdateLogs          LegalUpdateLog[]              @relation("LegalUpdateLogReviewedBy")
+
+  createdFinancialAssessments  FinancialObligationAssessment[] @relation("AssessmentCreator")
+  reviewedFinancialAssessments FinancialObligationAssessment[] @relation("AssessmentReviewer")
+  approvedFinancialAssessments FinancialObligationAssessment[] @relation("AssessmentApprover")
+  verifiedTaxNotices           TaxNoticeRecord[]               @relation("TaxNoticeVerifier")
+  verifiedPaymentEvidences     PaymentEvidenceRecord[]         @relation("PaymentVerifier")
+  financialAuditLogs           FinancialObligationAuditLog[]   @relation("AuditActor")
 }
 
 model LegalCase {
@@ -101,10 +108,10 @@ model LegalCase {
   status       CaseStatus   @default(NEW)
 
   assignedToId String?
-  assignedTo   User?        @relation("AssignedCases", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   User?   @relation("AssignedCases", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   createdById String?
-  createdBy   User?        @relation("CreatedCases", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?   @relation("CreatedCases", fields: [createdById], references: [id], onDelete: SetNull)
 
   deletedAt   DateTime?
   deletedById String?
@@ -202,33 +209,33 @@ enum RiskReviewStatus {
 }
 
 model LandProfile {
-  id                        String                     @id @default(uuid())
-  caseId                    String                     @unique
-  case                      LegalCase                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  
-  procedureType             LandProcedureType          @default(KHAC)
+  id     String    @id @default(uuid())
+  caseId String    @unique
+  case   LegalCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  procedureType             LandProcedureType         @default(KHAC)
   landType                  LandType
   currentLandUseType        LandType
-  requestedLandUseType      LandType?                  
-  area                      Float                      
-  neighborhood              Neighborhood               
-  planningStatus            PlanningStatus             @default(NGOAI_QUY_HOACH)
-  disputeStatus             DisputeStatus              @default(KHONG_TRANH_CHAP)
-  originOfLandStatus        OriginOfLandStatus         @default(KHAC)
-  documentCompleteness      DocumentCompleteness       @default(DU_HO_SO)
-  financialObligationStatus FinancialObligationStatus  @default(HOAN_THANH)
-  outcome                   LandOutcome?               
-  reasonCode                LandReasonCode?            
-  
-  complaintFlag             Boolean                    @default(false)
-  complaintType             ComplaintType?             
-  
-  processingDays            Int?                       
-  overdueDays               Int?                       
-  riskReviewStatus          RiskReviewStatus           @default(AN_TOAN)
-  
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  requestedLandUseType      LandType?
+  area                      Float
+  neighborhood              Neighborhood
+  planningStatus            PlanningStatus            @default(NGOAI_QUY_HOACH)
+  disputeStatus             DisputeStatus             @default(KHONG_TRANH_CHAP)
+  originOfLandStatus        OriginOfLandStatus        @default(KHAC)
+  documentCompleteness      DocumentCompleteness      @default(DU_HO_SO)
+  financialObligationStatus FinancialObligationStatus @default(HOAN_THANH)
+  outcome                   LandOutcome?
+  reasonCode                LandReasonCode?
+
+  complaintFlag Boolean        @default(false)
+  complaintType ComplaintType?
+
+  processingDays   Int?
+  overdueDays      Int?
+  riskReviewStatus RiskReviewStatus @default(AN_TOAN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([procedureType])
   @@index([landType])
@@ -237,7 +244,6 @@ model LandProfile {
   @@index([reasonCode])
   @@index([complaintFlag])
   @@index([planningStatus])
-
   @@index([procedureType, outcome])
   @@index([neighborhood, outcome])
   @@index([landType, outcome])
@@ -319,28 +325,28 @@ enum AiFeedbackStatus {
 }
 
 model AiAuditLog {
-  id               String           @id @default(uuid())
-  caseId           String?
-  case             LegalCase?       @relation(fields: [caseId], references: [id], onDelete: SetNull)
-  userId           String
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String     @id @default(uuid())
+  caseId String?
+  case   LegalCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  userId String
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   actionType       AiActionType
   modelName        String
   promptTokens     Int?
   completionTokens Int?
   latencyMs        Int?
-  
-  inputPayload     Json
-  outputPayload    Json
-  
-  status           AiLogStatus
-  errorMessage     String?
-  
-  userFeedback     AiFeedbackStatus @default(PENDING)
-  appliedAt        DateTime?
-  
-  createdAt        DateTime         @default(now())
+
+  inputPayload  Json
+  outputPayload Json
+
+  status       AiLogStatus
+  errorMessage String?
+
+  userFeedback AiFeedbackStatus @default(PENDING)
+  appliedAt    DateTime?
+
+  createdAt DateTime @default(now())
 
   @@index([caseId])
   @@index([userId])
@@ -350,19 +356,19 @@ model AiAuditLog {
 }
 
 model AiCaseSuggestion {
-  id               String     @id @default(uuid())
-  caseId           String     @unique
-  case             LegalCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  
+  id     String    @id @default(uuid())
+  caseId String    @unique
+  case   LegalCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
   suggestedSummary String?
   suggestedType    CaseType?
   suggestedField   CaseField?
   confidenceScore  Float?
   legalRationale   String?
-  
-  isApplied        Boolean    @default(false)
-  lastGeneratedAt  DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+
+  isApplied       Boolean  @default(false)
+  lastGeneratedAt DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([isApplied])
 }
@@ -422,8 +428,8 @@ model ProcedureType {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
-  procedureCases     AdministrativeProcedureCase[]
-  versions           ProcedureTypeVersion[]
+  procedureCases AdministrativeProcedureCase[]
+  versions       ProcedureTypeVersion[]
 
   @@index([field])
   @@index([group])
@@ -431,32 +437,33 @@ model ProcedureType {
 }
 
 model AdministrativeProcedureCase {
-  id                  String           @id @default(uuid())
-  caseCode            String           @unique
+  id                  String          @id @default(uuid())
+  caseCode            String          @unique
   procedureTypeId     String
-  procedureType       ProcedureType    @relation(fields: [procedureTypeId], references: [id], onDelete: Restrict)
+  procedureType       ProcedureType   @relation(fields: [procedureTypeId], references: [id], onDelete: Restrict)
   field               ProcedureField
   applicantName       String
   applicantAddress    String?
   applicantPhone      String?
   landParcelSummary   Json?
   constructionSummary Json?
-  status              ProcedureStatus  @default(SUBMITTED)
-  receivedAt          DateTime         @default(now())
+  status              ProcedureStatus @default(SUBMITTED)
+  receivedAt          DateTime        @default(now())
   dueDate             DateTime?
   assignedToId        String?
-  assignedTo          User?            @relation("AssignedProcedureCases", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo          User?           @relation("AssignedProcedureCases", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdById         String?
-  createdBy           User?            @relation("CreatedProcedureCases", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy           User?           @relation("CreatedProcedureCases", fields: [createdById], references: [id], onDelete: SetNull)
   notes               String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  documents           ProcedureDocument[]
-  checklistItems      ProcedureChecklistItem[]
-  procedureNotes      ProcedureNote[]
-  auditLogs           ProcedureAuditLog[]
-  aiAnalyses          ProcedureAiAnalysis[]
+  documents                     ProcedureDocument[]
+  checklistItems                ProcedureChecklistItem[]
+  procedureNotes                ProcedureNote[]
+  auditLogs                     ProcedureAuditLog[]
+  aiAnalyses                    ProcedureAiAnalysis[]
+  financialObligationAssessment FinancialObligationAssessment? @relation("ProcedureCaseFinancialAssessment")
 
   @@index([procedureTypeId])
   @@index([field])
@@ -549,19 +556,19 @@ enum ProcedureAiAnalysisStatus {
 }
 
 model ProcedureAiAnalysis {
-  id              String                      @id @default(uuid())
+  id              String                            @id @default(uuid())
   procedureCaseId String
-  procedureCase   AdministrativeProcedureCase @relation(fields: [procedureCaseId], references: [id], onDelete: Cascade)
+  procedureCase   AdministrativeProcedureCase       @relation(fields: [procedureCaseId], references: [id], onDelete: Cascade)
   analysisType    ProcedureAiAnalysisType
-  inputSnapshot   Json                        @default("{}")
-  outputPayload   Json                        @default("{}")
-  disclaimer      String                      @default("BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA")
-  confidenceLevel String                      @default("MEDIUM")
-  status          ProcedureAiAnalysisStatus   @default(PENDING)
+  inputSnapshot   Json                              @default("{}")
+  outputPayload   Json                              @default("{}")
+  disclaimer      String                            @default("BẢN GỢI Ý AI – CÁN BỘ PHẢI KIỂM TRA")
+  confidenceLevel String                            @default("MEDIUM")
+  status          ProcedureAiAnalysisStatus         @default(PENDING)
   createdById     String
-  createdBy       User                        @relation("CreatedProcedureAiAnalyses", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy       User                              @relation("CreatedProcedureAiAnalyses", fields: [createdById], references: [id], onDelete: Cascade)
   reviewedById    String?
-  reviewedBy      User?                       @relation("ReviewedProcedureAiAnalyses", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedBy      User?                             @relation("ReviewedProcedureAiAnalyses", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt      DateTime?
   createdAt       DateTime                          @default(now())
   updatedAt       DateTime                          @updatedAt
@@ -802,4 +809,224 @@ model ProcedureAiAnalysisLegalSnapshot {
   @@index([procedureTypeVersionId])
 }
 
+// ============================================================================
+// FINANCIAL OBLIGATION SUPPORT MODULE (Phase 12C)
+// ============================================================================
 
+enum FinancialObligationAssessmentStatus {
+  NOT_STARTED
+  MISSING_INFORMATION
+  READY_FOR_REVIEW
+  ESTIMATED
+  WAITING_FOR_TAX_NOTICE
+  TAX_NOTICE_RECEIVED
+  WAITING_FOR_PAYMENT
+  PAYMENT_UPLOADED
+  OFFICER_VERIFIED
+  MANAGER_VERIFIED
+  COMPLETED
+  BLOCKED
+  NOT_APPLICABLE
+}
+
+enum FinancialObligationAssessmentMode {
+  MANUAL
+  AI_ASSISTED
+  IMPORTED_TAX_NOTICE
+}
+
+enum TaxNoticeStatus {
+  NONE
+  AWAITING
+  RECEIVED
+  VERIFIED
+  DISCREPANCY_DETECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID_FULL
+  VERIFIED
+}
+
+enum OfficerReviewStatus {
+  UNVERIFIED
+  OFFICER_VERIFIED
+  REJECTED_NEEDS_INFO
+}
+
+enum ManagerReviewStatus {
+  NOT_REQUIRED
+  PENDING
+  MANAGER_VERIFIED
+  REJECTED_TO_OFFICER
+}
+
+enum FinancialRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FinancialObligationItemType {
+  LAND_USE_FEE
+  DIFFERENTIAL_LAND_USE_FEE
+  LAND_RENTAL_FEE
+  REGISTRATION_FEE
+  PERSONAL_INCOME_TAX
+  APPRAISAL_FEE
+  ISSUANCE_FEE
+  CADASTRAL_FEE
+  OTHER_FEE
+}
+
+enum FinancialAuditAction {
+  ASSESSMENT_CREATED
+  ASSESSMENT_UPDATED
+  AI_SUGGESTION_GENERATED
+  ITEM_CREATED
+  ITEM_UPDATED
+  OFFICER_EDITED
+  OFFICER_CONFIRMED
+  TAX_NOTICE_UPLOADED
+  PAYMENT_EVIDENCE_UPLOADED
+  OFFICER_VERIFIED
+  MANAGER_VERIFIED
+  STATUS_CHANGED
+  EXPORT_GENERATED
+  COMPLETED
+  COMPLETION_BLOCKED
+}
+
+model FinancialObligationAssessment {
+  id                   String                              @id @default(uuid())
+  caseId               String                              @unique
+  procedureType        String
+  assessmentStatus     FinancialObligationAssessmentStatus @default(NOT_STARTED)
+  assessmentMode       FinancialObligationAssessmentMode   @default(MANUAL)
+  estimatedTotalAmount Decimal                             @default(0.00) @db.Decimal(18, 2)
+  officialTotalAmount  Decimal?                            @db.Decimal(18, 2)
+  currency             String                              @default("VND")
+  isEstimate           Boolean                             @default(true)
+  taxNoticeStatus      TaxNoticeStatus                     @default(NONE)
+  paymentStatus        PaymentStatus                       @default(PENDING)
+  officerReviewStatus  OfficerReviewStatus                 @default(UNVERIFIED)
+  managerReviewStatus  ManagerReviewStatus                 @default(NOT_REQUIRED)
+  riskLevel            FinancialRiskLevel                  @default(LOW)
+  warningText          String?                             @default("DỰ KIẾN - CHƯA PHẢI SỐ TIỀN CHÍNH THỨC. HỆ THỐNG KHÔNG THAY THẾ CƠ QUAN THUẾ.")
+  createdById          String
+  reviewedById         String?
+  approvedById         String?
+  createdAt            DateTime                            @default(now())
+  updatedAt            DateTime                            @updatedAt
+
+  procedureCase    AdministrativeProcedureCase   @relation("ProcedureCaseFinancialAssessment", fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy        User                          @relation("AssessmentCreator", fields: [createdById], references: [id])
+  reviewedBy       User?                         @relation("AssessmentReviewer", fields: [reviewedById], references: [id])
+  approvedBy       User?                         @relation("AssessmentApprover", fields: [approvedById], references: [id])
+  items            FinancialObligationItem[]
+  taxNotice        TaxNoticeRecord?
+  paymentEvidences PaymentEvidenceRecord[]
+  auditLogs        FinancialObligationAuditLog[]
+
+  @@index([caseId])
+  @@index([assessmentStatus])
+  @@index([taxNoticeStatus])
+  @@index([paymentStatus])
+  @@index([riskLevel])
+  @@map("financial_obligation_assessments")
+}
+
+model FinancialObligationItem {
+  id               String                      @id @default(uuid())
+  assessmentId     String
+  itemType         FinancialObligationItemType
+  itemLabel        String
+  estimatedAmount  Decimal                     @default(0.00) @db.Decimal(18, 2)
+  officialAmount   Decimal?                    @db.Decimal(18, 2)
+  calculationBasis String?
+  legalBasis       String?
+  dataSource       String
+  confidenceLevel  Float                       @default(1.0)
+  isOfficial       Boolean                     @default(false)
+  notes            String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  assessment FinancialObligationAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([itemType])
+  @@index([isOfficial])
+  @@map("financial_obligation_items")
+}
+
+model TaxNoticeRecord {
+  id               String    @id @default(uuid())
+  assessmentId     String    @unique
+  noticeNumber     String
+  issuingAuthority String
+  issueDate        DateTime  @db.Date
+  receivedDate     DateTime  @db.Date
+  totalAmount      Decimal   @db.Decimal(18, 2)
+  fileAttachmentId String
+  verifiedById     String?
+  verifiedAt       DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  assessment FinancialObligationAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  verifiedBy User?                         @relation("TaxNoticeVerifier", fields: [verifiedById], references: [id])
+
+  @@index([assessmentId])
+  @@index([noticeNumber])
+  @@index([issuingAuthority])
+  @@map("tax_notice_records")
+}
+
+model PaymentEvidenceRecord {
+  id               String    @id @default(uuid())
+  assessmentId     String
+  paymentDate      DateTime  @db.Date
+  amountPaid       Decimal   @db.Decimal(18, 2)
+  payerName        String
+  receiptNumber    String
+  treasuryOrBank   String
+  fileAttachmentId String
+  verifiedById     String?
+  verifiedAt       DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  assessment FinancialObligationAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  verifiedBy User?                         @relation("PaymentVerifier", fields: [verifiedById], references: [id])
+
+  @@index([assessmentId])
+  @@index([receiptNumber])
+  @@index([treasuryOrBank])
+  @@map("payment_evidence_records")
+}
+
+model FinancialObligationAuditLog {
+  id           String               @id @default(uuid())
+  assessmentId String
+  actorId      String
+  action       FinancialAuditAction
+  beforeValue  String?
+  afterValue   String?
+  reason       String?
+  createdAt    DateTime             @default(now())
+
+  assessment FinancialObligationAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  actor      User                          @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([assessmentId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("financial_obligation_audit_logs")
+}
