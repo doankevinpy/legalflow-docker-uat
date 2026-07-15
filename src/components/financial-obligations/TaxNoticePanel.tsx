@@ -44,7 +44,9 @@ export const TaxNoticePanel: React.FC<TaxNoticePanelProps> = ({
 
   const handleOpenModal = () => {
     setNoticeNumber('');
-    setTotalAmount(assessment.estimatedTotalAmount ? String(assessment.estimatedTotalAmount) : '');
+    // SAFETY HARDENING (Phase 12E): Do NOT pre-fill estimated amount into official amount field.
+    // Officers must enter the official amount from the tax authority notice document.
+    setTotalAmount('');
     setFileAttachmentId(`FILE-TAX-${Date.now()}`);
     setNotes('Ghi nhận từ thông báo nộp tiền chính thức do cơ quan thuế ban hành.');
     setModalOpen(true);

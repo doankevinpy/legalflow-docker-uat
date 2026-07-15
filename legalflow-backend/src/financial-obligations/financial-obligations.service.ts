@@ -169,6 +169,31 @@ export class FinancialObligationsService {
     const assessment = await this.checkAssessmentAccess(assessmentId, user);
     const actorId = this.getUserId(user);
 
+    // SAFETY HARDENING (Phase 12E): Block direct status manipulation to terminal states.
+    // These statuses MUST only be set through their dedicated methods which enforce
+    // all required conditions (tax notice, payment evidence, officer/manager verification).
+    const protectedStatuses: FinancialObligationAssessmentStatus[] = [
+      FinancialObligationAssessmentStatus.COMPLETED,
+      FinancialObligationAssessmentStatus.OFFICER_VERIFIED,
+      FinancialObligationAssessmentStatus.MANAGER_VERIFIED,
+    ];
+    if (dto.assessmentStatus && protectedStatuses.includes(dto.assessmentStatus)) {
+      await this.logAudit(
+        assessmentId,
+        actorId,
+        FinancialAuditAction.COMPLETION_BLOCKED,
+        `Blocked direct status change to ${dto.assessmentStatus} via updateAssessment. Use dedicated endpoint.`,
+      );
+      throw new BadRequestException(
+        `Không được phép đặt trạng thái '${dto.assessmentStatus}' trực tiếp. Sử dụng chức năng chuyên dụng (officerVerify, managerVerify, markCompleted).`,
+      );
+    }
+
+    // SAFETY HARDENING (Phase 12E): Prevent clearing warningText to empty/null
+    if (dto.warningText !== undefined && (!dto.warningText || dto.warningText.trim().length === 0)) {
+      dto.warningText = this.defaultWarningText;
+    }
+
     const updated = await this.prisma.financialObligationAssessment.update({
       where: { id: assessmentId },
       data: {

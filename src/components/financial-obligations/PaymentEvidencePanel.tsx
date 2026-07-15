@@ -44,10 +44,12 @@ export const PaymentEvidencePanel: React.FC<PaymentEvidencePanelProps> = ({
 
   const handleOpenModal = () => {
     setPaymentDate(new Date().toISOString().split('T')[0]);
+    // SAFETY HARDENING (Phase 12E): Only pre-fill from official amount (from tax notice).
+    // Do NOT fall back to estimated amount to prevent estimates leaking into payment records.
     setAmountPaid(
       assessment.officialTotalAmount
         ? String(assessment.officialTotalAmount)
-        : (assessment.estimatedTotalAmount ? String(assessment.estimatedTotalAmount) : '')
+        : ''
     );
     setPayerName('Người nộp tiền theo Giấy báo/Giấy nộp tiền');
     setReceiptNumber('');

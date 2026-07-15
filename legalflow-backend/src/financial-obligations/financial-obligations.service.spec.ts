@@ -209,4 +209,61 @@ describe('FinancialObligationsService', () => {
       expect(res.data.assessmentStatus).toBe(FinancialObligationAssessmentStatus.COMPLETED);
     });
   });
+
+  // Phase 12E: Safety Hardening Tests
+  describe('updateAssessment - safety hardening', () => {
+    const existingAssessment = {
+      id: 'assessment-1',
+      caseId: 'case-1',
+      assessmentStatus: FinancialObligationAssessmentStatus.READY_FOR_REVIEW,
+      isEstimate: true,
+      warningText: 'DỰ KIẾN - CHƯA PHẢI SỐ TIỀN CHÍNH THỨC',
+      items: [],
+      taxNotice: null,
+      paymentEvidences: [],
+    };
+
+    it('should block direct status change to COMPLETED', async () => {
+      mockPrismaService.financialObligationAssessment.findUnique.mockResolvedValue(existingAssessment);
+
+      await expect(
+        service.updateAssessment('assessment-1', {
+          assessmentStatus: FinancialObligationAssessmentStatus.COMPLETED,
+        }, { id: 'user-1', role: Role.STAFF }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should block direct status change to OFFICER_VERIFIED', async () => {
+      mockPrismaService.financialObligationAssessment.findUnique.mockResolvedValue(existingAssessment);
+
+      await expect(
+        service.updateAssessment('assessment-1', {
+          assessmentStatus: FinancialObligationAssessmentStatus.OFFICER_VERIFIED,
+        }, { id: 'user-1', role: Role.STAFF }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should block direct status change to MANAGER_VERIFIED', async () => {
+      mockPrismaService.financialObligationAssessment.findUnique.mockResolvedValue(existingAssessment);
+
+      await expect(
+        service.updateAssessment('assessment-1', {
+          assessmentStatus: FinancialObligationAssessmentStatus.MANAGER_VERIFIED,
+        }, { id: 'user-1', role: Role.MANAGER }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow non-protected status changes', async () => {
+      mockPrismaService.financialObligationAssessment.findUnique.mockResolvedValue(existingAssessment);
+      mockPrismaService.financialObligationAssessment.update.mockResolvedValue({
+        ...existingAssessment,
+        assessmentStatus: FinancialObligationAssessmentStatus.MISSING_INFORMATION,
+      });
+
+      const res = await service.updateAssessment('assessment-1', {
+        assessmentStatus: FinancialObligationAssessmentStatus.MISSING_INFORMATION,
+      }, { id: 'user-1', role: Role.STAFF });
+      expect(res.success).toBe(true);
+    });
+  });
 });

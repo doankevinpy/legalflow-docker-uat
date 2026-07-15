@@ -24,6 +24,13 @@ export const ManagerVerificationPanel: React.FC<ManagerVerificationPanelProps> =
   const isManagerOrAdmin = userRole === 'MANAGER' || userRole === 'ADMIN';
 
   const handleAction = async (status: ManagerReviewStatus) => {
+    // SAFETY HARDENING (Phase 12E): Require explicit confirmation for manager approval
+    if (status === 'MANAGER_VERIFIED') {
+      const confirmed = confirm(
+        'Xác nhận Lãnh đạo đã xem xét hồ sơ, đối chiếu mức rủi ro, các khoản miễn/giảm và thông báo thuế?\n\nHành động này không thể hoàn tác.'
+      );
+      if (!confirmed) return;
+    }
     setSubmitting(true);
     try {
       await onManagerVerify({
